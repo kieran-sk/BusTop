@@ -1,4 +1,4 @@
-﻿package com.oasa.athensbus
+package com.oasa.athensbus
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -12,21 +12,19 @@ import android.os.Vibrator
 
 class AlarmReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val lineId = intent.getStringExtra(EXTRA_LINE_ID) ?: BUS
-        val stopName = intent.getStringExtra(EXTRA_STOP_NAME) ?: Στάση ΟΑΣΑ
-        val minutesAway = intent.getIntExtra(EXTRA_MINUTES_AWAY, 5)
-        val ringUntilDismissed = intent.getBooleanExtra(EXTRA_RING_UNTIL_DISMISSED, true)
+        val lineId = intent.getStringExtra("EXTRA_LINE_ID") ?: "BUS"
+        val stopName = intent.getStringExtra("EXTRA_STOP_NAME") ?: "Στάση ΟΑΣΑ"
+        val minutesAway = intent.getIntExtra("EXTRA_MINUTES_AWAY", 5)
+        val ringUntilDismissed = intent.getBooleanExtra("EXTRA_RING_UNTIL_DISMISSED", true)
 
         if (ringUntilDismissed) {
-            // Start continuous siren and repeating vibration foreground service until dismissed
             AlarmRingingService.start(context, lineId, stopName, minutesAway)
         } else {
-            // Fallback to one-shot alarm tone
             val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-            @Suppress(DEPRECATION)
+            @Suppress("DEPRECATION")
             val wakeLock = powerManager.newWakeLock(
                 PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
-                BusTop:AlarmWakeLock
+                "BusTop:AlarmWakeLock"
             )
             wakeLock.acquire(15000)
 
@@ -51,7 +49,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     vibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 800, 200, 800, 200, 800, 1000), -1))
                 } else {
-                    @Suppress(DEPRECATION)
+                    @Suppress("DEPRECATION")
                     vibrator.vibrate(longArrayOf(0, 800, 200, 800, 200, 800, 1000), -1)
                 }
             } catch (e: Exception) {

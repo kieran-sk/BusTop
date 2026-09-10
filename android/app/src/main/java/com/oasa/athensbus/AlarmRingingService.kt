@@ -1,4 +1,4 @@
-﻿package com.oasa.athensbus
+package com.oasa.athensbus
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -25,15 +25,15 @@ class AlarmRingingService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
 
     companion object {
-        const val ACTION_START = ACTION_START_ALARM_RINGING
-        const val ACTION_DISMISS = ACTION_DISMISS_ALARM_RINGING
+        const val ACTION_START = "ACTION_START_ALARM_RINGING"
+        const val ACTION_DISMISS = "ACTION_DISMISS_ALARM_RINGING"
 
-        const val EXTRA_LINE_ID = EXTRA_LINE_ID
-        const val EXTRA_STOP_NAME = EXTRA_STOP_NAME
-        const val EXTRA_MINS = EXTRA_MINS
+        const val EXTRA_LINE_ID = "EXTRA_LINE_ID"
+        const val EXTRA_STOP_NAME = "EXTRA_STOP_NAME"
+        const val EXTRA_MINS = "EXTRA_MINS"
 
         const val NOTIFICATION_ID = 3001
-        const val CHANNEL_ID = oasa_bus_continuous_alarm_v1
+        const val CHANNEL_ID = "oasa_bus_continuous_alarm_v1"
 
         fun start(context: Context, lineId: String, stopName: String, minsAway: Int) {
             val intent = Intent(context, AlarmRingingService::class.java).apply {
@@ -67,8 +67,8 @@ class AlarmRingingService : Service() {
             return START_NOT_STICKY
         }
 
-        val lineId = intent?.getStringExtra(EXTRA_LINE_ID) ?: BUS
-        val stopName = intent?.getStringExtra(EXTRA_STOP_NAME) ?: Στάση ΟΑΣΑ
+        val lineId = intent?.getStringExtra(EXTRA_LINE_ID) ?: "BUS"
+        val stopName = intent?.getStringExtra(EXTRA_STOP_NAME) ?: "Στάση ΟΑΣΑ"
         val minsAway = intent?.getIntExtra(EXTRA_MINS, 5) ?: 5
 
         acquireWakeLock()
@@ -85,10 +85,10 @@ class AlarmRingingService : Service() {
     private fun acquireWakeLock() {
         try {
             val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-            @Suppress(DEPRECATION)
+            @Suppress("DEPRECATION")
             wakeLock = pm.newWakeLock(
                 PowerManager.SCREEN_BRIGHT_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP or PowerManager.ON_AFTER_RELEASE,
-                BusTop:AlarmRingingWakeLock
+                "BusTop:AlarmRingingWakeLock"
             )
             wakeLock?.acquire(300000)
         } catch (e: Exception) {
@@ -101,10 +101,10 @@ class AlarmRingingService : Service() {
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                Bus Alarm Siren (Continuous),
+                "Bus Alarm Siren (Continuous)",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = Loud continuous siren until dismissed
+                description = "Loud continuous siren until dismissed"
                 enableVibration(true)
                 enableLights(true)
                 setBypassDnd(true)
@@ -135,13 +135,13 @@ class AlarmRingingService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val title = 🚨 Συναγερμός: Λεωφορείο • λεπτά!
-        val bigText = 📍 Στάση: \n⏰ Απομένουν λεπτά μέχρι την άφιξη!\n👉 Πατήστε 'ΑΠΕΝΕΡΓΟΠΟΙΗΣΗ' για διακοπή του ήχου.
+        val title = "🚨 Συναγερμός: Λεωφορείο $lineId • $minsAway λεπτά!"
+        val bigText = "📍 Στάση: $stopName\n⏰ Απομένουν $minsAway λεπτά μέχρι την άφιξη!\n👉 Πατήστε 'ΑΠΕΝΕΡΓΟΠΟΙΗΣΗ' για διακοπή του ήχου."
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
-            .setContentText(Στάση: • Πλησιάζει τώρα!)
+            .setContentText("Στάση: $stopName • Πλησιάζει τώρα!")
             .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
@@ -151,7 +151,7 @@ class AlarmRingingService : Service() {
             .setOngoing(true)
             .setAutoCancel(false)
             .setColor(0xFFDC2626.toInt())
-            .addAction(android.R.drawable.ic_lock_power_off, 🔕 ΑΠΕΝΕΡΓΟΠΟΙΗΣΗ, pDismiss)
+            .addAction(android.R.drawable.ic_lock_power_off, "🔕 ΑΠΕΝΕΡΓΟΠΟΙΗΣΗ", pDismiss)
             .build()
     }
 
@@ -183,7 +183,7 @@ class AlarmRingingService : Service() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
             } else {
-                @Suppress(DEPRECATION)
+                @Suppress("DEPRECATION")
                 vibrator?.vibrate(pattern, 0)
             }
         } catch (e: Exception) {

@@ -1,4 +1,4 @@
-﻿package com.oasa.athensbus
+package com.oasa.athensbus
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -31,22 +31,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Mandatory Google Maps Platform attribution as required by Google Maps SDK
         try {
             MapsInitializer.initialize(applicationContext, MapsInitializer.Renderer.LATEST) { renderer ->
-                // Renderer initialized
             }
         } catch (e: Exception) {
             e.printStackTrace()
         }
 
-        // Notification channel setup
         NotificationHelper.createNotificationChannel(this)
-
-        // Request runtime permissions
         requestRequiredPermissions()
-
-        // Initialize WebView
         initWebView()
     }
 
@@ -68,7 +61,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    @SuppressLint(SetJavaScriptEnabled)
+    @SuppressLint("SetJavaScriptEnabled")
     private fun initWebView() {
         webView = WebView(this)
         setContentView(webView)
@@ -83,7 +76,6 @@ class MainActivity : ComponentActivity() {
         settings.useWideViewPort = true
         settings.loadWithOverviewMode = true
 
-        // Enable Geolocation prompt handling in WebView
         webView.webChromeClient = object : WebChromeClient() {
             override fun onGeolocationPermissionsShowPrompt(
                 origin: String?,
@@ -104,16 +96,13 @@ class MainActivity : ComponentActivity() {
                 error: android.webkit.WebResourceError?
             ) {
                 if (request?.isForMainFrame == true) {
-                    view?.loadUrl(file:///android_asset/web/index.html)
+                    view?.loadUrl("file:///android_asset/web/index.html")
                 }
             }
         }
 
-        // Native Android Bridge for web interaction
-        webView.addJavascriptInterface(WebAppInterface(this), AndroidBridge)
-
-        // Load live production Cloudflare Pages or bundled offline fallback
-        webView.loadUrl(https://bustop.pages.dev)
+        webView.addJavascriptInterface(WebAppInterface(this), "AndroidBridge")
+        webView.loadUrl("https://bustop.pages.dev")
     }
 
     inner class WebAppInterface(private val context: Context) {
@@ -129,7 +118,7 @@ class MainActivity : ComponentActivity() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 vibrator.vibrate(VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE))
             } else {
-                @Suppress(DEPRECATION)
+                @Suppress("DEPRECATION")
                 vibrator.vibrate(durationMs)
             }
         }
@@ -144,10 +133,10 @@ class MainActivity : ComponentActivity() {
         ) {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
             val intent = Intent(context, AlarmReceiver::class.java).apply {
-                putExtra(EXTRA_LINE_ID, lineId)
-                putExtra(EXTRA_STOP_NAME, stopName)
-                putExtra(EXTRA_MINUTES_AWAY, minutesAway)
-                putExtra(EXTRA_RING_UNTIL_DISMISSED, ringUntilDismissed)
+                putExtra("EXTRA_LINE_ID", lineId)
+                putExtra("EXTRA_STOP_NAME", stopName)
+                putExtra("EXTRA_MINUTES_AWAY", minutesAway)
+                putExtra("EXTRA_RING_UNTIL_DISMISSED", ringUntilDismissed)
             }
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
@@ -158,16 +147,15 @@ class MainActivity : ComponentActivity() {
 
             val triggerTime = System.currentTimeMillis() + (triggerInSeconds * 1000)
 
-            // setAlarmClock guarantees OS wakeup even in deep sleep (Doze) or when screen is locked
             val showIntent = Intent(context, MainActivity::class.java)
             val pShow = PendingIntent.getActivity(context, 0, showIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
             val alarmClockInfo = AlarmManager.AlarmClockInfo(triggerTime, pShow)
             alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
 
             val msg = if (ringUntilDismissed) {
-                Συνεχής συναγερμός ρυθμίστηκε για το σε λεπτά (θα χτυπάει μέχρι να τον κλείσετε)
+                "Συνεχής συναγερμός ρυθμίστηκε για το " + lineId + " σε " + minutesAway + " λεπτά (θα χτυπάει μέχρι να τον κλείσετε)"
             } else {
-                Ειδοποίηση ρυθμίστηκε για το σε λεπτά
+                "Ειδοποίηση ρυθμίστηκε για το " + lineId + " σε " + minutesAway + " λεπτά"
             }
             Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
         }
@@ -212,27 +200,27 @@ class MainActivity : ComponentActivity() {
             lineId: String,
             minutesAway: Int,
             stopName: String,
-            destination: String = ",
- walkMinutes: Int = 0
- ) {
- NotificationHelper.updateLiveArrivalNotification(context, lineId, minutesAway, stopName, destination, walkMinutes)
- }
+            destination: String = "",
+            walkMinutes: Int = 0
+        ) {
+            NotificationHelper.updateLiveArrivalNotification(context, lineId, minutesAway, stopName, destination, walkMinutes)
+        }
 
- @JavascriptInterface
- fun clearLiveArrivalNotification() {
- NotificationHelper.clearLiveArrivalNotification(context)
- LiveTrackingService.stop(context)
- AlarmRingingService.dismiss(context)
- }
- }
+        @JavascriptInterface
+        fun clearLiveArrivalNotification() {
+            NotificationHelper.clearLiveArrivalNotification(context)
+            LiveTrackingService.stop(context)
+            AlarmRingingService.dismiss(context)
+        }
+    }
 
- @Deprecated(Deprecated in Java)
- override fun onBackPressed() {
- if (webView.canGoBack()) {
- webView.goBack()
- } else {
- @Suppress(DEPRECATION)
- super.onBackPressed()
- }
- }
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (webView.canGoBack()) {
+            webView.goBack()
+        } else {
+            @Suppress("DEPRECATION")
+            super.onBackPressed()
+        }
+    }
 }
