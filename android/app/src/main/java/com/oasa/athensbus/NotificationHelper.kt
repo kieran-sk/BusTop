@@ -178,4 +178,4 @@ object NotificationHelper {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(LIVE_NOTIF_ID)
     }
-}\n
+}

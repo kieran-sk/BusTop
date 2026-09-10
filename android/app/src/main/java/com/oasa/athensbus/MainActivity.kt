@@ -224,4 +224,4 @@ class MainActivity : ComponentActivity() {
             super.onBackPressed()
         }
     }
-}\n
+}

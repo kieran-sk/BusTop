@@ -59,4 +59,4 @@ class AlarmReceiver : BroadcastReceiver() {
             NotificationHelper.showBusAlarmNotification(context, lineId, stopName, minutesAway)
         }
     }
-}\n
+}

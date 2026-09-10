@@ -248,4 +248,4 @@ class LiveTrackingService : Service() {
         super.onDestroy()
         serviceJob.cancel()
     }
-}\n
+}

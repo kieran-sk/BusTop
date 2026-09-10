@@ -224,4 +224,4 @@ class AlarmRingingService : Service() {
         stopAlarm()
         super.onDestroy()
     }
-}\n
+}
