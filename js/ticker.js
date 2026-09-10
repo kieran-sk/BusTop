@@ -188,7 +188,7 @@ class AirportTicker {
     // Live location report latency string
     const reportAgo = arr.last_contact_ago_gr || arr.last_contact_ago;
 
-    const distanceFormatted = walk ? (walk.meters < 1000 ? `${walk.meters}μ` : `${(walk.meters / 1000).toFixed(1)}χλμ`) : '—';
+    const walkTimeDisplay = walk ? `${walk.minutes}λ` : '—';
 
     return `
       <div class="ticker-row" onclick="window.App.openLineTimetableBothDirections('${arr.line_code}', '${arr.line_id}', '${safeDescr}')" title="Κλικ για προβολή πλήρους δρομολογίου και στάσεων">
@@ -214,10 +214,10 @@ class AirportTicker {
           ${dueDisplay}
         </div>
 
-        <!-- 4. Distance -->
-        <div class="ticker-cell-walk ticker-col-walk ticker-walk-time" title="${walk ? `Απόσταση: ${distanceFormatted} (~${walk.minutes} λεπτά βάδισμα)` : ''}">
+        <!-- 4. Distance Column (shows walking time with +2m buffer) -->
+        <div class="ticker-cell-walk ticker-col-walk ticker-walk-time" title="${walk ? `Χρόνος περπατήματος: ${walk.minutes}λ (+2λ περιθώριο) • Απόσταση: ${walk.meters}μ` : ''}">
           <span class="ticker-walk-text">
-            ${distanceFormatted}
+            ${walkTimeDisplay}
           </span>
         </div>
 
