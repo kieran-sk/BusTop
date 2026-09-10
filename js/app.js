@@ -409,9 +409,6 @@ class AppController {
           updateStarIcon();
         };
       }
-
-      // Dynamic Live Notifications State (Bell Icon)
-      this.updateNotifyButtonState();
     }
 
     // Populate deduplicated line directions overview (with offline cache first)
@@ -465,60 +462,7 @@ class AppController {
     this.pollInterval = setInterval(() => this.refreshStopArrivals(this.currentStopRequestId), 15000);
   }
 
-  updateNotifyButtonState() {
-    if (!this.currentStop) return;
-    const stopCode = this.currentStop.StopCode;
-    const notifyBtn = document.getElementById('selected-stop-notify');
-    const badgeDot = document.getElementById('notify-badge-dot');
-    const isNotifActive = this.stopNotifActive.has(stopCode);
 
-    if (notifyBtn) {
-      notifyBtn.classList.toggle('active', isNotifActive);
-      notifyBtn.title = isNotifActive 
-        ? 'Ζωντανές ειδοποιήσεις ενεργές (κλικ για απενεργοποίηση)' 
-        : 'Ενεργοποίηση ζωντανών ειδοποιήσεων για αυτή τη στάση';
-    }
-    if (badgeDot) {
-      badgeDot.style.display = isNotifActive ? 'block' : 'none';
-    }
-  }
-
-  async toggleStopNotifications() {
-    if (!this.currentStop) return;
-    const stopCode = this.currentStop.StopCode;
-    const stopName = this.currentStop.StopDescr || `Στάση #${stopCode}`;
-
-    if (!('Notification' in window)) {
-      alert('Οι ζωντανές ειδοποιήσεις περιηγητή δεν υποστηρίζονται στη συσκευή σας.');
-      return;
-    }
-
-    if (this.stopNotifActive.has(stopCode)) {
-      this.stopNotifActive.delete(stopCode);
-      localStorage.setItem('OASA_STOP_NOTIF', JSON.stringify(Array.from(this.stopNotifActive)));
-      this.updateNotifyButtonState();
-      return;
-    }
-
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      this.stopNotifActive.add(stopCode);
-      localStorage.setItem('OASA_STOP_NOTIF', JSON.stringify(Array.from(this.stopNotifActive)));
-      this.updateNotifyButtonState();
-
-      if (window.Alarms) {
-        window.Alarms.playTone(587.33, 0.2);
-        setTimeout(() => window.Alarms.playTone(880, 0.2), 150);
-      }
-
-      new Notification(`Ζωντανές Αφίξεις: ${stopName}`, {
-        body: `Ενεργοποιήθηκαν οι ειδοποιήσεις για τη Στάση #${stopCode}. Θα ειδοποιείστε όταν πλησιάζει λεωφορείο.`,
-        icon: '/assets/icon-192.png'
-      });
-    } else {
-      alert('Απαιτείται άδεια ειδοποιήσεων για τη λήψη ζωντανών ενημερώσεων.');
-    }
-  }
 
   showPushNotification(title, options = {}) {
     if ('serviceWorker' in navigator) {
