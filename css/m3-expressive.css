@@ -295,7 +295,7 @@ body {
   transform: scale(0.95);
 }
 
-/* Bottom Navigation Bar (Mobile / Compact) */
+/* Bottom Navigation Bar (Mobile / Compact & Desktop - Strictly 1 Row) */
 .m3-nav-bar {
   position: fixed;
   bottom: 0;
@@ -304,11 +304,14 @@ body {
   z-index: 1000;
   background: var(--md-sys-color-surface-container);
   border-top: 1px solid var(--md-sys-color-outline-variant);
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  align-items: center;
+  display: flex !important;
+  flex-direction: row !important;
+  flex-wrap: nowrap !important;
+  justify-content: space-around !important;
+  align-items: center !important;
   padding: 0.35rem 0.25rem calc(0.35rem + env(safe-area-inset-bottom, 0px));
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+  box-sizing: border-box;
 }
 
 .m3-nav-item {
@@ -323,8 +326,9 @@ body {
   font-weight: 600;
   cursor: pointer;
   padding: 0.2rem 0;
-  width: 100%;
-  min-width: 0;
+  flex: 1 1 0px !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
   text-align: center;
   transition: color var(--md-sys-motion-duration-short);
   -webkit-tap-highlight-color: transparent;

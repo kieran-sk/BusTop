@@ -3,7 +3,7 @@
  * Background alarm notification scheduler and offline caching
  */
 
-const CACHE_NAME = 'oasa-bus-v15';
+const CACHE_NAME = 'oasa-bus-v16';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
