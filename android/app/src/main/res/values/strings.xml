@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">BusTop</string>
+    <!-- Replace with your Google Maps API Key or inject via BuildConfig -->
+    <string name="google_maps_key">YOUR_GOOGLE_MAPS_API_KEY</string>
+</resources>

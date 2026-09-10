@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#005ac1">
+  <meta name="color-scheme" content="light">
+  <title>Αστικές Συγκοινωνίες Αθηνών - ΟΑΣΑ Live Τηλεματική & Δρομολόγια</title>
+  <meta name="description" content="Ζωντανή παρακολούθηση λεωφορείων, πίνακας αναχωρήσεων αεροδρομίου, εκτιμώμενες αφίξεις, δρομολόγια, στάσεις και ειδοποιήσεις για την Αθήνα.">
+
+  <!-- Web App Manifest & Mobile App Icons -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="ΟΑΣΑ Live">
+
+  <!-- Google Fonts: Inter, Noto Sans & Roboto Mono with Greek subset -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans:wght@400;500;600;700;900&family=Roboto+Mono:wght@500;700;800&display=swap&subset=greek,greek-ext,latin" rel="stylesheet">
+
+  <!-- Leaflet Map CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Stylesheets (Relative paths with cache-busting for PWA updates) -->
+  <link rel="stylesheet" href="css/m3-expressive.css?v=20260910_2144">
+  <link rel="stylesheet" href="css/airport-ticker.css?v=20260910_2144">
+</head>
+<body>
+
+  <!-- Top App Bar -->
+  <header class="m3-top-app-bar">
+    <button id="global-back-btn" class="m3-back-btn" onclick="window.App.goBack()" style="display: none;" title="Επιστροφή (Πίσω)" aria-label="Πίσω">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="19" y1="12" x2="5" y2="12"></line>
+        <polyline points="12 19 5 12 12 5"></polyline>
+      </svg>
+      <span>Πίσω</span>
+    </button>
+    <div id="top-bar-filler" style="flex: 1;"></div>
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+      <span class="m3-badge m3-badge-live">
+        <span class="m3-pulse-dot"></span> Τηλεματική Ενεργή
+      </span>
+    </div>
+  </header>
+
+  <!-- Offline / Connection Status Banner -->
+  <div id="connection-status-banner" style="display: none; background: #fef3c7; color: #92400e; border-bottom: 1px solid #fde68a; padding: 6px 1rem; text-align: center; font-size: 0.8rem; font-weight: 700;">
+    <span id="connection-status-text">⚡ Εκτός σύνδεσης: Λειτουργία με αποθηκευμένα δεδομένα &amp; δρομολόγια</span>
+  </div>
+
+  <!-- Global Instant Search Container -->
+  <div class="m3-search-container">
+    <div class="m3-search-bar">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--md-sys-color-outline)"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      <input type="text" id="global-search-input" placeholder="Αναζήτηση γραμμής (π.χ. 040, 306, X95), στάσης ή κωδικού..." oninput="window.Search.onSearchInput(this.value)" onclick="window.App.switchTab('search')">
+      <button id="search-clear-btn" class="m3-icon-btn" title="Καθαρισμός" aria-label="Καθαρισμός" onclick="document.getElementById('global-search-input').value=''; window.Search.onSearchInput(''); this.style.display='none';" style="display: none; width: 32px; height: 32px; border: none; background: none; color: #64748b; flex-shrink: 0; cursor: pointer;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+      <button id="radar-search-btn" class="m3-icon-btn" title="Εντοπισμός στάσεων κοντά μου" aria-label="Εντοπισμός στάσεων κοντά μου" onclick="window.App.switchTab('search'); document.getElementById('global-search-input').value=''; window.Search.onSearchInput(''); window.Search.findNearbyStops();" style="background: var(--md-sys-color-primary); color: #ffffff; border: none; flex-shrink: 0;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <circle cx="12" cy="12" r="6"></circle>
+          <circle cx="12" cy="12" r="2"></circle>
+          <line x1="12" y1="2" x2="12" y2="4"></line>
+          <line x1="12" y1="20" x2="12" y2="22"></line>
+          <line x1="2" y1="12" x2="4" y2="12"></line>
+          <line x1="20" y1="12" x2="22" y2="12"></line>
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Content Layout -->
+  <main class="m3-container">
+
+    <!-- ================= 1. TICKER & DEPARTURES TAB ================= -->
+    <section id="section-ticker" class="app-section" style="display: none;">
+      
+      <!-- Selected Stop Header Card with Line Directions Overview -->
+      <div id="selected-stop-banner" class="m3-card" style="display: none; flex-direction: column; gap: 0.85rem; padding: 1.25rem; margin-bottom: 1rem; border-left: 4px solid var(--md-sys-color-primary); background: #ffffff;">
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+          <div style="flex: 1; min-width: 200px;">
+            <button class="m3-btn m3-btn-outlined" style="font-size: 0.75rem; padding: 3px 10px; margin-bottom: 0.5rem; display: inline-flex; align-items: center; gap: 5px; font-weight: 700; border-radius: 9999px;" onclick="window.App.showAllStopsInArrivals()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              Όλες οι Στάσεις
+            </button>
+            <h2 id="selected-stop-title" style="font-size: 1.25rem; font-weight: 900; color: #0f172a; line-height: 1.25; margin: 0;">Αφίξεις Στάσης</h2>
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.35rem; flex-wrap: wrap;">
+              <span id="selected-stop-code" class="m3-badge" style="background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface); font-size: 0.75rem; font-weight: 700; border: 1px solid var(--md-sys-color-outline-variant);">Στάση #60010</span>
+              <span id="selected-stop-street" style="font-size: 0.8rem; color: var(--md-sys-color-outline); font-weight: 500;"></span>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <!-- Dynamic Live Notifications Icon Button -->
+            <button id="selected-stop-notify" class="m3-icon-btn" title="Ενεργοποίηση ζωντανών ειδοποιήσεων άφιξης" aria-label="Εναλλαγή ζωντανών ειδοποιήσεων" onclick="window.App.toggleStopNotifications()">
+              <svg id="notify-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+              </svg>
+              <span id="notify-badge-dot" class="m3-pulse-dot" style="display: none; position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; background: #16a34a;"></span>
+            </button>
+            <!-- Dynamic Save / Favorite Icon Button -->
+            <button id="selected-stop-star" class="m3-icon-btn" title="Αποθήκευση στάσης στα αγαπημένα" aria-label="Αποθήκευση στα αγαπημένα">
+              <svg id="star-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+              </svg>
+            </button>
+            <!-- Dynamic Refresh Icon Button -->
+            <button id="selected-stop-refresh" class="m3-icon-btn" title="Ανανέωση ζωντανών αφίξεων" aria-label="Ανανέωση αφίξεων" onclick="window.App.refreshStopArrivals()">
+              <svg id="refresh-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Direction Overview for Lines at this Stop -->
+        <div style="border-top: 1px solid var(--md-sys-color-outline-variant); padding-top: 0.6rem;">
+          <div style="font-weight: 700; margin-bottom: 0.4rem; color: var(--md-sys-color-primary); text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.06em;">
+            Γραμμες &amp; Προορισμοι που Εξυπηρετουν τη Σταση
+          </div>
+          <div id="selected-stop-routes-list" style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+            <span style="color: var(--md-sys-color-outline); font-size: 0.8rem;">Φόρτωση γραμμών...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Arrival Display Options & Day Toggle -->
+      <div id="arrivals-options-bar" style="display: none; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; padding: 0 0.25rem;">
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <div style="display: flex; background: var(--md-sys-color-surface-container); padding: 3px; border-radius: 9999px; border: 1px solid var(--md-sys-color-outline-variant);">
+            <button id="day-today-btn" class="m3-btn m3-btn-primary" style="padding: 0.25rem 0.65rem; font-size: 0.78rem; border-radius: 9999px;" onclick="window.App.setArrivalsDay('today')">
+              Σήμερα
+            </button>
+            <button id="day-tomorrow-btn" class="m3-btn m3-btn-tonal" style="padding: 0.25rem 0.65rem; font-size: 0.78rem; border-radius: 9999px;" onclick="window.App.setArrivalsDay('tomorrow')">
+              Αύριο
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Airport Arrival Board Container -->
+      <div id="ticker-container">
+        <!-- Injected dynamically by AirportTicker -->
+      </div>
+
+    </section>
+
+    <!-- ================= 2. PINNED TRIPS TAB (COMPLEX TRIPS) ================= -->
+    <section id="section-pinned" class="app-section" style="display: none;">
+      <div id="pinned-trips-container">
+        <!-- Injected dynamically by PinnedTripsManager -->
+      </div>
+    </section>
+
+    <!-- ================= 3. TIMETABLE & STOP PROGRESSION TAB ================= -->
+    <section id="section-timetable" class="app-section" style="display: none;">
+      <div id="timetable-container">
+        <!-- Injected dynamically by TimetableManager -->
+      </div>
+    </section>
+
+    <!-- ================= 4. SEARCH, ROUTES, TIMETABLES & NEARBY TAB ================= -->
+    <section id="section-search" class="app-section">
+      
+      <!-- Interactive Stops Map -->
+      <div class="m3-card" style="padding: 0; overflow: hidden; height: 320px; margin-bottom: 1.25rem; position: relative;">
+        <div id="map-container" style="width: 100%; height: 100%;"></div>
+        <div style="position: absolute; top: 12px; left: 12px; z-index: 1000; background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(8px); padding: 5px 12px; border-radius: 9999px; box-shadow: var(--md-sys-elevation-2); font-size: 0.78rem; font-weight: 800; color: var(--md-sys-color-primary); display: flex; align-items: center; gap: 6px;">
+          <span class="m3-pulse-dot" style="background: var(--md-sys-color-primary);"></span>
+          Χάρτης Στάσεων &amp; Λεωφορείων
+        </div>
+      </div>
+
+      <!-- Nearby Stops Injected Container -->
+      <div id="nearby-stops-container" style="margin-bottom: 1.5rem;"></div>
+
+      <!-- Search Results Container -->
+      <div id="search-results"></div>
+
+    </section>
+
+    <!-- ================= 4b. NOTIFICATIONS (ALARMS & ALERTS) TAB ================= -->
+    <section id="section-notifications" class="app-section" style="display: none;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.5rem;">
+        <div>
+          <h2 style="font-size: 1.25rem; font-weight: 800; margin: 0; color: #0f172a;">🔔 Ειδοποιήσεις &amp; Υπενθυμίσεις</h2>
+          <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">Ζωντανή παρακολούθηση αφίξεων με ηχητικό συναγερμό και ειδοποιήσεις στο κινητό</div>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <button class="m3-btn m3-btn-tonal" style="font-size: 0.78rem; padding: 0.35rem 0.75rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px;" onclick="window.Alarms.unlockAudio(); window.Alarms.startAlarmRinging();" title="Δοκιμή ήχου σειρήνας">
+            🔊 Δοκιμή Σειρήνας
+          </button>
+        </div>
+      </div>
+
+      <div id="notifications-container">
+        <!-- Injected dynamically by AlarmManager -->
+      </div>
+    </section>
+
+    <!-- ================= 5. FAVORITES (SAVED) TAB ================= -->
+    <section id="section-favorites" class="app-section" style="display: none;">
+      
+      <div style="margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 0.75rem;">Αποθηκευμένα</h2>
+        <div id="favorites-container">
+          <!-- Injected dynamically by FavoritesManager -->
+        </div>
+      </div>
+
+    </section>
+
+
+  </main>
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- Set Custom Alarm Dialog -->
+  <div id="set-alarm-modal" class="m3-dialog-backdrop">
+    <div class="m3-dialog-content">
+      <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+        <div class="m3-icon-btn" style="background: var(--md-sys-color-primary-container); color: var(--md-sys-color-primary); border: none; width: 44px; height: 44px; flex-shrink: 0;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="13" r="8"></circle>
+            <path d="M12 9v4l2 2"></path>
+            <path d="M5 3L2 6"></path>
+            <path d="M22 6l-3-3"></path>
+            <path d="M6.38 18.7L4 21"></path>
+            <path d="M17.64 18.67L20 21"></path>
+          </svg>
+        </div>
+        <div>
+          <h3 style="font-size: 1.15rem; font-weight: 800;">Ρύθμιση Ειδοποίησης Άφιξης</h3>
+          <div style="font-size: 0.8rem; color: var(--md-sys-color-outline); margin-top: 2px;">
+            Γραμμή <span id="modal-alarm-line" style="font-weight: 800; color: var(--md-sys-color-primary);">--</span> • Άφιξη σε: 
+            <span id="modal-alarm-due" style="font-weight: 800; color: var(--md-sys-color-primary);">--</span>
+          </div>
+        </div>
+      </div>
+
+      <p style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 1.25rem; line-height: 1.5;">
+        Ορίστε πόσα λεπτά πριν θέλετε να ειδοποιηθείτε. Θα σταλεί ηχητική ειδοποίηση, δόνηση και ειδοποίηση συστήματος όταν το λεωφορείο φτάσει στο επιλεγμένο όριο (ακόμα και εκτός εφαρμογής).
+      </p>
+
+      <div style="margin-bottom: 1.25rem;">
+        <label style="display: block; font-size: 0.8rem; font-weight: 700; color: var(--md-sys-color-outline); margin-bottom: 0.5rem; text-transform: uppercase;">
+          Προεπιλεγμενα Ορια Ειδοποιησης:
+        </label>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+          <button type="button" class="m3-filter-chip" onclick="window.App.selectAlarmPreset(3)">3 λεπτά</button>
+          <button type="button" class="m3-filter-chip active" onclick="window.App.selectAlarmPreset(5)">5 λεπτά</button>
+          <button type="button" class="m3-filter-chip" onclick="window.App.selectAlarmPreset(7)">7 λεπτά</button>
+          <button type="button" class="m3-filter-chip" onclick="window.App.selectAlarmPreset(10)">10 λεπτά</button>
+          <button type="button" class="m3-filter-chip" onclick="window.App.selectAlarmPreset(15)">15 λεπτά</button>
+          <button type="button" class="m3-filter-chip" onclick="window.App.selectAlarmPreset(20)">20 λεπτά</button>
+        </div>
+
+        <label style="display: block; font-size: 0.8rem; font-weight: 700; color: var(--md-sys-color-outline); margin-bottom: 0.5rem; text-transform: uppercase;">
+          Η Εισαγετε Προσαρμοσμενο Χρονο (Λεπτα):
+        </label>
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <input type="number" id="alarm-threshold-custom" min="1" max="60" value="5" style="width: 100px; padding: 0.65rem 0.85rem; border-radius: var(--md-sys-shape-corner-medium); border: 1.5px solid var(--md-sys-color-outline-variant); font-size: 1.1rem; font-weight: 800; font-family: inherit; background: var(--md-sys-color-surface); color: var(--md-sys-color-primary); outline: none; text-align: center;">
+          <span style="font-size: 0.9rem; font-weight: 700; color: var(--md-sys-color-on-surface);">λεπτά πριν την άφιξη</span>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; gap: 0.5rem;">
+        <button class="m3-btn m3-btn-tonal" onclick="window.App.closeModal('set-alarm-modal')">
+          Ακύρωση
+        </button>
+        <button class="m3-btn m3-btn-primary" onclick="window.App.confirmSetAlarm()">
+          Ορισμός Ειδοποίησης
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Triggered Alarm Alert Modal -->
+  <div id="alarm-alert-modal" class="m3-dialog-backdrop">
+    <div class="m3-dialog-content" style="text-align: center; border-top: 6px solid var(--md-sys-color-primary);">
+      <div class="m3-icon-btn" style="width: 54px; height: 54px; margin: 0 auto 1rem; background: var(--md-sys-color-primary-container); color: var(--md-sys-color-primary); border: none;">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+      </div>
+      <h3 id="alarm-alert-title" style="font-size: 1.3rem; font-weight: 900; margin-bottom: 0.5rem; color: var(--md-sys-color-primary);">
+        Το Λεωφορείο Πλησιάζει!
+      </h3>
+      <p id="alarm-alert-desc" style="font-size: 0.95rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 1.5rem;">
+        Το λεωφορείο φτάνει στη στάση σας. Ώρα να κατευθυνθείτε προς τα εκεί.
+      </p>
+      <button class="m3-btn m3-btn-primary" style="width: 100%; padding: 0.85rem; font-size: 1.05rem; font-weight: 800; background: #dc2626; color: #ffffff; border: none; border-radius: 9999px;" onclick="if(window.Alarms) window.Alarms.stopAlarmRinging(); window.App.closeModal('alarm-alert-modal');">
+        🔕 Διακοπή Ήχου &amp; Κλείσιμο
+      </button>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation Bar (Search, Arrivals, Notifications, Pinned Trips, Saved) -->
+  <nav class="m3-nav-bar">
+    <div class="m3-nav-item active" data-tab="search" onclick="window.App.switchTab('search')">
+      <div class="m3-nav-pill">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+      </div>
+      <span>Αναζήτηση</span>
+    </div>
+    <div class="m3-nav-item" data-tab="ticker" onclick="window.App.switchTab('ticker')">
+      <div class="m3-nav-pill">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7-.8 1.3z"/></svg>
+      </div>
+      <span>Αφίξεις</span>
+    </div>
+    <div class="m3-nav-item" data-tab="notifications" onclick="window.App.switchTab('notifications')">
+      <div class="m3-nav-pill" style="position: relative;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+        <span id="nav-alarms-badge" style="display: none; position: absolute; top: -3px; right: -6px; background: #dc2626; color: #ffffff; font-size: 0.6rem; font-weight: 900; padding: 1px 5px; border-radius: 9999px; border: 1.5px solid #ffffff;">0</span>
+      </div>
+      <span>Ειδοποιήσεις</span>
+    </div>
+    <div class="m3-nav-item" data-tab="pinned" onclick="window.App.switchTab('pinned')">
+      <div class="m3-nav-pill">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="17" x2="12" y2="22"></line>
+          <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
+        </svg>
+      </div>
+      <span>Ταξίδια</span>
+    </div>
+    <div class="m3-nav-item" data-tab="favorites" onclick="window.App.switchTab('favorites')">
+      <div class="m3-nav-pill">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+      </div>
+      <span>Αγαπημένα</span>
+    </div>
+  </nav>
+
+  <!-- Scripts (Cache-busted for live updates) -->
+  <script src="js/api.js?v=20260910_2144"></script>
+  <script src="js/map-manager.js?v=20260910_2144"></script>
+  <script src="js/ticker.js?v=20260910_2144"></script>
+  <script src="js/alarms.js?v=20260910_2144"></script>
+  <script src="js/pinned-trips.js?v=20260910_2144"></script>
+  <script src="js/timetable.js?v=20260910_2144"></script>
+  <script src="js/search.js?v=20260910_2144"></script>
+  <script src="js/favorites.js?v=20260910_2144"></script>
+  <script src="js/app.js?v=20260910_2144"></script>
+</body>
+</html>
