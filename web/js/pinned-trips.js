@@ -208,6 +208,14 @@ class PinnedTripsManager {
     }
   }
 
+  formatMinutesHuman(mins) {
+    if (typeof mins !== 'number' || isNaN(mins)) return '--';
+    if (mins < 60) return `${mins}λ`;
+    const hours = Math.floor(mins / 60);
+    const remMins = mins % 60;
+    return remMins > 0 ? `${hours}ω ${remMins}λ` : `${hours}ω`;
+  }
+
   renderSplitFlapDigits(key, text) {
     const chars = String(text).split('');
     const prevChars = (this.previousDigitsMap.get(key) || '').split('');
@@ -216,6 +224,8 @@ class PinnedTripsManager {
     const html = chars.map((ch, idx) => {
       if (ch === ':' || ch === '.' || ch === '-') {
         return `<span class="flap-separator">${ch}</span>`;
+      } else if (ch === ' ') {
+        return `<span class="flap-separator" style="width: 6px; display: inline-block;"> </span>`;
       } else if (/[a-zA-Z\u0370-\u03ff]/.test(ch)) {
         return `<span class="flap-unit">${ch}</span>`;
       } else {
@@ -241,10 +251,10 @@ class PinnedTripsManager {
             </svg>
           </div>
           <h3 style="font-size: 1.2rem; font-weight: 800; color: #0f172a; margin-bottom: 0.5rem;">
-            Καρφιτσωμένες Αφίξεις για Σύνθετα Ταξίδια
+            Καρφίτσες • Καρφιτσωμένες Αφίξεις
           </h3>
           <p style="font-size: 0.9rem; color: #64748b; max-width: 440px; margin: 0 auto 1.5rem; line-height: 1.5;">
-            Καρφιτσώστε λεωφορεία από διαφορετικές στάσεις για να παρακολουθείτε σε πραγματικό χρόνο τις ανταποκρίσεις σας σε έναν ενιαίο πίνακα!
+            Καρφιτσώστε λεωφορεία από οποιαδήποτε στάση για να παρακολουθείτε ζωντανά τις αφίξεις τους σε έναν συγκεντρωτικό πίνακα!
           </p>
           <div style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.82rem; font-weight: 700; color: var(--md-sys-color-primary); background: var(--md-sys-color-surface-container); padding: 8px 16px; border-radius: 9999px;">
             <span>Πατήστε το εικονίδιο</span>
@@ -285,9 +295,16 @@ class PinnedTripsManager {
       if (matchingArr) {
         const isLive = matchingArr.is_live;
         const mins = matchingArr.btime2;
-        const dueText = isLive 
-          ? `${String(mins).padStart(2, '0')}λ` 
-          : (matchingArr.estimated_arrival_time || '--:--');
+        let dueText = '';
+        if (isLive) {
+          dueText = mins >= 60 ? this.formatMinutesHuman(mins) : `${String(mins).padStart(2, '0')}λ`;
+        } else if (matchingArr.estimated_arrival_time) {
+          dueText = matchingArr.estimated_arrival_time;
+        } else if (typeof mins === 'number') {
+          dueText = this.formatMinutesHuman(mins);
+        } else {
+          dueText = '--:--';
+        }
 
         dueBadgeHtml = `
           <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
@@ -348,10 +365,10 @@ class PinnedTripsManager {
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.75rem;">
           <div>
             <h2 style="font-size: 1.25rem; font-weight: 900; color: #0f172a; margin: 0;">
-              Σύνθετο Ταξίδι • Καρφιτσωμένες Αφίξεις
+              Καρφίτσες • Καρφιτσωμένες Αφίξεις
             </h2>
             <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">
-              ${this.pinnedItems.length} ενεργά σκέλη διαδρομής
+              ${this.pinnedItems.length} καρφιτσωμένες γραμμές
             </div>
           </div>
           <button class="m3-btn m3-btn-tonal" style="color: var(--md-sys-color-error); font-size: 0.8rem; padding: 0.4rem 0.8rem;" onclick="window.PinnedTrips.clearAll()">

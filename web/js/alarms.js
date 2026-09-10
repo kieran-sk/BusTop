@@ -245,8 +245,9 @@ class AlarmManager {
 
     // 2. Web Service Worker Live Notification
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
-    const title = `🚍 ${alarm.lineId} σε ${minutes}λ`;
-    const body = `Στάση: ${alarm.stopName} • Ειδοποίηση στα ${alarm.thresholdMinutes}λ`;
+    const timeDisplay = this.formatMinutesHuman(minutes);
+    const title = `🚍 ${alarm.lineId} σε ${timeDisplay}`;
+    const body = `Στάση: ${alarm.stopName} • Ειδοποίηση στα ${this.formatMinutesHuman(alarm.thresholdMinutes)}`;
     const tag = `live_alarm_${alarm.id}`;
     const iconUrl = new URL('assets/icon-192.png', window.location.href).href;
 
@@ -330,6 +331,14 @@ class AlarmManager {
     this.save();
   }
 
+  formatMinutesHuman(mins) {
+    if (typeof mins !== 'number' || isNaN(mins)) return '--';
+    if (mins < 60) return `${mins}λ`;
+    const hours = Math.floor(mins / 60);
+    const remMins = mins % 60;
+    return remMins > 0 ? `${hours}ω ${remMins}λ` : `${hours}ω`;
+  }
+
   startWatcher() {
     if (this.checkInterval) clearInterval(this.checkInterval);
     // Poll every 15 seconds for responsive countdown
@@ -337,6 +346,26 @@ class AlarmManager {
   }
 
   async checkAllAlarms() {
+    const now = Date.now();
+
+    // 1. Auto-dismiss triggered alerts 10 minutes (600,000 ms) after they go off
+    const initialCount = this.alarms.length;
+    this.alarms = this.alarms.filter(a => {
+      if (a.triggered && a.triggeredAt) {
+        const elapsedSinceTriggered = now - a.triggeredAt;
+        if (elapsedSinceTriggered >= 10 * 60 * 1000) {
+          // Clear any remaining notifications for this alarm
+          this.clearLiveNotification(a.id);
+          return false; // Remove from list
+        }
+      }
+      return true;
+    });
+
+    if (this.alarms.length !== initialCount) {
+      this.save();
+    }
+
     const active = this.alarms.filter(a => !a.triggered);
     if (active.length === 0) return;
 
@@ -366,7 +395,7 @@ class AlarmManager {
 
       // 2. Reliable Fallback to elapsed time if GPS drops or vehicle changes schedule
       if (currentMins === null) {
-        const elapsedMs = Date.now() - alarm.createdAt;
+        const elapsedMs = now - alarm.createdAt;
         const elapsedMins = Math.floor(elapsedMs / 60000);
         currentMins = Math.max(0, alarm.initialMinutes - elapsedMins);
       }
@@ -403,6 +432,7 @@ class AlarmManager {
 
   triggerAlarm(alarm, currentMinutes) {
     alarm.triggered = true;
+    alarm.triggeredAt = Date.now();
     this.save();
 
     // 1. Start loud audible ringing siren & vibration loop
@@ -483,6 +513,14 @@ class AlarmManager {
             const elapsedMins = Math.floor(elapsedMs / 60000);
             const currentEstMins = Math.max(0, a.initialMinutes - elapsedMins);
             const isUrgent = currentEstMins <= a.thresholdMinutes;
+            const formattedTime = this.formatMinutesHuman(currentEstMins);
+
+            let triggeredNote = '';
+            if (a.triggered && a.triggeredAt) {
+              const minsSince = Math.floor((Date.now() - a.triggeredAt) / 60000);
+              const remainingBeforeDismiss = Math.max(1, 10 - minsSince);
+              triggeredNote = ` • Αυτόματη αφαίρεση σε ${remainingBeforeDismiss}λ`;
+            }
 
             return `
               <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem; margin-bottom: 0; background: ${a.triggered ? '#fef2f2' : '#ffffff'}; border-left: 4px solid ${a.triggered ? '#dc2626' : (isUrgent ? '#ea580c' : '#005ac1')};">
@@ -498,17 +536,17 @@ class AlarmManager {
                   </div>
                   <div style="text-align: right; flex-shrink: 0;">
                     <span class="m3-badge" style="background: ${a.triggered ? '#fee2e2' : '#e0f2fe'}; color: ${a.triggered ? '#b91c1c' : '#005ac1'}; font-size: 0.72rem; font-weight: 800; padding: 2px 7px;">
-                      ${a.triggered ? '🚨 Συναγερμός' : `⏳ ~${currentEstMins}λ`}
+                      ${a.triggered ? '🚨 Συναγερμός' : `⏳ ~${formattedTime}`}
                     </span>
                   </div>
                 </div>
                 <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px dashed #e2e8f0; padding-top: 0.5rem; font-size: 0.8rem; color: #64748b;">
                   <div>
-                    Όριο: <strong style="color: #0f172a;">${a.thresholdMinutes}λ</strong> πριν την άφιξη
+                    Όριο: <strong style="color: #0f172a;">${this.formatMinutesHuman(a.thresholdMinutes)}</strong> πριν την άφιξη${triggeredNote}
                   </div>
                   <div style="display: flex; gap: 0.5rem;">
                     <button class="m3-btn m3-btn-tonal" onclick="window.Alarms.removeAlarm('${a.id}')" style="padding: 0.3rem 0.75rem; font-size: 0.78rem; border-radius: 9999px;">
-                      Ακύρωση
+                      ${a.triggered ? 'Διαγραφή' : 'Ακύρωση'}
                     </button>
                   </div>
                 </div>

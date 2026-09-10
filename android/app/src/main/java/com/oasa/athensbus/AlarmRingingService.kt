@@ -135,8 +135,9 @@ class AlarmRingingService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val title = "🚨 Συναγερμός: Λεωφορείο $lineId • $minsAway λεπτά!"
-        val bigText = "📍 Στάση: $stopName\n⏰ Απομένουν $minsAway λεπτά μέχρι την άφιξη!\n👉 Πατήστε 'ΑΠΕΝΕΡΓΟΠΟΙΗΣΗ' για διακοπή του ήχου."
+        val timeFormatted = NotificationHelper.formatMinutesHuman(minsAway)
+        val title = "🚨 Συναγερμός: Λεωφορείο $lineId • $timeFormatted!"
+        val bigText = "📍 Στάση: $stopName\n⏰ Απομένουν $timeFormatted μέχρι την άφιξη!\n👉 Πατήστε 'ΑΠΕΝΕΡΓΟΠΟΙΗΣΗ' για διακοπή του ήχου."
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
@@ -223,4 +224,4 @@ class AlarmRingingService : Service() {
         stopAlarm()
         super.onDestroy()
     }
-}
+}\n

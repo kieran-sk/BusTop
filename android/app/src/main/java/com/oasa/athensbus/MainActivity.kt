@@ -152,10 +152,11 @@ class MainActivity : ComponentActivity() {
             val alarmClockInfo = AlarmManager.AlarmClockInfo(triggerTime, pShow)
             alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
 
+            val timeFormatted = NotificationHelper.formatMinutesHuman(minutesAway)
             val msg = if (ringUntilDismissed) {
-                "Συνεχής συναγερμός ρυθμίστηκε για το " + lineId + " σε " + minutesAway + " λεπτά (θα χτυπάει μέχρι να τον κλείσετε)"
+                "Συνεχής συναγερμός ρυθμίστηκε για το $lineId σε $timeFormatted (θα χτυπάει μέχρι να τον κλείσετε)"
             } else {
-                "Ειδοποίηση ρυθμίστηκε για το " + lineId + " σε " + minutesAway + " λεπτά"
+                "Ειδοποίηση ρυθμίστηκε για το $lineId σε $timeFormatted"
             }
             Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
         }
@@ -223,4 +224,4 @@ class MainActivity : ComponentActivity() {
             super.onBackPressed()
         }
     }
-}
+}\n

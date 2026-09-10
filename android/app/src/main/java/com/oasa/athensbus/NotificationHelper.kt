@@ -14,6 +14,13 @@ object NotificationHelper {
     const val CHANNEL_ID = "oasa_bus_proximity_channel_v3"
     const val CHANNEL_NAME = "Bus Proximity Alarms"
 
+    fun formatMinutesHuman(mins: Int): String {
+        if (mins < 60) return "${mins}λ"
+        val hours = mins / 60
+        val rem = mins % 60
+        return if (rem > 0) "${hours}ω ${rem}λ" else "${hours}ω"
+    }
+
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
@@ -57,11 +64,12 @@ object NotificationHelper {
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
 
-        val bigText = "Το λεωφορείο $lineId απέχει $minutesAway λεπτά από τη στάση $stopName.\n\nΏρα να κατευθυνθείτε προς τη στάση!"
+        val timeFormatted = formatMinutesHuman(minutesAway)
+        val bigText = "Το λεωφορείο $lineId απέχει $timeFormatted από τη στάση $stopName.\n\nΏρα να κατευθυνθείτε προς τη στάση!"
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("🚨 Λεωφορείο $lineId • σε $minutesAway λεπτά!")
+            .setContentTitle("🚨 Λεωφορείο $lineId • σε $timeFormatted!")
             .setContentText("Στάση: $stopName • Πλησιάζει τώρα!")
             .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
             .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -126,7 +134,8 @@ object NotificationHelper {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val title = if (minutesAway <= 0) "🚨 Γραμμή $lineId • ΕΦΤΑΣΕ ΣΤΗ ΣΤΑΣΗ!" else "🚍 Γραμμή $lineId • σε $minutesAway λεπτά"
+        val timeFormatted = formatMinutesHuman(minutesAway)
+        val title = if (minutesAway <= 0) "🚨 Γραμμή $lineId • ΕΦΤΑΣΕ ΣΤΗ ΣΤΑΣΗ!" else "🚍 Γραμμή $lineId • σε $timeFormatted"
         val subtitle = if (destination.isNotBlank()) "Προς $destination" else "Live Tracker"
 
         val sb = StringBuilder()
@@ -135,20 +144,20 @@ object NotificationHelper {
             sb.append("🏁 Προορισμός: ").append(destination).append("\n")
         }
         if (walkMinutes > 0) {
-            sb.append("🚶 Χρόνος βαδίσματος: ~").append(walkMinutes).append("λ (απόσταση)\n")
+            sb.append("🚶 Χρόνος βαδίσματος: ~").append(formatMinutesHuman(walkMinutes)).append(" (απόσταση)\n")
         }
         sb.append("⏳ Εκτίμηση άφιξης: ")
         if (minutesAway <= 0) {
             sb.append("ΤΩΡΑ στη στάση!\n")
         } else {
-            sb.append("σε ").append(minutesAway).append(" λεπτά\n")
+            sb.append("σε ").append(timeFormatted).append("\n")
         }
         sb.append("📡 Ζωντανή τηλεματική GPS ΟΑΣΑ")
 
         val notification = NotificationCompat.Builder(context, LIVE_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
-            .setContentText("Στάση: $stopName • σε $minutesAway λεπτά")
+            .setContentText("Στάση: $stopName • σε $timeFormatted")
             .setSubText(subtitle)
             .setStyle(NotificationCompat.BigTextStyle().bigText(sb.toString()))
             .setOngoing(true)
@@ -169,4 +178,4 @@ object NotificationHelper {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(LIVE_NOTIF_ID)
     }
-}
+}\n

@@ -3,7 +3,7 @@
  * Background alarm notification scheduler and offline caching
  */
 
-const CACHE_NAME = 'oasa-bus-v19';
+const CACHE_NAME = 'oasa-bus-v20';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -46,6 +46,14 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+function formatMinutesHuman(mins) {
+  if (typeof mins !== 'number' || isNaN(mins)) return '--';
+  if (mins < 60) return `${mins}λ`;
+  const hours = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  return remMins > 0 ? `${hours}ω ${remMins}λ` : `${hours}ω`;
+}
+
 // Active Alarms Map for background countdown
 const activeAlarms = new Map();
 let alarmTickerInterval = null;
@@ -59,8 +67,9 @@ function tickServiceWorkerAlarms() {
     if (remainingMins <= alarm.thresholdMinutes) {
       // Threshold reached: Ring the loud alert!
       const destText = alarm.destination ? `\n🏁 Προορισμός: ${alarm.destination}` : '';
+      const remFormatted = formatMinutesHuman(remainingMins);
       self.registration.showNotification(`🚨 Το Λεωφορείο ${alarm.lineId} πλησιάζει!`, {
-        body: `Η γραμμή ${alarm.lineId} απέχει ${remainingMins} λεπτά από τη στάση ${alarm.stopName}.${destText}\nΏρα για αναχώρηση!`,
+        body: `Η γραμμή ${alarm.lineId} απέχει ${remFormatted} από τη στάση ${alarm.stopName}.${destText}\nΏρα για αναχώρηση!`,
         tag: `bus_alarm_${alarm.id}`,
         icon: '/assets/icon-192.png',
         badge: '/assets/icon-192.png',
@@ -80,9 +89,10 @@ function tickServiceWorkerAlarms() {
     } else {
       // Live countdown notification update
       const destLine = alarm.destination ? ` • Προς ${alarm.destination}` : '';
-      const walkLine = alarm.walkMinutes ? `\n🚶 Βάδισμα: ~${alarm.walkMinutes}λ` : '';
-      self.registration.showNotification(`🚍 ${alarm.lineId} σε ${remainingMins}λ`, {
-        body: `Στάση: ${alarm.stopName}${destLine}${walkLine} • Ειδοποίηση στα ${alarm.thresholdMinutes}λ`,
+      const walkLine = alarm.walkMinutes ? `\n🚶 Βάδισμα: ~${formatMinutesHuman(alarm.walkMinutes)}` : '';
+      const timeDisplay = formatMinutesHuman(remainingMins);
+      self.registration.showNotification(`🚍 ${alarm.lineId} σε ${timeDisplay}`, {
+        body: `Στάση: ${alarm.stopName}${destLine}${walkLine} • Ειδοποίηση στα ${formatMinutesHuman(alarm.thresholdMinutes)}`,
         tag: `live_alarm_${alarm.id}`,
         icon: '/assets/icon-192.png',
         badge: '/assets/icon-192.png',

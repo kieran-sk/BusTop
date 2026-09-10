@@ -58,6 +58,17 @@ class AirportTicker {
     this.render();
   }
 
+  /**
+   * Format long amounts of minutes into hours and minutes (e.g. 500λ -> 8ω 20λ)
+   */
+  formatMinutesHuman(mins) {
+    if (typeof mins !== 'number' || isNaN(mins)) return '--';
+    if (mins < 60) return `${mins}λ`;
+    const hours = Math.floor(mins / 60);
+    const remMins = mins % 60;
+    return remMins > 0 ? `${hours}ω ${remMins}λ` : `${hours}ω`;
+  }
+
   renderSplitFlapDigits(key, text, urgencyClass = '') {
     const chars = String(text).split('');
     const prev = this.previousDigitsMap.get(key) || '';
@@ -67,6 +78,8 @@ class AirportTicker {
     const html = chars.map((ch, idx) => {
       if (ch === ':' || ch === '.' || ch === '-') {
         return `<span class="flap-separator">${ch}</span>`;
+      } else if (ch === ' ') {
+        return `<span class="flap-separator" style="width: 6px; display: inline-block;"> </span>`;
       } else if (/[a-zA-Z\u0370-\u03ff]/.test(ch)) {
         return `<span class="flap-unit">${ch}</span>`;
       } else {
@@ -107,7 +120,7 @@ class AirportTicker {
   }
 
   /**
-   * Get Commute Advice: Signed time difference only (+20λ, -2λ)
+   * Get Commute Advice: Signed time difference only (+20λ, -2λ, +1ω 15λ)
    */
   getCommuteAdvice(busMinutes, walkMinutes) {
     if (walkMinutes === null) {
@@ -119,7 +132,9 @@ class AirportTicker {
     }
 
     const buffer = busMinutes - walkMinutes;
-    const sign = buffer > 0 ? `+${buffer}λ` : `${buffer}λ`;
+    const absBuf = Math.abs(buffer);
+    const formattedBuf = this.formatMinutesHuman(absBuf);
+    const sign = buffer > 0 ? `+${formattedBuf}` : (buffer < 0 ? `-${formattedBuf}` : '0λ');
 
     if (buffer >= 5) {
       return {
@@ -165,7 +180,13 @@ class AirportTicker {
     const fieldKey = `arr_${arr.line_id}_${arr.route_code}_${arrIdx}`;
 
     if (isLive) {
-      const padded = String(busMins).padStart(2, '0');
+      let timeText = '';
+      if (busMins >= 60) {
+        timeText = this.formatMinutesHuman(busMins);
+      } else {
+        timeText = `${String(busMins).padStart(2, '0')}λ`;
+      }
+
       if (busMins <= 3) {
         urgencyClass = 'urgency-now';
       } else if (busMins <= 10) {
@@ -173,10 +194,18 @@ class AirportTicker {
       } else {
         urgencyClass = 'urgency-normal';
       }
-      dueDisplay = this.renderSplitFlapDigits(fieldKey, `${padded}λ`, urgencyClass);
+      dueDisplay = this.renderSplitFlapDigits(fieldKey, timeText, urgencyClass);
     } else {
       urgencyClass = 'urgency-scheduled';
-      dueDisplay = this.renderSplitFlapDigits(fieldKey, arr.estimated_arrival_time || arr.departure_time || '--:--', urgencyClass);
+      // If arrival has estimated arrival clock or departure time, display it; otherwise format btime2
+      const clockTime = arr.estimated_arrival_time || arr.departure_time;
+      if (clockTime) {
+        dueDisplay = this.renderSplitFlapDigits(fieldKey, clockTime, urgencyClass);
+      } else if (typeof busMins === 'number') {
+        dueDisplay = this.renderSplitFlapDigits(fieldKey, this.formatMinutesHuman(busMins), urgencyClass);
+      } else {
+        dueDisplay = this.renderSplitFlapDigits(fieldKey, '--:--', urgencyClass);
+      }
     }
 
     // Check if an alarm is active for this route
@@ -240,7 +269,7 @@ class AirportTicker {
           </div>
 
           <div class="ticker-cell-pin">
-            <button class="ticker-pin-btn ${isPinned ? 'active' : ''}" title="${isPinned ? 'Καρφιτσωμένο (κλικ για αφαίρεση)' : 'Καρφίτσωμα άφιξης για σύνθετο ταξίδι'}" onclick="event.stopPropagation(); window.PinnedTrips.togglePin(${JSON.stringify(arr).replace(/"/g, '&quot;')}, window.App.currentStop)">
+            <button class="ticker-pin-btn ${isPinned ? 'active' : ''}" title="${isPinned ? 'Καρφιτσωμένο (κλικ για αφαίρεση)' : 'Καρφίτσωμα άφιξης στις Καρφίτσες'}" onclick="event.stopPropagation(); window.PinnedTrips.togglePin(${JSON.stringify(arr).replace(/"/g, '&quot;')}, window.App.currentStop)">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="${isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <line x1="12" y1="17" x2="12" y2="22"></line>
                 <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>

@@ -105,7 +105,6 @@ class LiveTrackingService : Service() {
         ringUntilDismissed = intent?.getBooleanExtra(EXTRA_RING_UNTIL_DISMISSED, true) ?: true
         isAlarmTriggered = false
 
-        // Start Foreground immediately with Ongoing Rich Live Notification
         NotificationHelper.createLiveNotificationChannel(this)
         val initialNotif = buildLiveNotification(10)
         startForeground(NotificationHelper.LIVE_NOTIF_ID, initialNotif)
@@ -200,7 +199,8 @@ class LiveTrackingService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val title = if (mins <= 0) "🚨 Γραμμή $lineId • ΕΦΤΑΣΕ ΣΤΗ ΣΤΑΣΗ!" else "🚍 Γραμμή $lineId • σε $mins λεπτά"
+        val timeFormatted = NotificationHelper.formatMinutesHuman(mins)
+        val title = if (mins <= 0) "🚨 Γραμμή $lineId • ΕΦΤΑΣΕ ΣΤΗ ΣΤΑΣΗ!" else "🚍 Γραμμή $lineId • σε $timeFormatted"
         val subtitle = if (destination.isNotBlank()) "Προς $destination" else "Live Tracker"
 
         val sb = StringBuilder()
@@ -209,20 +209,20 @@ class LiveTrackingService : Service() {
             sb.append("🏁 Προορισμός: ").append(destination).append("\n")
         }
         if (walkMinutes > 0) {
-            sb.append("🚶 Χρόνος βαδίσματος: ~").append(walkMinutes).append("λ (απόσταση)\n")
+            sb.append("🚶 Χρόνος βαδίσματος: ~").append(NotificationHelper.formatMinutesHuman(walkMinutes)).append(" (απόσταση)\n")
         }
         sb.append("⏳ Εκτίμηση άφιξης: ")
         if (mins <= 0) {
             sb.append("ΤΩΡΑ στη στάση!\n")
         } else {
-            sb.append("σε ").append(mins).append(" λεπτά (ειδοποίηση στα ").append(thresholdMinutes).append("λ)\n")
+            sb.append("σε ").append(timeFormatted).append(" (ειδοποίηση στα ").append(NotificationHelper.formatMinutesHuman(thresholdMinutes)).append(")\n")
         }
         sb.append("📡 Ζωντανή τηλεματική GPS ΟΑΣΑ")
 
         return NotificationCompat.Builder(this, NotificationHelper.LIVE_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
-            .setContentText("Στάση: $stopName • σε $mins λεπτά")
+            .setContentText("Στάση: $stopName • σε $timeFormatted")
             .setSubText(subtitle)
             .setStyle(NotificationCompat.BigTextStyle().bigText(sb.toString()))
             .setOngoing(true)
@@ -248,4 +248,4 @@ class LiveTrackingService : Service() {
         super.onDestroy()
         serviceJob.cancel()
     }
-}
+}\n
