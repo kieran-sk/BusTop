@@ -595,9 +595,14 @@ class AppController {
     modal.dataset.lineId = lineId;
     modal.dataset.routeCode = routeCode;
     modal.dataset.dueMins = busMinutes;
+    modal.dataset.lineDescr = lineDescr || '';
 
     // Reset preset chips to default 5 mins
     this.selectAlarmPreset(5);
+
+    // Default continuous alarm to checked
+    const continuousCheck = document.getElementById('alarm-ring-until-dismissed');
+    if (continuousCheck) continuousCheck.checked = true;
 
     modal.classList.add('open');
     this.updateBackButtonsVisibility();
@@ -625,8 +630,11 @@ class AppController {
     const lineId = modal.dataset.lineId;
     const routeCode = modal.dataset.routeCode;
     const dueMins = parseInt(modal.dataset.dueMins, 10);
+    const lineDescr = modal.dataset.lineDescr || '';
     const customInput = document.getElementById('alarm-threshold-custom');
     const threshold = customInput ? (parseInt(customInput.value, 10) || 5) : 5;
+    const continuousCheck = document.getElementById('alarm-ring-until-dismissed');
+    const ringUntilDismissed = continuousCheck ? continuousCheck.checked : true;
 
     if (!this.currentStop) return;
 
@@ -634,13 +642,22 @@ class AppController {
       window.Alarms.unlockAudio();
     }
 
+    // Walking time to current stop if available
+    let walkMins = 0;
+    if (this.currentStop.distanceMeters) {
+      walkMins = Math.ceil(this.currentStop.distanceMeters / 80) + 2;
+    }
+
     window.Alarms.addAlarm({
       stopCode: this.currentStop.StopCode,
       stopName: this.currentStop.StopDescr || 'Στάση ΟΑΣΑ',
       lineId,
       routeCode,
+      destination: lineDescr,
+      walkMinutes: walkMins,
       targetMinutes: dueMins,
-      thresholdMinutes: threshold
+      thresholdMinutes: threshold,
+      ringUntilDismissed: ringUntilDismissed
     });
 
     this.closeModal('set-alarm-modal');

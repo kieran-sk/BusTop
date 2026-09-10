@@ -1,4 +1,4 @@
-package com.oasa.athensbus
+﻿package com.oasa.athensbus
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -68,7 +68,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    @SuppressLint("SetJavaScriptEnabled")
+    @SuppressLint(SetJavaScriptEnabled)
     private fun initWebView() {
         webView = WebView(this)
         setContentView(webView)
@@ -104,16 +104,16 @@ class MainActivity : ComponentActivity() {
                 error: android.webkit.WebResourceError?
             ) {
                 if (request?.isForMainFrame == true) {
-                    view?.loadUrl("file:///android_asset/web/index.html")
+                    view?.loadUrl(file:///android_asset/web/index.html)
                 }
             }
         }
 
         // Native Android Bridge for web interaction
-        webView.addJavascriptInterface(WebAppInterface(this), "AndroidBridge")
+        webView.addJavascriptInterface(WebAppInterface(this), AndroidBridge)
 
         // Load live production Cloudflare Pages or bundled offline fallback
-        webView.loadUrl("https://bustop.pages.dev")
+        webView.loadUrl(https://bustop.pages.dev)
     }
 
     inner class WebAppInterface(private val context: Context) {
@@ -129,18 +129,25 @@ class MainActivity : ComponentActivity() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 vibrator.vibrate(VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE))
             } else {
-                @Suppress("DEPRECATION")
+                @Suppress(DEPRECATION)
                 vibrator.vibrate(durationMs)
             }
         }
 
         @JavascriptInterface
-        fun scheduleAlarm(lineId: String, stopName: String, minutesAway: Int, triggerInSeconds: Long) {
+        fun scheduleAlarm(
+            lineId: String,
+            stopName: String,
+            minutesAway: Int,
+            triggerInSeconds: Long,
+            ringUntilDismissed: Boolean = true
+        ) {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
             val intent = Intent(context, AlarmReceiver::class.java).apply {
-                putExtra("EXTRA_LINE_ID", lineId)
-                putExtra("EXTRA_STOP_NAME", stopName)
-                putExtra("EXTRA_MINUTES_AWAY", minutesAway)
+                putExtra(EXTRA_LINE_ID, lineId)
+                putExtra(EXTRA_STOP_NAME, stopName)
+                putExtra(EXTRA_MINUTES_AWAY, minutesAway)
+                putExtra(EXTRA_RING_UNTIL_DISMISSED, ringUntilDismissed)
             }
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
@@ -157,38 +164,75 @@ class MainActivity : ComponentActivity() {
             val alarmClockInfo = AlarmManager.AlarmClockInfo(triggerTime, pShow)
             alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
 
-            Toast.makeText(context, "Ειδοποίηση ρυθμίστηκε για το $lineId σε $minutesAway λεπτά (λειτουργεί και με κλειστή οθόνη)", Toast.LENGTH_LONG).show()
+            val msg = if (ringUntilDismissed) {
+                Συνεχής συναγερμός ρυθμίστηκε για το σε λεπτά (θα χτυπάει μέχρι να τον κλείσετε)
+            } else {
+                Ειδοποίηση ρυθμίστηκε για το σε λεπτά
+            }
+            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
         }
 
         @JavascriptInterface
-        fun startLiveTracking(stopCode: String, lineId: String, routeCode: String, stopName: String, thresholdMinutes: Int) {
-            LiveTrackingService.start(context, stopCode, lineId, routeCode, stopName, thresholdMinutes)
+        fun startLiveTracking(
+            stopCode: String,
+            lineId: String,
+            routeCode: String,
+            stopName: String,
+            destination: String,
+            walkMinutes: Int,
+            thresholdMinutes: Int,
+            ringUntilDismissed: Boolean = true
+        ) {
+            LiveTrackingService.start(
+                context,
+                stopCode,
+                lineId,
+                routeCode,
+                stopName,
+                destination,
+                walkMinutes,
+                thresholdMinutes,
+                ringUntilDismissed
+            )
         }
 
         @JavascriptInterface
         fun stopLiveTracking() {
             LiveTrackingService.stop(context)
+            AlarmRingingService.dismiss(context)
         }
 
         @JavascriptInterface
-        fun updateLiveArrivalNotification(lineId: String, minutesAway: Int, stopName: String) {
-            NotificationHelper.updateLiveArrivalNotification(context, lineId, minutesAway, stopName)
+        fun dismissAlarm() {
+            AlarmRingingService.dismiss(context)
         }
 
         @JavascriptInterface
-        fun clearLiveArrivalNotification() {
-            NotificationHelper.clearLiveArrivalNotification(context)
-            LiveTrackingService.stop(context)
-        }
-    }
+        fun updateLiveArrivalNotification(
+            lineId: String,
+            minutesAway: Int,
+            stopName: String,
+            destination: String = ",
+ walkMinutes: Int = 0
+ ) {
+ NotificationHelper.updateLiveArrivalNotification(context, lineId, minutesAway, stopName, destination, walkMinutes)
+ }
 
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        if (webView.canGoBack()) {
-            webView.goBack()
-        } else {
-            @Suppress("DEPRECATION")
-            super.onBackPressed()
-        }
-    }
+ @JavascriptInterface
+ fun clearLiveArrivalNotification() {
+ NotificationHelper.clearLiveArrivalNotification(context)
+ LiveTrackingService.stop(context)
+ AlarmRingingService.dismiss(context)
+ }
+ }
+
+ @Deprecated(Deprecated in Java)
+ override fun onBackPressed() {
+ if (webView.canGoBack()) {
+ webView.goBack()
+ } else {
+ @Suppress(DEPRECATION)
+ super.onBackPressed()
+ }
+ }
 }

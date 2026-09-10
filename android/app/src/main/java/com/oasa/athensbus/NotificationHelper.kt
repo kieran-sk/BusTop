@@ -1,4 +1,4 @@
-package com.oasa.athensbus
+﻿package com.oasa.athensbus
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -11,8 +11,8 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 
 object NotificationHelper {
-    const val CHANNEL_ID = "oasa_bus_proximity_channel_v3"
-    const val CHANNEL_NAME = "Bus Proximity Alarms"
+    const val CHANNEL_ID = oasa_bus_proximity_channel_v3
+    const val CHANNEL_NAME = Bus Proximity Alarms
 
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -27,7 +27,7 @@ object NotificationHelper {
 
             val importance = NotificationManager.IMPORTANCE_HIGH
             val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, importance).apply {
-                description = "Alerts commuters when their Athens bus is approaching the stop"
+                description = Alerts commuters when their Athens bus is approaching the stop
                 enableLights(true)
                 enableVibration(true)
                 setSound(defaultSoundUri, audioAttributes)
@@ -57,11 +57,13 @@ object NotificationHelper {
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
 
+        val bigText = Το λεωφορείο απέχει λεπτά από τη στάση .\n\nΏρα να κατευθυνθείτε προς τη στάση!
+
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle("🚨 Λεωφορείο $lineId: $minutesAway λεπτά απομένουν!")
-            .setContentText("Πλησιάζει στη στάση $stopName. Ώρα αναχώρησης!")
-            .setStyle(NotificationCompat.BigTextStyle().bigText("Το λεωφορείο $lineId απέχει $minutesAway λεπτά από τη στάση $stopName. Ξεκινήστε για τη στάση!"))
+            .setContentTitle(🚨 Λεωφορείο • σε λεπτά!)
+            .setContentText(Στάση: • Πλησιάζει τώρα!)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(bigText))
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -76,14 +78,14 @@ object NotificationHelper {
         notificationManager.notify(lineId.hashCode(), notification)
     }
 
-    const val LIVE_CHANNEL_ID = "oasa_bus_live_channel_v3"
-    const val LIVE_CHANNEL_NAME = "Live Bus Tracking"
+    const val LIVE_CHANNEL_ID = oasa_bus_live_channel_v4
+    const val LIVE_CHANNEL_NAME = Live Bus Tracking
     const val LIVE_NOTIF_ID = 2001
 
     fun createLiveNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(LIVE_CHANNEL_ID, LIVE_CHANNEL_NAME, NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "Shows live ongoing countdown for pinned bus arrivals on lock screen"
+                description = Rich Ongoing Live Activity pill showing bus arrival countdown, stop, and status
                 setShowBadge(true)
                 setSound(null, null)
                 enableVibration(false)
@@ -95,44 +97,79 @@ object NotificationHelper {
     }
 
     /**
-     * Android Native Live Notification (Rich Ongoing Status Bar Pill & Lock Screen)
+     * Android Native Live Notification (Rich Ongoing Status Bar Pill & Expanded Card)
      */
-    fun updateLiveArrivalNotification(context: Context, lineId: String, minutesAway: Int, stopName: String) {
-        createLiveNotificationChannel(context)
+    fun updateLiveArrivalNotification(
+        context: Context,
+        lineId: String,
+        minutesAway: Int,
+        stopName: String,
+        destination: String = ",
+ walkMinutes: Int = 0
+ ) {
+ createLiveNotificationChannel(context)
 
-        val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            context,
-            LIVE_NOTIF_ID,
-            intent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
+ val intent = Intent(context, MainActivity::class.java).apply {
+ flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+ }
+ val pendingIntent = PendingIntent.getActivity(
+ context,
+ LIVE_NOTIF_ID,
+ intent,
+ PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+ )
 
-        val title = if (minutesAway <= 0) "🚨 Γραμμή $lineId • ΕΦΤΑΣΕ ΣΤΗ ΣΤΑΣΗ!" else "🚍 Γραμμή $lineId • σε $minutesAway λεπτά"
-        val text = "Στάση: $stopName • Ζωντανό GPS ΟΑΣΑ"
+ val stopIntent = Intent(context, LiveTrackingService::class.java).apply {
+ action = LiveTrackingService.ACTION_STOP
+ }
+ val pStop = PendingIntent.getService(
+ context,
+ LIVE_NOTIF_ID + 1,
+ stopIntent,
+ PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+ )
 
-        val notification = NotificationCompat.Builder(context, LIVE_CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setSubText("Live Activity")
-            .setOngoing(true) // Android Live Notification
-            .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setCategory(NotificationCompat.CATEGORY_STATUS)
-            .setColor(0xFF005AC1.toInt())
-            .setContentIntent(pendingIntent)
-            .build()
+ val title = if (minutesAway <= 0) 🚨 Γραμμή  • ΕΦΤΑΣΕ ΣΤΗ ΣΤΑΣΗ! else 🚍 Γραμμή  • σε  λεπτά
+ val subtitle = if (destination.isNotBlank()) Προς  else Live Tracker
 
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(LIVE_NOTIF_ID, notification)
-    }
+ val sb = StringBuilder()
+ sb.append(📍 Στάση: ).append(stopName).append(\n)
+ if (destination.isNotBlank()) {
+ sb.append(🏁 Προορισμός: ).append(destination).append(\n)
+ }
+ if (walkMinutes > 0) {
+ sb.append(🚶 Χρόνος βαδίσματος: ~).append(walkMinutes).append(λ (απόσταση)\n)
+ }
+ sb.append(⏳ Εκτίμηση άφιξης: )
+ if (minutesAway <= 0) {
+ sb.append(ΤΩΡΑ στη στάση!\n)
+ } else {
+ sb.append(σε ).append(minutesAway).append( λεπτά\n)
+ }
+ sb.append(📡 Ζωντανή τηλεματική GPS ΟΑΣΑ)
 
-    fun clearLiveArrivalNotification(context: Context) {
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.cancel(LIVE_NOTIF_ID)
-    }
+ val notification = NotificationCompat.Builder(context, LIVE_CHANNEL_ID)
+ .setSmallIcon(R.mipmap.ic_launcher)
+ .setContentTitle(title)
+ .setContentText(Στάση:  • σε  λεπτά)
+ .setSubText(subtitle)
+ .setStyle(NotificationCompat.BigTextStyle().bigText(sb.toString()))
+ .setOngoing(true) // Keeps it as an Android Live Notification / Status Bar Pill
+ .setOnlyAlertOnce(true)
+ .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+ .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+ .setCategory(NotificationCompat.CATEGORY_STATUS)
+ .setColor(0xFF005AC1.toInt())
+ .setContentIntent(pendingIntent)
+ .addAction(android.R.drawable.ic_menu_close_clear_cancel, 🛑 Τερματισμός, pStop)
+ .build()
+
+ val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+ notificationManager.notify(LIVE_NOTIF_ID, notification)
+ }
+
+ fun clearLiveArrivalNotification(context: Context) {
+ val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+ notificationManager.cancel(LIVE_NOTIF_ID)
+ }
 }

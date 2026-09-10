@@ -3,7 +3,7 @@
  * Background alarm notification scheduler and offline caching
  */
 
-const CACHE_NAME = 'oasa-bus-v18';
+const CACHE_NAME = 'oasa-bus-v19';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -58,8 +58,9 @@ function tickServiceWorkerAlarms() {
 
     if (remainingMins <= alarm.thresholdMinutes) {
       // Threshold reached: Ring the loud alert!
+      const destText = alarm.destination ? `\n🏁 Προορισμός: ${alarm.destination}` : '';
       self.registration.showNotification(`🚨 Το Λεωφορείο ${alarm.lineId} πλησιάζει!`, {
-        body: `Η γραμμή ${alarm.lineId} απέχει ${remainingMins} λεπτά από τη στάση ${alarm.stopName}. Ώρα για αναχώρηση!`,
+        body: `Η γραμμή ${alarm.lineId} απέχει ${remainingMins} λεπτά από τη στάση ${alarm.stopName}.${destText}\nΏρα για αναχώρηση!`,
         tag: `bus_alarm_${alarm.id}`,
         icon: '/assets/icon-192.png',
         badge: '/assets/icon-192.png',
@@ -78,8 +79,10 @@ function tickServiceWorkerAlarms() {
       activeAlarms.delete(id);
     } else {
       // Live countdown notification update
+      const destLine = alarm.destination ? ` • Προς ${alarm.destination}` : '';
+      const walkLine = alarm.walkMinutes ? `\n🚶 Βάδισμα: ~${alarm.walkMinutes}λ` : '';
       self.registration.showNotification(`🚍 ${alarm.lineId} σε ${remainingMins}λ`, {
-        body: `Στάση: ${alarm.stopName} • Ειδοποίηση στα ${alarm.thresholdMinutes}λ`,
+        body: `Στάση: ${alarm.stopName}${destLine}${walkLine} • Ειδοποίηση στα ${alarm.thresholdMinutes}λ`,
         tag: `live_alarm_${alarm.id}`,
         icon: '/assets/icon-192.png',
         badge: '/assets/icon-192.png',

@@ -133,6 +133,11 @@ class AlarmManager {
     if ('vibrate' in navigator) {
       navigator.vibrate(0);
     }
+    if (window.AndroidBridge && typeof window.AndroidBridge.dismissAlarm === 'function') {
+      try {
+        window.AndroidBridge.dismissAlarm();
+      } catch (e) {}
+    }
   }
 
   /**
@@ -146,6 +151,9 @@ class AlarmManager {
     const id = 'alarm_' + Date.now();
     const threshold = options.thresholdMinutes || 5;
     const initialMins = options.targetMinutes || 10;
+    const destination = options.destination || '';
+    const walkMinutes = options.walkMinutes || 0;
+    const ringUntilDismissed = options.ringUntilDismissed !== false;
     const createdAt = Date.now();
 
     const alarm = {
@@ -154,8 +162,11 @@ class AlarmManager {
       stopName: options.stopName,
       lineId: String(options.lineId).trim(),
       routeCode: options.routeCode ? String(options.routeCode) : '',
+      destination,
+      walkMinutes,
       initialMinutes: initialMins,
       thresholdMinutes: threshold,
+      ringUntilDismissed,
       createdAt,
       triggered: false
     };
@@ -170,8 +181,11 @@ class AlarmManager {
         id,
         lineId: alarm.lineId,
         stopName: alarm.stopName,
+        destination: alarm.destination,
+        walkMinutes: alarm.walkMinutes,
         initialMinutes: initialMins,
         thresholdMinutes: threshold,
+        ringUntilDismissed: alarm.ringUntilDismissed,
         createdAt
       });
     }
@@ -181,10 +195,19 @@ class AlarmManager {
       try {
         const triggerInSecs = Math.max(1, (initialMins - threshold) * 60);
         if (typeof window.AndroidBridge.scheduleAlarm === 'function') {
-          window.AndroidBridge.scheduleAlarm(alarm.lineId, alarm.stopName, threshold, triggerInSecs);
+          window.AndroidBridge.scheduleAlarm(alarm.lineId, alarm.stopName, threshold, triggerInSecs, ringUntilDismissed);
         }
         if (typeof window.AndroidBridge.startLiveTracking === 'function') {
-          window.AndroidBridge.startLiveTracking(alarm.stopCode, alarm.lineId, alarm.routeCode || '', alarm.stopName, threshold);
+          window.AndroidBridge.startLiveTracking(
+            alarm.stopCode,
+            alarm.lineId,
+            alarm.routeCode || '',
+            alarm.stopName,
+            alarm.destination || '',
+            alarm.walkMinutes || 0,
+            threshold,
+            ringUntilDismissed
+          );
         }
       } catch (e) {
         console.warn('AndroidBridge schedule error:', e);
@@ -210,7 +233,13 @@ class AlarmManager {
     // 1. Android Native Ongoing Live Notification
     if (window.AndroidBridge && typeof window.AndroidBridge.updateLiveArrivalNotification === 'function') {
       try {
-        window.AndroidBridge.updateLiveArrivalNotification(alarm.lineId, minutes, alarm.stopName);
+        window.AndroidBridge.updateLiveArrivalNotification(
+          alarm.lineId,
+          minutes,
+          alarm.stopName,
+          alarm.destination || '',
+          alarm.walkMinutes || 0
+        );
       } catch (e) {}
     }
 
