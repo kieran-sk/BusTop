@@ -1,0 +1,565 @@
+/**
+ * Airport Flight Departure Board ("Ticker") Styling - Light Mode & Per-Digit Split-Flap
+ * Greek-compatible typography ('Inter', 'Noto Sans', 'Roboto Mono')
+ */
+
+.ticker-board {
+  background: #ffffff;
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  border: 1.5px solid var(--md-sys-color-outline-variant);
+  box-shadow: var(--md-sys-elevation-2);
+  padding: 1.25rem;
+  color: #0f172a;
+  font-family: 'Inter', 'Noto Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+  position: relative;
+}
+
+/* Board Header bar */
+.ticker-board-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1.5px solid var(--md-sys-color-outline-variant);
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.75rem;
+  text-transform: uppercase;
+}
+
+.ticker-board-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 1rem;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  color: var(--md-sys-color-primary);
+}
+
+/* Individual Digit Split-Flap Container */
+.split-flap-board {
+  display: inline-flex;
+  align-items: center;
+  gap: 2.5px;
+  vertical-align: middle;
+}
+
+/* Individual Digit Split Flap Tile */
+.flap-digit-box {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 30px;
+  background: #ffffff;
+  color: #0f172a;
+  font-family: 'Roboto Mono', 'SF Mono', Consolas, monospace;
+  font-weight: 800;
+  font-size: 1.15rem;
+  line-height: 30px;
+  text-align: center;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  perspective: 250px;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Horizontal split-flap seam on each digit */
+.flap-digit-box::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(0, 0, 0, 0.22);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9);
+  z-index: 5;
+  pointer-events: none;
+}
+
+/* 3D Flip Animation on Value Changes */
+.flap-digit-box.flap-flip {
+  animation: flapTileFlip 0.38s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes flapTileFlip {
+  0% { transform: rotateX(0deg); }
+  50% { transform: rotateX(-90deg); filter: brightness(0.85); }
+  51% { transform: rotateX(90deg); }
+  100% { transform: rotateX(0deg); filter: brightness(1); }
+}
+
+.flap-separator {
+  font-family: 'Roboto Mono', monospace;
+  font-weight: 900;
+  font-size: 1.1rem;
+  color: #64748b;
+  margin: 0 1px;
+  line-height: 30px;
+}
+
+.flap-unit {
+  font-family: 'Roboto Mono', monospace;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #64748b;
+  margin-left: 2px;
+}
+
+/* Split-Flap Board Urgency Themes */
+.split-flap-board.urgency-now .flap-digit-box {
+  background: #fef2f2;
+  border-color: #f87171;
+  color: #dc2626;
+  box-shadow: 0 0 6px rgba(239, 68, 68, 0.35);
+}
+.split-flap-board.urgency-now .flap-unit,
+.split-flap-board.urgency-now .flap-separator {
+  color: #dc2626;
+}
+
+.split-flap-board.urgency-soon .flap-digit-box {
+  background: #f0fdf4;
+  border-color: #4ade80;
+  color: #15803d;
+  box-shadow: 0 0 5px rgba(34, 197, 94, 0.25);
+}
+.split-flap-board.urgency-soon .flap-unit,
+.split-flap-board.urgency-soon .flap-separator {
+  color: #15803d;
+}
+
+.split-flap-board.urgency-normal .flap-digit-box {
+  background: #f0f9ff;
+  border-color: #38bdf8;
+  color: #0284c7;
+}
+.split-flap-board.urgency-normal .flap-unit,
+.split-flap-board.urgency-normal .flap-separator {
+  color: #0284c7;
+}
+
+.split-flap-board.urgency-scheduled .flap-digit-box {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  color: #334155;
+}
+
+.ticker-due-pill {
+  display: inline-block;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-top: 3px;
+  line-height: 1.3;
+}
+
+.ticker-due-pill.pill-now {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+  animation: pulseNow 1.5s infinite;
+}
+
+.ticker-due-pill.pill-soon {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+
+.ticker-due-pill.pill-normal {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+.ticker-due-pill.pill-sched {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+@keyframes pulseNow {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.04); }
+}
+
+/* Live Header Clock */
+.ticker-clock {
+  display: inline-flex;
+  align-items: center;
+  background: #f8fafc;
+  padding: 0.2rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* Ticker Line Filter Bar (Show/Hide routes) */
+.ticker-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #f8fafc;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ticker-filter-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.ticker-filter-pills {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.ticker-filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  cursor: pointer;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.ticker-filter-pill.is-active {
+  background: #e0f2fe;
+  color: #005ac1;
+  border-color: #bae6fd;
+}
+
+.ticker-filter-pill.is-hidden {
+  background: #f1f5f9;
+  color: #94a3b8;
+  text-decoration: line-through;
+  opacity: 0.65;
+}
+
+.ticker-filter-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.ticker-filter-reset {
+  background: none;
+  border: none;
+  color: #005ac1;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 2px 6px;
+}
+
+/* Table Column Headers */
+.ticker-col-headers {
+  display: grid;
+  grid-template-columns: 56px 1fr 125px 80px 75px 40px 40px;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: #64748b;
+  border-bottom: 1.5px dashed var(--md-sys-color-outline-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  align-items: center;
+}
+
+.ticker-col-headers > div {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Rows */
+.ticker-row {
+  display: grid;
+  grid-template-columns: 56px 1fr 125px 80px 75px 40px 40px;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--md-sys-color-outline-variant);
+  transition: background 0.15s ease;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.ticker-row > div {
+  min-width: 0;
+}
+
+.ticker-row:hover {
+  background: rgba(0, 90, 193, 0.04);
+}
+
+@media (max-width: 640px) {
+  .ticker-col-headers {
+    display: none;
+  }
+
+  .ticker-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    grid-template-areas:
+      "line dest dest due"
+      "walk commute alarm pin";
+    gap: 0.45rem 0.5rem;
+    padding: 0.75rem 0.65rem;
+    align-items: center;
+  }
+
+  .ticker-cell-line {
+    grid-area: line;
+    align-self: center;
+  }
+
+  .ticker-cell-dest {
+    grid-area: dest;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .ticker-cell-due {
+    grid-area: due;
+    justify-self: end;
+  }
+
+  .ticker-cell-walk {
+    grid-area: walk;
+    display: flex;
+    align-items: center;
+  }
+
+  .ticker-cell-commute {
+    grid-area: commute;
+    display: flex;
+    align-items: center;
+  }
+
+  .ticker-cell-alarm {
+    grid-area: alarm;
+    justify-self: end;
+  }
+
+  .ticker-cell-pin {
+    grid-area: pin;
+    justify-self: end;
+  }
+}
+
+/* Line Code Badge - Plain M3 Style (NOT split-flap) */
+.ticker-line-badge {
+  background: #f0f7ff;
+  color: #005ac1;
+  font-weight: 900;
+  font-size: 0.95rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 8px;
+  text-align: center;
+  border: 1.5px solid #bfdbfe;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  letter-spacing: 0.02em;
+}
+
+/* Destination */
+.ticker-dest {
+  color: #0f172a;
+  font-weight: 700;
+  overflow: hidden;
+  letter-spacing: 0.01em;
+}
+
+.ticker-dest-title {
+  color: #0f172a;
+  font-weight: 800;
+  font-size: 0.95rem;
+  line-height: 1.25;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+.ticker-dest-sub {
+  font-size: 0.75rem;
+  color: #64748b;
+  display: block;
+  margin-top: 2px;
+  line-height: 1.25;
+}
+
+.ticker-contact-ping {
+  display: inline-block;
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-left: 4px;
+}
+
+/* Countdown / Time Due Display (Separated digit flaps) */
+.ticker-due {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Walk Nav Time - Plain text (NOT split-flap) */
+.ticker-walk-text {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #334155;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Commute Action Recommendation - Plain signed badge (NOT split-flap) */
+.ticker-commute-badge {
+  font-size: 0.85rem;
+  font-weight: 900;
+  padding: 0.25rem 0.55rem;
+  border-radius: 8px;
+  text-align: center;
+  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 46px;
+}
+
+.commute-relax {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.commute-leave-now {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.commute-hurry {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.commute-too-late {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+}
+
+/* Alarm Icon Button next to each arrival */
+.ticker-alarm-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.ticker-alarm-btn:hover {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-primary);
+  border-color: var(--md-sys-color-primary);
+  transform: scale(1.1);
+  box-shadow: 0 2px 5px rgba(0, 90, 193, 0.2);
+}
+
+.ticker-alarm-btn.active {
+  background: #fef3c7;
+  color: #b45309;
+  border-color: #f59e0b;
+}
+
+/* Live Notification Active Indicator */
+.live-notif-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+/* Dedicated Pin Button for Complex Trips */
+.ticker-pin-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+  cursor: pointer;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 0;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.ticker-pin-btn:hover {
+  background: #eff6ff;
+  color: var(--md-sys-color-primary);
+  border-color: var(--md-sys-color-primary);
+  transform: scale(1.1);
+  box-shadow: 0 2px 5px rgba(0, 90, 193, 0.2);
+}
+
+.ticker-pin-btn.active {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
+}
+
+/* Route stop item hover and active states */
+.route-stop-item:hover {
+  border-color: var(--md-sys-color-primary) !important;
+  background: #f0f7ff !important;
+  transform: translateX(2px);
+  box-shadow: 0 2px 6px rgba(0, 90, 193, 0.08);
+}
