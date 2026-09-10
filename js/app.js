@@ -85,7 +85,21 @@ class AppController {
 
     // Register Service Worker for background notifications and offline caching
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(err => {
+      navigator.serviceWorker.register('/sw.js').then((reg) => {
+        // Force immediate check for worker update on every page load
+        reg.update().catch(() => {});
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
+                console.log('New service worker activated - reloading for updates');
+                window.location.reload();
+              }
+            });
+          }
+        });
+      }).catch(err => {
         console.warn('Service worker registration failed:', err);
       });
     }

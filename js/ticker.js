@@ -15,6 +15,7 @@ class AirportTicker {
     this.previousDigitsMap = new Map();
     this.hiddenLines = new Set();
     this.showAllStops = false;
+    window.Ticker = this;
   }
 
   setUserLocation(lat, lng) {
@@ -49,6 +50,9 @@ class AirportTicker {
   }
 
   setStopAndArrivals(stopInfo, arrivals = []) {
+    if (this.currentStop && stopInfo && String(this.currentStop.StopCode) !== String(stopInfo.StopCode)) {
+      this.hiddenLines.clear();
+    }
     this.currentStop = stopInfo;
     this.arrivals = arrivals;
     this.render();
@@ -407,8 +411,8 @@ class AirportTicker {
     const walk = this.getWalkMinutes(this.currentStop.StopLat, this.currentStop.StopLng);
 
     // Extract unique line IDs for interactive show/hide filtering
-    const uniqueLines = Array.from(new Set(this.arrivals.map(a => a.line_id).filter(Boolean)));
-    const visibleArrivals = this.arrivals.filter(a => !this.hiddenLines.has(a.line_id));
+    const uniqueLines = Array.from(new Set(this.arrivals.map(a => String(a.line_id || '').trim()).filter(Boolean)));
+    const visibleArrivals = this.arrivals.filter(a => !this.hiddenLines.has(String(a.line_id || '').trim()));
 
     let rowsHtml = '';
     if (this.arrivals.length === 0) {
@@ -493,10 +497,11 @@ class AirportTicker {
   }
 
   toggleLine(lineId) {
-    if (this.hiddenLines.has(lineId)) {
-      this.hiddenLines.delete(lineId);
+    const lid = String(lineId).trim();
+    if (this.hiddenLines.has(lid)) {
+      this.hiddenLines.delete(lid);
     } else {
-      this.hiddenLines.add(lineId);
+      this.hiddenLines.add(lid);
     }
     this.render();
   }

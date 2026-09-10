@@ -3,7 +3,7 @@
  * Background alarm notification scheduler and offline caching
  */
 
-const CACHE_NAME = 'oasa-bus-v7';
+const CACHE_NAME = 'oasa-bus-v14';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -22,12 +22,12 @@ const STATIC_ASSETS = [
 ];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS);
     })
   );
-  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
@@ -35,7 +35,8 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
-          if (key !== CACHE_NAME && key !== 'oasa-api-cache') {
+          if (key !== CACHE_NAME) {
+            console.log('Purging obsolete cache:', key);
             return caches.delete(key);
           }
         })
@@ -197,6 +198,8 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
+
   if (event.request.url.includes('/api/')) {
     // Network-first with Cache-fallback for offline route and direction support
     event.respondWith(
@@ -213,9 +216,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Network-First for HTML, JS, CSS and all static assets
+  // Guarantees immediate updates on fresh deploy, with offline fallback
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return cached || fetch(event.request);
-    })
+    fetch(event.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const clone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return networkResponse;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
