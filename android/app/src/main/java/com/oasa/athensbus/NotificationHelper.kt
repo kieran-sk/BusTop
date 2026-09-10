@@ -5,22 +5,35 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.media.AudioAttributes
 import android.media.RingtoneManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 
 object NotificationHelper {
-    const val CHANNEL_ID = "oasa_bus_proximity_channel"
+    const val CHANNEL_ID = "oasa_bus_proximity_channel_v2"
     const val CHANNEL_NAME = "Bus Proximity Alarms"
 
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+
+            val audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ALARM)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+
             val importance = NotificationManager.IMPORTANCE_HIGH
             val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, importance).apply {
                 description = "Alerts commuters when their Athens bus is approaching the stop"
                 enableLights(true)
                 enableVibration(true)
-                vibrationPattern = longArrayOf(0, 300, 150, 300, 150, 400)
+                setSound(defaultSoundUri, audioAttributes)
+                setBypassDnd(true)
+                lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
+                vibrationPattern = longArrayOf(0, 800, 200, 800, 200, 800, 1000)
             }
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
@@ -31,27 +44,30 @@ object NotificationHelper {
         createNotificationChannel(context)
 
         val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
         val pendingIntent = PendingIntent.getActivity(
             context,
-            0,
+            lineId.hashCode(),
             intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
         val defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
             ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_alert)
-            .setContentTitle("🚌 Bus $lineId is $minutesAway min away!")
-            .setContentText("Approaching $stopName. Head to the stop now!")
-            .setStyle(NotificationCompat.BigTextStyle().bigText("Bus $lineId is $minutesAway minutes away from $stopName. Time to leave!"))
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("🚨 Λεωφορείο $lineId: $minutesAway λεπτά απομένουν!")
+            .setContentText("Πλησιάζει στη στάση $stopName. Ώρα αναχώρησης!")
+            .setStyle(NotificationCompat.BigTextStyle().bigText("Το λεωφορείο $lineId απέχει $minutesAway λεπτά από τη στάση $stopName. Ξεκινήστε για τη στάση!"))
+            .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setFullScreenIntent(pendingIntent, true) // Turns screen ON immediately on locked device
             .setSound(defaultSoundUri)
-            .setVibrate(longArrayOf(0, 300, 150, 300, 150, 400))
+            .setVibrate(longArrayOf(0, 800, 200, 800, 200, 800, 1000))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()
@@ -60,7 +76,7 @@ object NotificationHelper {
         notificationManager.notify(lineId.hashCode(), notification)
     }
 
-    const val LIVE_CHANNEL_ID = "oasa_bus_live_channel"
+    const val LIVE_CHANNEL_ID = "oasa_bus_live_channel_v2"
     const val LIVE_CHANNEL_NAME = "Live Bus Tracking"
     const val LIVE_NOTIF_ID = 2001
 
@@ -69,6 +85,7 @@ object NotificationHelper {
             val channel = NotificationChannel(LIVE_CHANNEL_ID, LIVE_CHANNEL_NAME, NotificationManager.IMPORTANCE_LOW).apply {
                 description = "Shows live ongoing countdown for pinned bus arrivals on lock screen"
                 setShowBadge(true)
+                lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
             }
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
@@ -91,17 +108,18 @@ object NotificationHelper {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val title = if (minutesAway <= 0) "🚍 Γραμμή $lineId • ΦΘΑΝΕΙ ΤΩΡΑ!" else "🚍 Γραμμή $lineId • σε $minutesAway λεπτά"
+        val title = if (minutesAway <= 0) "🚨 Γραμμή $lineId • ΕΦΤΑΣΕ ΣΤΗ ΣΤΑΣΗ!" else "🚍 Γραμμή $lineId • σε $minutesAway λεπτά"
         val text = "Στάση: $stopName • Ζωντανή Τηλεματική ΟΑΣΑ"
 
         val notification = NotificationCompat.Builder(context, LIVE_CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(text)
             .setSubText("BusTop Live")
             .setOngoing(true) // Native Android Live Notification
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setContentIntent(pendingIntent)
             .build()

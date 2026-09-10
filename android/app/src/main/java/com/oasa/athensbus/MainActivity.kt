@@ -151,13 +151,23 @@ class MainActivity : ComponentActivity() {
 
             val triggerTime = System.currentTimeMillis() + (triggerInSeconds * 1000)
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
-            } else {
-                alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
-            }
+            // setAlarmClock guarantees OS wakeup even in deep sleep (Doze) or when screen is locked
+            val showIntent = Intent(context, MainActivity::class.java)
+            val pShow = PendingIntent.getActivity(context, 0, showIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            val alarmClockInfo = AlarmManager.AlarmClockInfo(triggerTime, pShow)
+            alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
 
-            Toast.makeText(context, "Alarm set for Bus $lineId in $minutesAway min", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, "Ειδοποίηση ρυθμίστηκε για το $lineId σε $minutesAway λεπτά (λειτουργεί και με κλειστή οθόνη)", Toast.LENGTH_LONG).show()
+        }
+
+        @JavascriptInterface
+        fun startLiveTracking(stopCode: String, lineId: String, routeCode: String, stopName: String, thresholdMinutes: Int) {
+            LiveTrackingService.start(context, stopCode, lineId, routeCode, stopName, thresholdMinutes)
+        }
+
+        @JavascriptInterface
+        fun stopLiveTracking() {
+            LiveTrackingService.stop(context)
         }
 
         @JavascriptInterface
@@ -168,6 +178,7 @@ class MainActivity : ComponentActivity() {
         @JavascriptInterface
         fun clearLiveArrivalNotification() {
             NotificationHelper.clearLiveArrivalNotification(context)
+            LiveTrackingService.stop(context)
         }
     }
 

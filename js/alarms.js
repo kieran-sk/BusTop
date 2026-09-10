@@ -176,14 +176,19 @@ class AlarmManager {
       });
     }
 
-    // 2. Dispatch to Android native AlarmManager if inside WebView wrapper
+    // 2. Dispatch to Android native AlarmManager & Foreground LiveTrackingService
     if (window.AndroidBridge) {
       try {
         const triggerInSecs = Math.max(1, (initialMins - threshold) * 60);
         if (typeof window.AndroidBridge.scheduleAlarm === 'function') {
           window.AndroidBridge.scheduleAlarm(alarm.lineId, alarm.stopName, threshold, triggerInSecs);
         }
-      } catch (e) {}
+        if (typeof window.AndroidBridge.startLiveTracking === 'function') {
+          window.AndroidBridge.startLiveTracking(alarm.stopCode, alarm.lineId, alarm.routeCode || '', alarm.stopName, threshold);
+        }
+      } catch (e) {
+        console.warn('AndroidBridge schedule error:', e);
+      }
     }
 
     // 3. Live Notification initialization immediately
@@ -202,6 +207,14 @@ class AlarmManager {
   }
 
   updateLiveNotification(alarm, minutes) {
+    // 1. Android Native Ongoing Live Notification
+    if (window.AndroidBridge && typeof window.AndroidBridge.updateLiveArrivalNotification === 'function') {
+      try {
+        window.AndroidBridge.updateLiveArrivalNotification(alarm.lineId, minutes, alarm.stopName);
+      } catch (e) {}
+    }
+
+    // 2. Web Service Worker Live Notification
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
     const title = `🚍 ${alarm.lineId} σε ${minutes}λ`;
     const body = `Στάση: ${alarm.stopName} • Ειδοποίηση στα ${alarm.thresholdMinutes}λ`;
@@ -228,6 +241,11 @@ class AlarmManager {
   }
 
   clearLiveNotification(id) {
+    if (window.AndroidBridge && typeof window.AndroidBridge.clearLiveArrivalNotification === 'function') {
+      try {
+        window.AndroidBridge.clearLiveArrivalNotification();
+      } catch (e) {}
+    }
     const tag = `live_alarm_${id}`;
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.ready.then(reg => {
@@ -379,6 +397,16 @@ class AlarmManager {
 
   clearAllAlarms() {
     this.stopAlarmRinging();
+    if (window.AndroidBridge) {
+      try {
+        if (typeof window.AndroidBridge.clearLiveArrivalNotification === 'function') {
+          window.AndroidBridge.clearLiveArrivalNotification();
+        }
+        if (typeof window.AndroidBridge.stopLiveTracking === 'function') {
+          window.AndroidBridge.stopLiveTracking();
+        }
+      } catch (e) {}
+    }
     this.alarms.forEach(a => this.clearLiveNotification(a.id));
     this.alarms = [];
     this.save();

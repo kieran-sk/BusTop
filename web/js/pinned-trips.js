@@ -130,6 +130,9 @@ class PinnedTripsManager {
 
   updateLiveAndroidNotification() {
     if (this.pinnedItems.length === 0) {
+      if (window.AndroidBridge && typeof window.AndroidBridge.clearLiveArrivalNotification === 'function') {
+        try { window.AndroidBridge.clearLiveArrivalNotification(); } catch (e) {}
+      }
       if (navigator.serviceWorker && navigator.serviceWorker.controller) {
         navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_PINNED_LIVE_NOTIFICATION' });
       }
@@ -179,9 +182,14 @@ class PinnedTripsManager {
       }
 
       // Android Bridge Hook if running inside Android APK WebView
-      if (window.AndroidBridge && typeof window.AndroidBridge.updateLiveArrivalNotification === 'function') {
+      if (window.AndroidBridge) {
         try {
-          window.AndroidBridge.updateLiveArrivalNotification(item.lineId, mins, item.stopName);
+          if (typeof window.AndroidBridge.updateLiveArrivalNotification === 'function') {
+            window.AndroidBridge.updateLiveArrivalNotification(item.lineId, mins, item.stopName);
+          }
+          if (typeof window.AndroidBridge.startLiveTracking === 'function') {
+            window.AndroidBridge.startLiveTracking(item.stopCode, item.lineId, item.routeCode || '', item.stopName, 3);
+          }
         } catch (e) {}
       }
     }
