@@ -11,7 +11,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 
 object NotificationHelper {
-    const val CHANNEL_ID = "oasa_bus_proximity_channel_v3"
+    const val CHANNEL_ID = "oasa_bus_proximity_channel_v5"
     const val CHANNEL_NAME = "Bus Proximity Alarms"
 
     fun formatMinutesHuman(mins: Int): String {
@@ -86,7 +86,7 @@ object NotificationHelper {
         notificationManager.notify(lineId.hashCode(), notification)
     }
 
-    const val LIVE_CHANNEL_ID = "oasa_bus_live_channel_v4"
+    const val LIVE_CHANNEL_ID = "oasa_bus_live_channel_v5"
     const val LIVE_CHANNEL_NAME = "Live Bus Tracking"
     const val LIVE_NOTIF_ID = 2001
 

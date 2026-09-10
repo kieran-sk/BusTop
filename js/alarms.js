@@ -195,18 +195,25 @@ class AlarmManager {
       try {
         const triggerInSecs = Math.max(1, (initialMins - threshold) * 60);
         if (typeof window.AndroidBridge.scheduleAlarm === 'function') {
-          window.AndroidBridge.scheduleAlarm(alarm.lineId, alarm.stopName, threshold, triggerInSecs, ringUntilDismissed);
+          window.AndroidBridge.scheduleAlarm(
+            String(alarm.lineId),
+            String(alarm.stopName),
+            Number(threshold),
+            Number(triggerInSecs),
+            Boolean(ringUntilDismissed)
+          );
         }
         if (typeof window.AndroidBridge.startLiveTracking === 'function') {
           window.AndroidBridge.startLiveTracking(
-            alarm.stopCode,
-            alarm.lineId,
-            alarm.routeCode || '',
-            alarm.stopName,
-            alarm.destination || '',
-            alarm.walkMinutes || 0,
-            threshold,
-            ringUntilDismissed
+            String(alarm.stopCode),
+            String(alarm.lineId),
+            String(alarm.routeCode || ''),
+            String(alarm.stopName),
+            String(alarm.destination || ''),
+            Number(alarm.walkMinutes || 0),
+            Number(threshold),
+            Boolean(ringUntilDismissed),
+            Number(initialMins)
           );
         }
       } catch (e) {
@@ -234,11 +241,11 @@ class AlarmManager {
     if (window.AndroidBridge && typeof window.AndroidBridge.updateLiveArrivalNotification === 'function') {
       try {
         window.AndroidBridge.updateLiveArrivalNotification(
-          alarm.lineId,
-          minutes,
-          alarm.stopName,
-          alarm.destination || '',
-          alarm.walkMinutes || 0
+          String(alarm.lineId),
+          Number(minutes),
+          String(alarm.stopName),
+          String(alarm.destination || ''),
+          Number(alarm.walkMinutes || 0)
         );
       } catch (e) {}
     }

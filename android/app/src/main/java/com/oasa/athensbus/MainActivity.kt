@@ -113,13 +113,18 @@ class MainActivity : ComponentActivity() {
         }
 
         @JavascriptInterface
-        fun vibrate(durationMs: Long) {
-            val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator.vibrate(VibrationEffect.createOneShot(durationMs, VibrationEffect.DEFAULT_AMPLITUDE))
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(durationMs)
+        fun vibrate(durationMs: Double) {
+            try {
+                val duration = durationMs.toLong()
+                val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    vibrator.vibrate(VibrationEffect.createOneShot(duration, VibrationEffect.DEFAULT_AMPLITUDE))
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator.vibrate(duration)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
 
@@ -127,38 +132,69 @@ class MainActivity : ComponentActivity() {
         fun scheduleAlarm(
             lineId: String,
             stopName: String,
-            minutesAway: Int,
-            triggerInSeconds: Long,
+            minutesAway: Double,
+            triggerInSeconds: Double,
             ringUntilDismissed: Boolean = true
         ) {
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            val intent = Intent(context, AlarmReceiver::class.java).apply {
-                putExtra("EXTRA_LINE_ID", lineId)
-                putExtra("EXTRA_STOP_NAME", stopName)
-                putExtra("EXTRA_MINUTES_AWAY", minutesAway)
-                putExtra("EXTRA_RING_UNTIL_DISMISSED", ringUntilDismissed)
+            try {
+                val mins = minutesAway.toInt()
+                val trigSecs = triggerInSeconds.toLong()
+
+                val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                val intent = Intent(context, AlarmReceiver::class.java).apply {
+                    putExtra("EXTRA_LINE_ID", lineId)
+                    putExtra("EXTRA_STOP_NAME", stopName)
+                    putExtra("EXTRA_MINUTES_AWAY", mins)
+                    putExtra("EXTRA_RING_UNTIL_DISMISSED", ringUntilDismissed)
+                }
+                val pendingIntent = PendingIntent.getBroadcast(
+                    context,
+                    lineId.hashCode(),
+                    intent,
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                )
+
+                val triggerTime = System.currentTimeMillis() + (trigSecs * 1000L)
+
+                val showIntent = Intent(context, MainActivity::class.java)
+                val pShow = PendingIntent.getActivity(
+                    context,
+                    0,
+                    showIntent,
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                )
+
+                var exactScheduled = false
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    if (alarmManager.canScheduleExactAlarms()) {
+                        val alarmClockInfo = AlarmManager.AlarmClockInfo(triggerTime, pShow)
+                        alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
+                        exactScheduled = true
+                    }
+                } else {
+                    val alarmClockInfo = AlarmManager.AlarmClockInfo(triggerTime, pShow)
+                    alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
+                    exactScheduled = true
+                }
+
+                if (!exactScheduled) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+                    } else {
+                        alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+                    }
+                }
+
+                val timeFormatted = NotificationHelper.formatMinutesHuman(mins)
+                val msg = if (ringUntilDismissed) {
+                    "Συνεχής συναγερμός ρυθμίστηκε για το $lineId σε $timeFormatted (θα χτυπάει μέχρι να τον κλείσετε)"
+                } else {
+                    "Ειδοποίηση ρυθμίστηκε για το $lineId σε $timeFormatted"
+                }
+                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-            val pendingIntent = PendingIntent.getBroadcast(
-                context,
-                lineId.hashCode(),
-                intent,
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-            )
-
-            val triggerTime = System.currentTimeMillis() + (triggerInSeconds * 1000)
-
-            val showIntent = Intent(context, MainActivity::class.java)
-            val pShow = PendingIntent.getActivity(context, 0, showIntent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
-            val alarmClockInfo = AlarmManager.AlarmClockInfo(triggerTime, pShow)
-            alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
-
-            val timeFormatted = NotificationHelper.formatMinutesHuman(minutesAway)
-            val msg = if (ringUntilDismissed) {
-                "Συνεχής συναγερμός ρυθμίστηκε για το $lineId σε $timeFormatted (θα χτυπάει μέχρι να τον κλείσετε)"
-            } else {
-                "Ειδοποίηση ρυθμίστηκε για το $lineId σε $timeFormatted"
-            }
-            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
         }
 
         @JavascriptInterface
@@ -168,50 +204,79 @@ class MainActivity : ComponentActivity() {
             routeCode: String,
             stopName: String,
             destination: String,
-            walkMinutes: Int,
-            thresholdMinutes: Int,
-            ringUntilDismissed: Boolean = true
+            walkMinutes: Double,
+            thresholdMinutes: Double,
+            ringUntilDismissed: Boolean = true,
+            initialMinutes: Double = 10.0
         ) {
-            LiveTrackingService.start(
-                context,
-                stopCode,
-                lineId,
-                routeCode,
-                stopName,
-                destination,
-                walkMinutes,
-                thresholdMinutes,
-                ringUntilDismissed
-            )
+            try {
+                LiveTrackingService.start(
+                    context,
+                    stopCode,
+                    lineId,
+                    routeCode,
+                    stopName,
+                    destination,
+                    walkMinutes.toInt(),
+                    thresholdMinutes.toInt(),
+                    ringUntilDismissed,
+                    initialMinutes.toInt()
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
 
         @JavascriptInterface
         fun stopLiveTracking() {
-            LiveTrackingService.stop(context)
-            AlarmRingingService.dismiss(context)
+            try {
+                LiveTrackingService.stop(context)
+                AlarmRingingService.dismiss(context)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
 
         @JavascriptInterface
         fun dismissAlarm() {
-            AlarmRingingService.dismiss(context)
+            try {
+                AlarmRingingService.dismiss(context)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
 
         @JavascriptInterface
         fun updateLiveArrivalNotification(
             lineId: String,
-            minutesAway: Int,
+            minutesAway: Double,
             stopName: String,
             destination: String = "",
-            walkMinutes: Int = 0
+            walkMinutes: Double = 0.0
         ) {
-            NotificationHelper.updateLiveArrivalNotification(context, lineId, minutesAway, stopName, destination, walkMinutes)
+            try {
+                NotificationHelper.updateLiveArrivalNotification(
+                    context,
+                    lineId,
+                    minutesAway.toInt(),
+                    stopName,
+                    destination,
+                    walkMinutes.toInt()
+                )
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
 
         @JavascriptInterface
         fun clearLiveArrivalNotification() {
-            NotificationHelper.clearLiveArrivalNotification(context)
-            LiveTrackingService.stop(context)
-            AlarmRingingService.dismiss(context)
+            try {
+                NotificationHelper.clearLiveArrivalNotification(context)
+                LiveTrackingService.stop(context)
+                AlarmRingingService.dismiss(context)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 

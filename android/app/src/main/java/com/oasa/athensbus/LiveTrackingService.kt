@@ -9,6 +9,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import android.os.PowerManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -33,8 +34,11 @@ class LiveTrackingService : Service() {
     private var destination: String = ""
     private var walkMinutes: Int = 0
     private var thresholdMinutes: Int = 5
+    private var initialMinutes: Int = 10
+    private var startedAtMs: Long = 0L
     private var ringUntilDismissed: Boolean = true
     private var isAlarmTriggered = false
+    private var wakeLock: PowerManager.WakeLock? = null
 
     companion object {
         const val ACTION_START = "ACTION_START_LIVE_TRACKING"
@@ -47,6 +51,7 @@ class LiveTrackingService : Service() {
         const val EXTRA_DESTINATION = "EXTRA_DESTINATION"
         const val EXTRA_WALK_MINUTES = "EXTRA_WALK_MINUTES"
         const val EXTRA_THRESHOLD = "EXTRA_THRESHOLD"
+        const val EXTRA_INITIAL_MINS = "EXTRA_INITIAL_MINS"
         const val EXTRA_RING_UNTIL_DISMISSED = "EXTRA_RING_UNTIL_DISMISSED"
 
         fun start(
@@ -58,7 +63,8 @@ class LiveTrackingService : Service() {
             destination: String,
             walkMinutes: Int,
             threshold: Int,
-            ringUntilDismissed: Boolean = true
+            ringUntilDismissed: Boolean = true,
+            initialMinutes: Int = 10
         ) {
             val intent = Intent(context, LiveTrackingService::class.java).apply {
                 action = ACTION_START
@@ -70,6 +76,7 @@ class LiveTrackingService : Service() {
                 putExtra(EXTRA_WALK_MINUTES, walkMinutes)
                 putExtra(EXTRA_THRESHOLD, threshold)
                 putExtra(EXTRA_RING_UNTIL_DISMISSED, ringUntilDismissed)
+                putExtra(EXTRA_INITIAL_MINS, initialMinutes)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
@@ -90,10 +97,13 @@ class LiveTrackingService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            releaseWakeLock()
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             return START_NOT_STICKY
         }
+
+        acquireWakeLock()
 
         stopCode = intent?.getStringExtra(EXTRA_STOP_CODE) ?: ""
         lineId = intent?.getStringExtra(EXTRA_LINE_ID) ?: ""
@@ -102,11 +112,13 @@ class LiveTrackingService : Service() {
         destination = intent?.getStringExtra(EXTRA_DESTINATION) ?: ""
         walkMinutes = intent?.getIntExtra(EXTRA_WALK_MINUTES, 0) ?: 0
         thresholdMinutes = intent?.getIntExtra(EXTRA_THRESHOLD, 5) ?: 5
+        initialMinutes = intent?.getIntExtra(EXTRA_INITIAL_MINS, 10) ?: 10
+        startedAtMs = System.currentTimeMillis()
         ringUntilDismissed = intent?.getBooleanExtra(EXTRA_RING_UNTIL_DISMISSED, true) ?: true
         isAlarmTriggered = false
 
         NotificationHelper.createLiveNotificationChannel(this)
-        val initialNotif = buildLiveNotification(10)
+        val initialNotif = buildLiveNotification(initialMinutes)
         startForeground(NotificationHelper.LIVE_NOTIF_ID, initialNotif)
 
         startBackgroundPolling()
@@ -114,18 +126,47 @@ class LiveTrackingService : Service() {
         return START_STICKY
     }
 
+    private fun acquireWakeLock() {
+        try {
+            if (wakeLock == null) {
+                val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "BusTop:LiveTrackingWakeLock")
+                wakeLock?.acquire(60 * 60 * 1000L) // 1 hour max
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun releaseWakeLock() {
+        try {
+            if (wakeLock?.isHeld == true) {
+                wakeLock?.release()
+            }
+            wakeLock = null
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     private fun startBackgroundPolling() {
         serviceScope.launch {
             while (isActive) {
                 try {
-                    val remainingMins = fetchLiveArrivalMinutes()
-                    if (remainingMins != null) {
-                        updateNotification(remainingMins)
+                    // Try fetching live GPS telemetry from API
+                    var remainingMins = fetchLiveArrivalMinutes()
 
-                        if (remainingMins <= thresholdMinutes && !isAlarmTriggered) {
-                            isAlarmTriggered = true
-                            triggerAlarmWakeup(remainingMins)
-                        }
+                    // Fallback to elapsed time if GPS is temporarily absent or network drops
+                    if (remainingMins == null) {
+                        val elapsedMins = ((System.currentTimeMillis() - startedAtMs) / 60000L).toInt()
+                        remainingMins = kotlin.math.max(0, initialMinutes - elapsedMins)
+                    }
+
+                    updateNotification(remainingMins)
+
+                    if (remainingMins <= thresholdMinutes && !isAlarmTriggered) {
+                        isAlarmTriggered = true
+                        triggerAlarmWakeup(remainingMins)
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -245,6 +286,7 @@ class LiveTrackingService : Service() {
     }
 
     override fun onDestroy() {
+        releaseWakeLock()
         super.onDestroy()
         serviceJob.cancel()
     }

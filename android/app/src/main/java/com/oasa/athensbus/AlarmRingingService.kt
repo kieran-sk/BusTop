@@ -33,7 +33,7 @@ class AlarmRingingService : Service() {
         const val EXTRA_MINS = "EXTRA_MINS"
 
         const val NOTIFICATION_ID = 3001
-        const val CHANNEL_ID = "oasa_bus_continuous_alarm_v1"
+        const val CHANNEL_ID = "oasa_bus_continuous_alarm_v5"
 
         fun start(context: Context, lineId: String, stopName: String, minsAway: Int) {
             val intent = Intent(context, AlarmRingingService::class.java).apply {
