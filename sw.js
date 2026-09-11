@@ -3,7 +3,7 @@
  * Background alarm notification scheduler and offline caching
  */
 
-const CACHE_NAME = 'oasa-bus-v21';
+const CACHE_NAME = 'oasa-bus-v22';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -179,6 +179,32 @@ self.addEventListener('message', (event) => {
       self.navigator.clearAppBadge().catch(() => {});
     }
   }
+});
+
+// Web Push Notification Handler (iOS PWA & Desktop Web Push)
+self.addEventListener('push', (event) => {
+  let data = {};
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch (e) {
+      data = { body: event.data.text() };
+    }
+  }
+
+  const title = data.title || '🚨 Το Λεωφορείο πλησιάζει!';
+  const options = {
+    body: data.body || 'Το λεωφορείο πλησιάζει στη στάση σας. Ώρα για αναχώρηση!',
+    icon: '/assets/icon-192.png',
+    badge: '/assets/icon-192.png',
+    vibrate: [800, 200, 800, 200, 800],
+    renotify: true,
+    requireInteraction: true,
+    tag: data.tag || ('bus_push_' + Date.now()),
+    data: { url: data.url || '/?tab=notifications' }
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
 self.addEventListener('notificationclick', (event) => {

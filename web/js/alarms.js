@@ -36,11 +36,55 @@ class AlarmManager {
     }
     if ('Notification' in window && Notification.permission !== 'granted') {
       try {
-        Notification.requestPermission().catch(() => {});
+        await Notification.requestPermission();
       } catch (e) {
         console.warn('Notification permission error:', e);
       }
     }
+
+    // Register Web Push subscription for iOS PWA and Safari/Chrome
+    await this.registerWebPushSubscription();
+  }
+
+  async registerWebPushSubscription() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      if (!reg || !reg.pushManager) return null;
+
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        const vapidPublicKey = 'BMFpVKCE4nWW4qSakggJbRvBp9DMvb4dDC_bDWsIERpb8dpRH7Oj5nv9Z69kGu1LTg05XqacAzLgArdt5xoz5QQ';
+        const convertedVapidKey = this.urlBase64ToUint8Array(vapidPublicKey);
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: convertedVapidKey
+        });
+      }
+
+      if (sub) {
+        fetch('/api/push/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subscription: sub, subscribedAt: Date.now() })
+        }).catch(() => {});
+      }
+      return sub;
+    } catch (err) {
+      console.log('Web Push registration note:', err.message);
+      return null;
+    }
+  }
+
+  urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
   }
 
   unlockAudio() {

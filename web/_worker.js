@@ -346,6 +346,28 @@ export default {
             daily_schedule: daily || {}
           });
         }
+
+        // Web Push VAPID Configuration & Registration Endpoints
+        if (path === '/api/push/config') {
+          return jsonRes({
+            publicKey: 'BMFpVKCE4nWW4qSakggJbRvBp9DMvb4dDC_bDWsIERpb8dpRH7Oj5nv9Z69kGu1LTg05XqacAzLgArdt5xoz5QQ'
+          });
+        }
+
+        if (path === '/api/push/register' && request.method === 'POST') {
+          try {
+            const body = await request.json();
+            // Cache active push subscription in edge memory
+            if (body && body.subscription && body.subscription.endpoint) {
+              const subKey = 'push_sub:' + body.subscription.endpoint;
+              setCache(subKey, body, 86400 * 7); // 7 days
+            }
+            return jsonRes({ success: true });
+          } catch(e) {
+            return jsonRes({ error: 'Invalid JSON payload' }, 400);
+          }
+        }
+
         return jsonRes({ error: 'Endpoint not found' }, 404);
       } catch(err) {
         return jsonRes({ error: err.message }, 500);
