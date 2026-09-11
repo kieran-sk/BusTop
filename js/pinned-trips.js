@@ -292,7 +292,7 @@ class PinnedTripsManager {
     if (this.pinnedItems.length === 0) {
       container.innerHTML = `
         <div class="m3-card" style="text-align: center; padding: 3rem 1.5rem; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);">
-          <div style="width: 54px; height: 54px; border-radius: 50%; background: #1e293b; color: var(--md-sys-color-primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem;">
+          <div style="width: 54px; height: 54px; border-radius: 50%; background: #eff6ff; color: var(--md-sys-color-primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem;">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="12" y1="17" x2="12" y2="22"></line>
               <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
@@ -374,7 +374,7 @@ class PinnedTripsManager {
         <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.75rem; padding: 1.1rem; background: var(--md-sys-color-surface-container); margin-bottom: 0.75rem; border: 1px solid var(--md-sys-color-outline-variant); border-left: 4px solid var(--md-sys-color-primary);">
           <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
             <div style="display: flex; align-items: center; gap: 0.6rem;">
-              <span class="m3-badge" style="background: #334155; color: #f8fafc; font-weight: 800; font-size: 0.72rem;">
+              <span class="m3-badge" style="background: #0f172a; color: #ffffff; font-weight: 800; font-size: 0.72rem;">
                 Σκέλος ${idx + 1}
               </span>
               <span class="ticker-line-badge" style="font-size: 1rem;">

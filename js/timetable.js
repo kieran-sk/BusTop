@@ -511,11 +511,11 @@ class TimetableManager {
             <div>
               <div style="display: flex; align-items: center; gap: 0.5rem;">
                 <span style="font-weight: 800; font-size: 1rem; color: var(--md-sys-color-primary);">Κυκλική Διαδρομή</span>
-                <span class="m3-badge" style="background: #1e3a8a; color: #93c5fd; font-size: 0.72rem; font-weight: 800; padding: 2px 8px;">
+                <span class="m3-badge" style="background: #eff6ff; color: #005ac1; font-size: 0.72rem; font-weight: 800; padding: 2px 8px;">
                   🔄 Κυκλική
                 </span>
               </div>
-              <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">
+              <div style="font-size: 0.78rem; color: #64748b; margin-top: 2px;">
                 ${outRoute.RouteDescr || this.currentLine.lineDescr || 'Πλήρης Κύκλος Διαδρομής'} • ${isStopsMode ? `${outStops.length} στάσεις` : `${goTrips.length} δρομολόγια`}
               </div>
             </div>
@@ -533,11 +533,11 @@ class TimetableManager {
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; border-bottom: 1px solid var(--md-sys-color-outline-variant); padding-bottom: 0.5rem;">
               <div>
                 <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-primary);">Κατεύθυνση 1: Μετάβαση</div>
-                <div style="font-size: 0.75rem; color: #94a3b8;">
+                <div style="font-size: 0.75rem; color: #64748b;">
                   ${outRoute.RouteDescr || 'Προς Τέρμα'} • ${isStopsMode ? `${outStops.length} στάσεις` : `${goTrips.length} δρομολόγια`}
                 </div>
               </div>
-              <span class="m3-badge" style="background: #1e3a8a; color: #93c5fd; font-size: 0.65rem;">Μετάβαση</span>
+              <span class="m3-badge" style="background: #eff6ff; color: #005ac1; font-size: 0.65rem;">Μετάβαση</span>
             </div>
             <div style="max-height: 480px; overflow-y: auto; padding-right: 4px;">
               ${isStopsMode ? outStopsHtml : outScheduleHtml}
@@ -548,12 +548,12 @@ class TimetableManager {
           <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 16px; padding: 1rem;">
             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; border-bottom: 1px solid var(--md-sys-color-outline-variant); padding-bottom: 0.5rem;">
               <div>
-                <div style="font-weight: 800; font-size: 0.95rem; color: #34d399;">Κατεύθυνση 2: Επιστροφή</div>
-                <div style="font-size: 0.75rem; color: #94a3b8;">
+                <div style="font-weight: 800; font-size: 0.95rem; color: #047857;">Κατεύθυνση 2: Επιστροφή</div>
+                <div style="font-size: 0.75rem; color: #64748b;">
                   ${inRoute.RouteDescr || 'Προς Αφετηρία'} • ${isStopsMode ? `${inStops.length} στάσεις` : `${comeTrips.length} δρομολόγια`}
                 </div>
               </div>
-              <span class="m3-badge" style="background: #064e3b; color: #6ee7b7; font-size: 0.65rem;">Επιστροφή</span>
+              <span class="m3-badge" style="background: #ecfdf5; color: #047857; font-size: 0.65rem;">Επιστροφή</span>
             </div>
             <div style="max-height: 480px; overflow-y: auto; padding-right: 4px;">
               ${isStopsMode ? inStopsHtml : inScheduleHtml}
@@ -574,7 +574,7 @@ class TimetableManager {
               </span>
               <h2 style="font-size: 1.2rem; font-weight: 900; color: var(--md-sys-color-on-surface);">${this.currentLine.lineDescr || 'Γραμμή ΟΑΣΑ'}</h2>
               ${isCircular ? `
-                <span class="m3-badge" style="background: #1e3a8a; color: #93c5fd; font-weight: 800; font-size: 0.72rem; padding: 2px 8px;">
+                <span class="m3-badge" style="background: #eff6ff; color: #005ac1; font-weight: 800; font-size: 0.72rem; padding: 2px 8px;">
                   🔄 Κυκλική Διαδρομή
                 </span>
               ` : ''}

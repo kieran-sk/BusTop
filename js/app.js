@@ -353,7 +353,7 @@ class AppController {
     }
 
     routesListEl.innerHTML = uniqueRoutes.map(r => `
-      <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 9999px; padding: 3px 10px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; box-shadow: 0 1px 2px rgba(0,0,0,0.2); cursor: pointer;" onclick="window.App.openLineTimetableBothDirections('${r.LineCode}', '${r.LineID}', '${r.cleanDestination}')">
+      <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 9999px; padding: 3px 10px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer;" onclick="window.App.openLineTimetableBothDirections('${r.LineCode}', '${r.LineID}', '${r.cleanDestination}')">
         <span style="font-weight: 800; color: var(--md-sys-color-primary);">${r.LineID || 'BUS'}</span>
         <span style="color: var(--md-sys-color-outline);">προς</span>
         <span style="color: var(--md-sys-color-on-surface); max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600;">${r.cleanDestination}</span>

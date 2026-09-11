@@ -378,22 +378,22 @@ class AirportTicker {
               }
 
               return `
-                <div class="m3-card" style="padding: 0.9rem; display: flex; flex-direction: column; justify-content: space-between; gap: 0.65rem; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; border: ${isFav ? '2px solid #eab308; background: #24200d;' : (hasRoutes ? '1px solid var(--md-sys-color-outline-variant); background: var(--md-sys-color-surface-container);' : '1px dashed #334155; background: #0b0f19; opacity: 0.85;')}" onclick="window.App.selectStop('${sCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})" onmouseover="this.style.borderColor='var(--md-sys-color-primary)'" onmouseout="this.style.borderColor='${isFav ? '#eab308' : (hasRoutes ? 'var(--md-sys-color-outline-variant)' : '#334155')}'">
+                <div class="m3-card" style="padding: 0.9rem; display: flex; flex-direction: column; justify-content: space-between; gap: 0.65rem; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; border: ${isFav ? '2px solid #eab308; background: #fffdf5;' : (hasRoutes ? '1px solid var(--md-sys-color-outline-variant); background: #ffffff;' : '1px dashed #cbd5e1; background: #f8fafc; opacity: 0.85;')}" onclick="window.App.selectStop('${sCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})" onmouseover="this.style.borderColor='var(--md-sys-color-primary)'" onmouseout="this.style.borderColor='${isFav ? '#eab308' : (hasRoutes ? 'var(--md-sys-color-outline-variant)' : '#cbd5e1')}'">
                   <div>
                     <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem;">
-                      <div style="font-weight: 800; font-size: 0.98rem; color: var(--md-sys-color-on-surface); line-height: 1.25;">
+                      <div style="font-weight: 800; font-size: 0.98rem; color: #0f172a; line-height: 1.25;">
                         ${isFav ? '<span style="color: #ca8a04; margin-right: 4px;">⭐</span>' : ''}${sTitle}
                       </div>
                       <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
-                        ${isFav ? '<span class="m3-badge" style="background: #78350f; color: #fde68a; font-size: 0.68rem; font-weight: 800;">Αγαπημένη</span>' : ''}
-                        <span class="m3-badge" style="font-size: 0.7rem; font-weight: 800; background: #0b0f19; color: #cbd5e1; border: 1px solid #334155;">
+                        ${isFav ? '<span class="m3-badge" style="background: #fef08a; color: #854d0e; font-size: 0.68rem; font-weight: 800;">Αγαπημένη</span>' : ''}
+                        <span class="m3-badge" style="font-size: 0.7rem; font-weight: 800; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;">
                           #${sCode}
                         </span>
                       </div>
                     </div>
-                    ${sStreet ? `<div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">${sStreet}</div>` : ''}
+                    ${sStreet ? `<div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">${sStreet}</div>` : ''}
                     ${(distText || walkText) ? `
-                      <div style="display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #38bdf8; font-weight: 700; margin-top: 4px;">
+                      <div style="display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #0284c7; font-weight: 700; margin-top: 4px;">
                         <span>🚶 ${distText}</span>
                         ${walkText ? `<span>• ${walkText}</span>` : ''}
                       </div>
@@ -401,12 +401,12 @@ class AirportTicker {
                   </div>
 
                   ${linesPills ? `
-                    <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding-top: 4px; border-top: 1px dashed #334155;">
-                      <span style="font-size: 0.68rem; font-weight: 800; color: #94a3b8; text-transform: uppercase;">Γραμμές:</span>
+                    <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding-top: 4px; border-top: 1px dashed #e2e8f0;">
+                      <span style="font-size: 0.68rem; font-weight: 800; color: #64748b; text-transform: uppercase;">Γραμμές:</span>
                       ${linesPills}
                     </div>
                   ` : `
-                    <div style="padding-top: 4px; border-top: 1px dashed #334155; font-size: 0.72rem; color: #64748b; font-style: italic;">
+                    <div style="padding-top: 4px; border-top: 1px dashed #e2e8f0; font-size: 0.72rem; color: #64748b; font-style: italic;">
                       ⚠️ Δεν διέρχονται ενεργές γραμμές
                     </div>
                   `}
@@ -423,19 +423,19 @@ class AirportTicker {
         `;
       } else {
         stopsContent = `
-          <div class="m3-card" style="padding: 2.5rem 1.5rem; text-align: center; background: var(--md-sys-color-surface-container);">
-            <div style="width: 48px; height: 48px; border-radius: 50%; background: #1e3a8a; color: #93c5fd; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
+          <div class="m3-card" style="padding: 2.5rem 1.5rem; text-align: center; background: #ffffff; border: 1px solid var(--md-sys-color-outline-variant);">
+            <div style="width: 48px; height: 48px; border-radius: 50%; background: #eff6ff; color: #005ac1; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
               <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
             </div>
-            <div style="font-size: 1.15rem; font-weight: 900; color: var(--md-sys-color-on-surface); margin-bottom: 0.4rem;">Όλες οι Στάσεις</div>
-            <div style="font-size: 0.85rem; color: #94a3b8; max-width: 380px; margin: 0 auto 1.25rem; line-height: 1.4;">
+            <div style="font-size: 1.15rem; font-weight: 900; color: #0f172a; margin-bottom: 0.4rem;">Όλες οι Στάσεις</div>
+            <div style="font-size: 0.85rem; color: #64748b; max-width: 380px; margin: 0 auto 1.25rem; line-height: 1.4;">
               Εντοπίστε αυτόματα όλες τις στάσεις γύρω σας ή αναζητήστε γραμμή από την αναζήτηση.
             </div>
             <div style="display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap;">
               <button class="m3-btn m3-btn-primary" style="padding: 0.5rem 1.2rem; font-weight: 800; border-radius: 9999px;" onclick="window.Search.findNearbyStops()">
                 📍 Εντοπισμός Στάσεων Κοντά μου
               </button>
-              <button class="m3-btn m3-btn-tonal" style="padding: 0.5rem 1.2rem; font-weight: 700; border-radius: 9999px; border: 1px solid #334155;" onclick="window.App.switchTab('search')">
+              <button class="m3-btn m3-btn-tonal" style="padding: 0.5rem 1.2rem; font-weight: 700; border-radius: 9999px; border: 1px solid #e2e8f0;" onclick="window.App.switchTab('search')">
                 🔍 Αναζήτηση Στάσης
               </button>
             </div>

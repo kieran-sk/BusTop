@@ -551,7 +551,7 @@ class AlarmManager {
 
             const cleanStopName = (a.stopName || '').replace(/'/g, "\\'");
             return `
-              <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem; margin-bottom: 0; background: ${a.triggered ? '#450a0a' : 'var(--md-sys-color-surface-container)'}; border: 1px solid var(--md-sys-color-outline-variant); border-left: 4px solid ${a.triggered ? '#ef4444' : (isUrgent ? '#f97316' : 'var(--md-sys-color-primary)')}; cursor: pointer;" onclick="window.App.switchTab('ticker'); window.App.selectStop('${a.stopCode}', '${cleanStopName}');">
+              <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem; margin-bottom: 0; background: ${a.triggered ? '#fef2f2' : 'var(--md-sys-color-surface-container)'}; border: 1px solid var(--md-sys-color-outline-variant); border-left: 4px solid ${a.triggered ? '#dc2626' : (isUrgent ? '#ea580c' : 'var(--md-sys-color-primary)')}; cursor: pointer;" onclick="window.App.switchTab('ticker'); window.App.selectStop('${a.stopCode}', '${cleanStopName}');">
                 <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
                   <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
                     <span class="ticker-line-badge" style="font-size: 1rem; min-width: 48px; flex-shrink: 0;">
@@ -565,7 +565,7 @@ class AlarmManager {
                     </div>
                   </div>
                   <div style="text-align: right; flex-shrink: 0;">
-                    <span class="m3-badge" style="background: ${a.triggered ? '#7f1d1d' : '#1e3a8a'}; color: ${a.triggered ? '#fca5a5' : '#93c5fd'}; font-size: 0.72rem; font-weight: 800; padding: 2px 7px;">
+                    <span class="m3-badge" style="background: ${a.triggered ? '#fee2e2' : '#e0f2fe'}; color: ${a.triggered ? '#b91c1c' : '#005ac1'}; font-size: 0.72rem; font-weight: 800; padding: 2px 7px;">
                       ${a.triggered ? '🚨 Συναγερμός' : `⏳ ~${formattedTime}`}
                     </span>
                   </div>

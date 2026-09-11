@@ -139,7 +139,7 @@ class SearchManager {
             return `
               <div class="m3-card" style="display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1rem; margin-bottom: 0; cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})">
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
-                  <div class="m3-icon-btn" style="width: 38px; height: 38px; background: #064e3b; color: #34d399; border: 1.5px solid #059669;">
+                  <div class="m3-icon-btn" style="width: 38px; height: 38px; background: #ecfdf5; color: #047857; border: 1.5px solid #a7f3d0;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"></path>
                       <circle cx="12" cy="9" r="2.5"></circle>
@@ -420,11 +420,11 @@ class SearchManager {
           const isFav = window.Favorites && window.Favorites.isStopFav(s.StopCode);
 
           return `
-            <div class="m3-card" style="display: flex; flex-direction: column; padding: 0.9rem 1.1rem; cursor: pointer; background: ${isFav ? '#2d2510' : (hasRoutes ? 'var(--md-sys-color-surface-container)' : '#0b1120')}; margin-bottom: 0; border: ${isFav ? '1.5px solid #ca8a04' : (hasRoutes ? '1px solid var(--md-sys-color-outline-variant)' : '1px dashed var(--md-sys-color-outline-variant)')}; opacity: ${hasRoutes ? '1' : '0.8'};" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', '${s.StopLat}', '${s.StopLng}')">
+            <div class="m3-card" style="display: flex; flex-direction: column; padding: 0.9rem 1.1rem; cursor: pointer; background: ${isFav ? '#fffdf5' : (hasRoutes ? 'var(--md-sys-color-surface-container)' : '#f8fafc')}; margin-bottom: 0; border: ${isFav ? '2px solid #eab308' : (hasRoutes ? '1px solid var(--md-sys-color-outline-variant)' : '1px dashed #cbd5e1')}; opacity: ${hasRoutes ? '1' : '0.8'};" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', '${s.StopLat}', '${s.StopLng}')">
               <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
                 <div style="min-width: 0; flex: 1;">
                   <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                    ${isFav ? '<span class="m3-badge" style="background: #713f12; color: #fef08a; font-size: 0.68rem; font-weight: 800;">⭐ Αγαπημένη</span>' : ''}
+                    ${isFav ? '<span class="m3-badge" style="background: #fef08a; color: #854d0e; font-size: 0.68rem; font-weight: 800;">⭐ Αγαπημένη</span>' : ''}
                     <div style="font-weight: 800; font-size: 0.94rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: break-word;">${stopTitle}</div>
                   </div>
                   <div style="font-size: 0.75rem; color: var(--md-sys-color-outline); margin-top: 3px;">
@@ -432,7 +432,7 @@ class SearchManager {
                   </div>
                 </div>
                 <div style="text-align: right; flex-shrink: 0;">
-                  <div style="font-weight: 800; font-size: 0.85rem; color: var(--md-sys-color-primary); background: #1e293b; border: 1px solid #3b82f6; border-radius: 6px; padding: 2px 8px;">
+                  <div style="font-weight: 800; font-size: 0.85rem; color: var(--md-sys-color-primary); background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 2px 8px;">
                     🚶 ${walkMins}λ
                   </div>
                   <div style="font-size: 0.7rem; color: var(--md-sys-color-outline); margin-top: 3px;">
