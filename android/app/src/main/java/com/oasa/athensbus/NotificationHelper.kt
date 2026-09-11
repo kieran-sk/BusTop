@@ -161,6 +161,8 @@ object NotificationHelper {
             0xFF005AC1.toInt()
         }
 
+        val targetTimestamp = System.currentTimeMillis() + (minutesAway * 60 * 1000L)
+
         val builder = NotificationCompat.Builder(context, LIVE_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
@@ -174,6 +176,10 @@ object NotificationHelper {
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setColor(accentColor)
             .setContentIntent(pendingIntent)
+            .setWhen(targetTimestamp)
+            .setShowWhen(true)
+            .setUsesChronometer(minutesAway > 0)
+            .setChronometerCountDown(true)
             .addExtras(extras)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "🛑 Τερματισμός", pStop)
 

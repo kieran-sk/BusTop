@@ -215,6 +215,14 @@ class LiveTrackingService : Service() {
                                 if (diff < bestDiff && (btime2 <= expectedMins + 20 || diff <= 15)) {
                                     bestDiff = diff
                                     bestArrivalMins = btime2
+                                    if (destination.isBlank()) {
+                                        val apiDest = arr.optString("destination", "").ifBlank {
+                                            arr.optString("route_descr", "")
+                                        }
+                                        if (apiDest.isNotBlank()) {
+                                            destination = apiDest
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -280,6 +288,8 @@ class LiveTrackingService : Service() {
             0xFF005AC1.toInt()
         }
 
+        val targetTimestamp = System.currentTimeMillis() + (mins * 60 * 1000L)
+
         val builder = NotificationCompat.Builder(this, NotificationHelper.LIVE_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
@@ -293,6 +303,10 @@ class LiveTrackingService : Service() {
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setColor(accentColor)
             .setContentIntent(pLaunch)
+            .setWhen(targetTimestamp)
+            .setShowWhen(true)
+            .setUsesChronometer(mins > 0)
+            .setChronometerCountDown(true)
             .addExtras(extras)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "🛑 Τερματισμός", pStop)
 

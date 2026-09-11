@@ -27,9 +27,13 @@ class AlarmManager {
   }
 
   async requestPermission() {
+    if (window.AndroidBridge) {
+      // In Android WebView, permissions are handled natively by the Android wrapper
+      return;
+    }
     if ('Notification' in window && Notification.permission !== 'granted') {
       try {
-        await Notification.requestPermission();
+        Notification.requestPermission().catch(() => {});
       } catch (e) {
         console.warn('Notification permission error:', e);
       }

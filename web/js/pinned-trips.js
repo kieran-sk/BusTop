@@ -219,11 +219,12 @@ class PinnedTripsManager {
       // Android Bridge Hook if running inside Android APK WebView
       if (window.AndroidBridge) {
         try {
+          const dest = item.direction || item.destination || item.lineDescr || '';
           if (typeof window.AndroidBridge.updateLiveArrivalNotification === 'function') {
-            window.AndroidBridge.updateLiveArrivalNotification(item.lineId, mins, item.stopName);
+            window.AndroidBridge.updateLiveArrivalNotification(item.lineId, mins, item.stopName, dest, item.walkMinutes || 0, item.stopCode, 10);
           }
           if (typeof window.AndroidBridge.startLiveTracking === 'function') {
-            window.AndroidBridge.startLiveTracking(item.stopCode, item.lineId, item.routeCode || '', item.stopName, 3);
+            window.AndroidBridge.startLiveTracking(item.stopCode, item.lineId, item.routeCode || '', item.stopName, dest, item.walkMinutes || 0, 0, false, mins);
           }
         } catch (e) {}
       }

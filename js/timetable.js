@@ -468,8 +468,8 @@ class TimetableManager {
 
     if (isMapMode) {
       mainContentHtml = `
-        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 0.5rem; margin-top: 0.5rem;">
-          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem; padding: 0 0.25rem;">
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 0.4rem; margin-top: 0.25rem; margin-bottom: 0;">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.35rem; padding: 0 0.2rem;">
             <div style="font-weight: 800; font-size: 0.95rem; color: #005ac1; display: flex; align-items: center; gap: 6px;">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
               Χάρτης Διαδρομής
@@ -483,7 +483,7 @@ class TimetableManager {
             ` : ''}
           </div>
           <div id="line-route-map" style="height: 60vh; min-height: 380px; width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid #cbd5e1; background: #e2e8f0;"></div>
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.6rem; font-size: 0.75rem; color: #64748b; flex-wrap: wrap; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.35rem; font-size: 0.75rem; color: #64748b; flex-wrap: wrap; gap: 0.35rem; padding: 0 0.2rem;">
             <div style="display: flex; align-items: center; gap: 12px;">
               <span style="display: inline-flex; align-items: center; gap: 4px;">
                 <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #005ac1;"></span>
@@ -564,7 +564,7 @@ class TimetableManager {
     }
 
     container.innerHTML = `
-      <div class="m3-card" style="margin-bottom: 1.5rem; background: #ffffff;">
+      <div class="m3-card" style="margin-bottom: ${isMapMode ? '0.5rem' : '1.5rem'}; background: #ffffff;">
         <!-- Header -->
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
           <div>

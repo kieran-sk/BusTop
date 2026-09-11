@@ -221,9 +221,10 @@ class AppController {
     const optBar = document.getElementById('arrivals-options-bar');
     if (optBar) optBar.style.display = 'none';
     if (this.ticker) {
+      this.ticker.currentStop = null;
       this.ticker.render();
     }
-    if (window.Search && (!window.Search.nearbyStops || window.Search.nearbyStops.length === 0)) {
+    if (window.Search) {
       window.Search.findNearbyStops(true);
     }
     this.updateBackButtonsVisibility();
@@ -609,6 +610,8 @@ class AppController {
     modal.dataset.routeCode = routeCode;
     modal.dataset.dueMins = busMinutes;
     modal.dataset.lineDescr = lineDescr || '';
+    modal.dataset.stopCode = this.currentStop ? this.currentStop.StopCode : '';
+    modal.dataset.stopName = this.currentStop ? (this.currentStop.StopDescr || '') : '';
 
     // Reset preset chips to default 5 mins
     this.selectAlarmPreset(5);
@@ -644,11 +647,11 @@ class AppController {
     const routeCode = modal.dataset.routeCode;
     const dueMins = parseInt(modal.dataset.dueMins, 10);
     const lineDescr = modal.dataset.lineDescr || '';
+    const stopCode = modal.dataset.stopCode || (this.currentStop ? this.currentStop.StopCode : '');
+    const stopName = modal.dataset.stopName || (this.currentStop ? this.currentStop.StopDescr : '') || 'Στάση ΟΑΣΑ';
     const customInput = document.getElementById('alarm-threshold-custom');
     const threshold = customInput ? (parseInt(customInput.value, 10) || 5) : 5;
     const ringUntilDismissed = true; // Always trigger loud siren alarm when threshold is reached
-
-    if (!this.currentStop) return;
 
     if (window.Alarms) {
       window.Alarms.unlockAudio();
@@ -656,21 +659,23 @@ class AppController {
 
     // Walking time to current stop if available
     let walkMins = 0;
-    if (this.currentStop.distanceMeters) {
+    if (this.currentStop && this.currentStop.distanceMeters) {
       walkMins = Math.ceil(this.currentStop.distanceMeters / 80) + 2;
     }
 
-    window.Alarms.addAlarm({
-      stopCode: this.currentStop.StopCode,
-      stopName: this.currentStop.StopDescr || 'Στάση ΟΑΣΑ',
-      lineId,
-      routeCode,
-      destination: lineDescr,
-      walkMinutes: walkMins,
-      targetMinutes: dueMins,
-      thresholdMinutes: threshold,
-      ringUntilDismissed: ringUntilDismissed
-    });
+    if (window.Alarms) {
+      window.Alarms.addAlarm({
+        stopCode: stopCode,
+        stopName: stopName,
+        lineId,
+        routeCode,
+        destination: lineDescr,
+        walkMinutes: walkMins,
+        targetMinutes: dueMins,
+        thresholdMinutes: threshold,
+        ringUntilDismissed: ringUntilDismissed
+      });
+    }
 
     this.closeModal('set-alarm-modal');
   }
@@ -682,29 +687,20 @@ class AppController {
         const colors = JSON.parse(jsonStr);
         if (colors && colors.primary) {
           const root = document.documentElement;
+          // Only replace where the app used to have blue highlights / primary accents
           root.style.setProperty('--md-sys-color-primary', colors.primary);
-          root.style.setProperty('--md-sys-color-on-primary', colors.onPrimary);
-          root.style.setProperty('--md-sys-color-primary-container', colors.primaryContainer);
-          root.style.setProperty('--md-sys-color-on-primary-container', colors.onPrimaryContainer);
-          if (colors.secondary) root.style.setProperty('--md-sys-color-secondary', colors.secondary);
-          if (colors.secondaryContainer) root.style.setProperty('--md-sys-color-secondary-container', colors.secondaryContainer);
-          if (colors.surface) {
-            root.style.setProperty('--md-sys-color-surface', colors.surface);
-            document.body.style.backgroundColor = colors.surface;
+          root.style.setProperty('--md-sys-color-on-primary', colors.onPrimary || '#ffffff');
+          if (colors.primaryContainer) {
+            root.style.setProperty('--md-sys-color-primary-container', colors.primaryContainer);
           }
-          if (colors.onSurface) {
-            root.style.setProperty('--md-sys-color-on-surface', colors.onSurface);
-            document.body.style.color = colors.onSurface;
+          if (colors.onPrimaryContainer) {
+            root.style.setProperty('--md-sys-color-on-primary-container', colors.onPrimaryContainer);
           }
-          if (colors.surfaceContainer) root.style.setProperty('--md-sys-color-surface-container', colors.surfaceContainer);
-          if (colors.surfaceContainerHigh) root.style.setProperty('--md-sys-color-surface-container-high', colors.surfaceContainerHigh);
-          if (colors.surfaceContainerHighest) root.style.setProperty('--md-sys-color-surface-container-highest', colors.surfaceContainerHighest);
-          if (colors.outline) root.style.setProperty('--md-sys-color-outline', colors.outline);
-          if (colors.outlineVariant) root.style.setProperty('--md-sys-color-outline-variant', colors.outlineVariant);
-          console.log('[BusTop] Material You dynamic palette successfully applied from device wallpaper:', colors);
+          // Do NOT touch surface, surfaceContainer, background, or text colors so cards and dark mode stay crisp
+          console.log('[BusTop] Material You accent highlight applied (blue replaced with):', colors.primary);
         }
       } catch (e) {
-        console.warn('Material You application error:', e);
+        console.warn('[BusTop] Failed to parse Material You colors:', e);
       }
     }
   }
