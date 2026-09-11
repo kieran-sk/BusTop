@@ -630,6 +630,40 @@ class AppController {
 
       const arrivals = data.arrivals || [];
 
+      // Dynamically re-evaluate walking distance based on latest user location
+      if (this.currentStop) {
+        let sLat = this.currentStop.StopLat;
+        let sLng = this.currentStop.StopLng;
+        if ((!sLat || !sLng) && this.ticker) {
+          try {
+            const cached = JSON.parse(localStorage.getItem('OASA_STOP_COORDS_' + currentCode) || 'null');
+            if (cached && cached.lat && cached.lng) {
+              sLat = cached.lat;
+              sLng = cached.lng;
+              this.currentStop.StopLat = sLat;
+              this.currentStop.StopLng = sLng;
+            }
+          } catch (e) {}
+        }
+        if (sLat && sLng && this.ticker && typeof this.ticker.getWalkMinutes === 'function') {
+          const walk = this.ticker.getWalkMinutes(sLat, sLng);
+          if (walk && typeof walk.minutes === 'number') {
+            this.currentStop.distanceMeters = walk.meters;
+            const walkPill = document.getElementById('selected-stop-walk-pill');
+            if (walkPill) {
+              walkPill.style.display = 'inline-flex';
+              walkPill.innerText = `🚶 ${walk.minutes}λ (${walk.meters}μ)`;
+            }
+          }
+        }
+      }
+
+      // Hide telematics banner if it was previously visible
+      const connBanner = document.getElementById('connection-status-banner');
+      if (connBanner && navigator.onLine) {
+        connBanner.style.display = 'none';
+      }
+
       // Update Airport Ticker with fresh arrivals for this exact stop
       this.ticker.setStopAndArrivals(this.currentStop, arrivals);
 
@@ -654,6 +688,12 @@ class AppController {
       }
     } catch (err) {
       console.warn('Failed to refresh arrivals:', err);
+      const connBanner = document.getElementById('connection-status-banner');
+      const connText = document.getElementById('connection-status-text');
+      if (connBanner && connText) {
+        connText.innerText = '⚡ Προσωρινή καθυστέρηση τηλεματικής ΟΑΣΑ: Προβολή προηγούμενων αφίξεων';
+        connBanner.style.display = 'flex';
+      }
     }
   }
 

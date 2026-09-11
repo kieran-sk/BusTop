@@ -209,7 +209,10 @@
           <h2 style="font-size: 1.25rem; font-weight: 800; margin: 0; color: #0f172a;">🔔 Ειδοποιήσεις &amp; Υπενθυμίσεις</h2>
           <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">Ζωντανή παρακολούθηση αφίξεων με ηχητικό συναγερμό και ειδοποιήσεις στο κινητό</div>
         </div>
-        <div style="display: flex; gap: 0.5rem; align-items: center;">
+        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+          <button id="btn-request-battery-opt" class="m3-btn m3-btn-tonal" style="display: none; font-size: 0.78rem; padding: 0.35rem 0.75rem; border-radius: 9999px; align-items: center; gap: 4px;" onclick="if (window.AndroidBridge && typeof window.AndroidBridge.requestIgnoreBatteryOptimizations === 'function') { window.AndroidBridge.requestIgnoreBatteryOptimizations(); }" title="Εξαίρεση από εξοικονόμηση μπαταρίας για αξιόπιστες ειδοποιήσεις στο παρασκήνιο">
+            ⚡ Εξοικονόμηση Μπαταρίας
+          </button>
           <button class="m3-btn m3-btn-tonal" style="font-size: 0.78rem; padding: 0.35rem 0.75rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px;" onclick="window.Alarms.unlockAudio(); window.Alarms.startAlarmRinging();" title="Δοκιμή ήχου σειρήνας">
             🔊 Δοκιμή Σειρήνας
           </button>

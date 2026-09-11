@@ -86,6 +86,9 @@ class AirportTicker {
     const chars = String(text).split('');
     const prev = this.previousDigitsMap.get(key) || '';
     const prevChars = prev.split('');
+    if (this.previousDigitsMap.size > 200) {
+      this.previousDigitsMap.clear();
+    }
     this.previousDigitsMap.set(key, String(text));
 
     const html = chars.map((ch, idx) => {

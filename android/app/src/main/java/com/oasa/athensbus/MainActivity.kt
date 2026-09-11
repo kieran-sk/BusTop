@@ -23,6 +23,9 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.maps.MapsInitializer
 import android.content.res.Configuration
+import android.os.PowerManager
+import android.provider.Settings
+import android.net.Uri
 import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
@@ -396,6 +399,47 @@ class MainActivity : ComponentActivity() {
                 AlarmRingingService.dismiss(context)
             } catch (e: Exception) {
                 e.printStackTrace()
+            }
+        }
+
+        @JavascriptInterface
+        fun isIgnoringBatteryOptimizations(): Boolean {
+            return try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+                    pm.isIgnoringBatteryOptimizations(context.packageName)
+                } else {
+                    true
+                }
+            } catch (e: Exception) {
+                true
+            }
+        }
+
+        @JavascriptInterface
+        fun requestIgnoreBatteryOptimizations() {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+                    if (!pm.isIgnoringBatteryOptimizations(context.packageName)) {
+                        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                            data = Uri.parse("package:${context.packageName}")
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        context.startActivity(intent)
+                    } else {
+                        Toast.makeText(context, "Η εφαρμογή εξαιρείται ήδη από την εξοικονόμηση μπαταρίας!", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                try {
+                    val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    context.startActivity(intent)
+                } catch (e2: Exception) {
+                    e2.printStackTrace()
+                }
             }
         }
     }

@@ -589,6 +589,19 @@ class AlarmManager {
       badge.textContent = activeCount;
     }
 
+    // Check battery optimization button visibility
+    const batteryOptBtn = document.getElementById('btn-request-battery-opt');
+    if (batteryOptBtn && window.AndroidBridge && typeof window.AndroidBridge.requestIgnoreBatteryOptimizations === 'function') {
+      try {
+        const isIgnored = typeof window.AndroidBridge.isIgnoringBatteryOptimizations === 'function'
+          ? window.AndroidBridge.isIgnoringBatteryOptimizations()
+          : false;
+        batteryOptBtn.style.display = isIgnored ? 'none' : 'inline-flex';
+      } catch (e) {
+        batteryOptBtn.style.display = 'inline-flex';
+      }
+    }
+
     if (targets.length === 0) return;
 
     let contentHtml = '';
