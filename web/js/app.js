@@ -164,6 +164,9 @@ class AppController {
   }
 
   goBack(popBrowserHistory = true) {
+    const backBtn = document.getElementById('global-back-btn');
+    if (backBtn) backBtn.blur();
+
     // 1. If any modal dialog is currently open, close it first
     const openDialog = document.querySelector('.m3-dialog-backdrop.open');
     if (openDialog) {
@@ -285,6 +288,7 @@ class AppController {
     // Render Notifications Tab if selected
     if (tabId === 'notifications' && window.Alarms) {
       window.Alarms.renderUI('notifications-container');
+      window.Alarms.checkAllAlarms();
     }
 
     // Re-render favorites if selected

@@ -415,8 +415,9 @@ class AlarmManager {
       if (currentMins === null) {
         const elapsedMs = now - alarm.createdAt;
         const elapsedMins = Math.floor(elapsedMs / 60000);
-        currentMins = Math.max(0, alarm.initialMinutes - elapsedMins);
-      }
+      // Save live minutes so notifications tab and notification remain perfectly synced
+      alarm.currentMinutes = currentMins;
+      alarm.lastUpdated = now;
 
       // 3. Trigger alarm if threshold is reached!
       if (currentMins <= alarm.thresholdMinutes) {
@@ -426,6 +427,8 @@ class AlarmManager {
         this.updateLiveNotification(alarm, currentMins);
       }
     }
+    this.save();
+    this.renderUI();
   }
 
   playTone(frequency, duration) {
@@ -529,7 +532,9 @@ class AlarmManager {
           ${this.alarms.map(a => {
             const elapsedMs = Date.now() - a.createdAt;
             const elapsedMins = Math.floor(elapsedMs / 60000);
-            const currentEstMins = Math.max(0, a.initialMinutes - elapsedMins);
+            const currentEstMins = (typeof a.currentMinutes === 'number')
+              ? a.currentMinutes
+              : Math.max(0, a.initialMinutes - elapsedMins);
             const isUrgent = currentEstMins <= a.thresholdMinutes;
             const formattedTime = this.formatMinutesHuman(currentEstMins);
 
@@ -550,7 +555,9 @@ class AlarmManager {
                     </span>
                     <div style="min-width: 0; flex: 1;">
                       <div style="font-weight: 800; font-size: 0.95rem; color: #0f172a; line-height: 1.3; word-break: break-word;">${a.stopName}</div>
-                      <div style="font-size: 0.76rem; color: #64748b; margin-top: 2px;">Στάση #${a.stopCode} • <span style="color: #005ac1; text-decoration: underline;">Προβολή στάσης ➜</span></div>
+                      <div style="font-size: 0.76rem; color: #64748b; margin-top: 2px;">
+                        ${a.destination ? `<strong style="color: var(--md-sys-color-primary); margin-right: 4px;">προς ${a.destination}</strong> • ` : ''}Στάση #${a.stopCode} • <span style="color: #005ac1; text-decoration: underline;">Προβολή στάσης ➜</span>
+                      </div>
                     </div>
                   </div>
                   <div style="text-align: right; flex-shrink: 0;">

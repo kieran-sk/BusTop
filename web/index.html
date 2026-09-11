@@ -27,14 +27,14 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- Stylesheets (Relative paths with cache-busting for PWA updates) -->
-  <link rel="stylesheet" href="css/m3-expressive.css?v=20260910_2215">
-  <link rel="stylesheet" href="css/airport-ticker.css?v=20260910_2215">
+  <link rel="stylesheet" href="css/m3-expressive.css?v=20260911_1230">
+  <link rel="stylesheet" href="css/airport-ticker.css?v=20260911_1230">
 </head>
 <body>
 
   <!-- Top App Bar -->
   <header class="m3-top-app-bar">
-    <button id="global-back-btn" class="m3-back-btn" onclick="window.App.goBack()" style="display: none;" title="Επιστροφή (Πίσω)" aria-label="Πίσω">
+    <button id="global-back-btn" class="m3-back-btn" onclick="this.blur(); window.App.goBack()" onpointerup="this.blur()" style="display: none;" title="Επιστροφή (Πίσω)" aria-label="Πίσω">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
         <line x1="19" y1="12" x2="5" y2="12"></line>
         <polyline points="12 19 5 12 12 5"></polyline>
@@ -353,14 +353,14 @@
   </nav>
 
   <!-- Scripts (Cache-busted for live updates) -->
-  <script src="js/api.js?v=20260911_1115"></script>
-  <script src="js/map-manager.js?v=20260911_1115"></script>
-  <script src="js/ticker.js?v=20260911_1115"></script>
-  <script src="js/alarms.js?v=20260911_1115"></script>
-  <script src="js/pinned-trips.js?v=20260911_1115"></script>
-  <script src="js/timetable.js?v=20260911_1115"></script>
-  <script src="js/search.js?v=20260911_1115"></script>
-  <script src="js/favorites.js?v=20260911_1115"></script>
-  <script src="js/app.js?v=20260911_1115"></script>
+  <script src="js/api.js?v=20260911_1230"></script>
+  <script src="js/map-manager.js?v=20260911_1230"></script>
+  <script src="js/ticker.js?v=20260911_1230"></script>
+  <script src="js/alarms.js?v=20260911_1230"></script>
+  <script src="js/pinned-trips.js?v=20260911_1230"></script>
+  <script src="js/timetable.js?v=20260911_1230"></script>
+  <script src="js/search.js?v=20260911_1230"></script>
+  <script src="js/favorites.js?v=20260911_1230"></script>
+  <script src="js/app.js?v=20260911_1230"></script>
 </body>
 </html>

@@ -239,10 +239,13 @@ class AirportTicker {
 
         <!-- 2. Destination & Direction -->
         <div class="ticker-cell-dest ticker-dest">
-          <div class="ticker-dest-title">${lineDescr}</div>
+          <div class="ticker-dest-title">
+            ${arr.destination ? `<span style="color: #0f172a; font-weight: 900;">${arr.destination}</span>` : lineDescr}
+          </div>
           <div class="ticker-dest-sub">
-            <strong style="color: var(--md-sys-color-primary);">${directionText}</strong> • 
+            <strong style="color: var(--md-sys-color-primary); background: #e0f2fe; padding: 1px 6px; border-radius: 4px; font-size: 0.72rem;">${directionText}</strong> • 
             <span>${isLive ? 'Ζωντανό GPS' : `Προγραμματισμένο (Αναχ. ${arr.departure_time || ''})`}</span>
+            ${lineDescr && arr.destination && lineDescr !== arr.destination ? `<span style="color: #64748b;"> • ${lineDescr}</span>` : ''}
             ${reportAgo ? `<span class="ticker-contact-ping">• Λεωφ. #${arr.veh_code || ''} στίγμα: ${reportAgo}</span>` : ''}
           </div>
         </div>
@@ -269,7 +272,7 @@ class AirportTicker {
         <!-- 6. Dedicated Alarm & Pin Actions (Grouped so buttons never shift across rows) -->
         <div class="ticker-cell-actions">
           <div class="ticker-cell-alarm">
-            <button class="ticker-alarm-btn ${isAlarmSet ? 'active' : ''}" title="${isAlarmSet ? 'Ειδοποίηση ενεργή' : 'Ρύθμιση ειδοποίησης άφιξης'}" onclick="event.stopPropagation(); window.App.openAlarmDialog('${arr.line_id}', '${arr.route_code}', ${busMins}, '${safeDescr}')">
+            <button class="ticker-alarm-btn ${isAlarmSet ? 'active' : ''}" title="${isAlarmSet ? 'Ειδοποίηση ενεργή' : 'Ρύθμιση ειδοποίησης άφιξης'}" onclick="event.stopPropagation(); const notifDest = '${(arr.destination || safeDescr).replace(/'/g, "\\'")}'; window.App.openAlarmDialog('${arr.line_id}', '${arr.route_code}', ${busMins}, notifDest)">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="${isAlarmSet ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
                 <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
@@ -303,30 +306,18 @@ class AirportTicker {
       const rawStops = window.Search && Array.isArray(window.Search.nearbyStops) ? [...window.Search.nearbyStops] : [];
       // Prioritize starred/favourite stops with routes, active routes, and push stops without routes to the bottom
       rawStops.sort((a, b) => {
-        const isFavA = window.Favorites && window.Favorites.isStopFav(a.StopCode);
-        const isFavB = window.Favorites && window.Favorites.isStopFav(b.StopCode);
         const aHas = Array.isArray(a.serving_lines) && a.serving_lines.length > 0;
         const bHas = Array.isArray(b.serving_lines) && b.serving_lines.length > 0;
 
-        if (isFavA && isFavB) {
-          if (aHas && !bHas) return -1;
-          if (!aHas && bHas) return 1;
-          return (a.distanceMeters || 0) - (b.distanceMeters || 0);
-        }
-        if (isFavA && !isFavB) {
-          if (aHas) return -1;
-          if (!aHas && bHas) return 1;
-          return -1;
-        }
-        if (!isFavA && isFavB) {
-          if (bHas) return 1;
-          if (!bHas && aHas) return -1;
-          return 1;
-        }
-
-        // If no routes are routed through them, show them at the bottom
+        // FIRST: Stops with NO routes/arrivals always go strictly to the bottom
         if (aHas && !bHas) return -1;
         if (!aHas && bHas) return 1;
+
+        const isFavA = window.Favorites && window.Favorites.isStopFav(a.StopCode);
+        const isFavB = window.Favorites && window.Favorites.isStopFav(b.StopCode);
+
+        if (isFavA && !isFavB) return -1;
+        if (!isFavA && isFavB) return 1;
 
         return (a.distanceMeters || 0) - (b.distanceMeters || 0);
       });
@@ -362,12 +353,16 @@ class AirportTicker {
               const hasRoutes = Array.isArray(s.serving_lines) && s.serving_lines.length > 0;
               let linesPills = '';
               if (hasRoutes) {
-                const uniqueLids = Array.from(new Set(s.serving_lines.map(l => l.line_id).filter(Boolean)));
-                linesPills = uniqueLids.slice(0, 8).map(lid => `
-                  <span style="font-size: 0.72rem; font-weight: 800; color: #005ac1; background: #e0f2fe; padding: 1px 6px; border-radius: 4px; border: 1px solid #bae6fd;">${lid}</span>
+                linesPills = s.serving_lines.slice(0, 6).map(l => `
+                  <span class="m3-badge" style="background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface); font-size: 0.75rem; padding: 2px 7px; border: 1px solid var(--md-sys-color-outline-variant); margin-bottom: 2px;">
+                    <strong style="color: var(--md-sys-color-primary);">${l.line_id}</strong>
+                    <span style="color: var(--md-sys-color-outline); margin: 0 3px;">προς</span>
+                    <span>${l.last_stop}</span>
+                    ${l.direction ? `<span style="font-size: 0.68rem; color: #64748b; margin-left: 2px;">(${l.direction})</span>` : ''}
+                  </span>
                 `).join('');
-                if (uniqueLids.length > 8) {
-                  linesPills += `<span style="font-size: 0.7rem; color: #64748b; font-weight: 700;">+${uniqueLids.length - 8}</span>`;
+                if (s.serving_lines.length > 6) {
+                  linesPills += `<span style="font-size: 0.7rem; color: #64748b; font-weight: 700; align-self: center;">+${s.serving_lines.length - 6} ακόμη</span>`;
                 }
               }
 

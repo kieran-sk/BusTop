@@ -260,7 +260,9 @@ class LiveTrackingService : Service() {
         )
 
         val timeFormatted = NotificationHelper.formatMinutesHuman(mins)
-        val title = if (mins <= 0) "🚨 Γραμμή $lineId • ΕΦΤΑΣΕ!" else "🚍 Γραμμή $lineId • σε $timeFormatted"
+        val shortText = if (mins <= 0) "ΤΩΡΑ" else "${mins}λ"
+        val dirPart = if (destination.isNotBlank()) " προς $destination" else ""
+        val title = if (mins <= 0) "🚨 $lineId$dirPart • ΕΦΤΑΣΕ!" else "🚍 $lineId$dirPart • σε $timeFormatted"
         val content = "📍 Στάση: $stopName"
 
         val maxMins = kotlin.math.max(1, initialMinutes)
@@ -268,12 +270,15 @@ class LiveTrackingService : Service() {
 
         val extras = android.os.Bundle().apply {
             putBoolean("android.requestPromotedOngoing", true)
+            putCharSequence("android.shortCriticalText", shortText)
+            putCharSequence("android.substName", shortText)
         }
 
-        return NotificationCompat.Builder(this, NotificationHelper.LIVE_CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, NotificationHelper.LIVE_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(content)
+            .setSubText(shortText)
             .setProgress(maxMins, progress, false)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -284,7 +289,19 @@ class LiveTrackingService : Service() {
             .setContentIntent(pLaunch)
             .addExtras(extras)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "🛑 Τερματισμός", pStop)
-            .build()
+
+        try {
+            val method = builder.javaClass.getMethod("setShortCriticalText", CharSequence::class.java)
+            method.invoke(builder, shortText)
+        } catch (e: Throwable) {}
+
+        val notif = builder.build()
+        try {
+            notif.extras.putCharSequence("android.shortCriticalText", shortText)
+            notif.extras.putBoolean("android.requestPromotedOngoing", true)
+        } catch (e: Throwable) {}
+
+        return notif
     }
 
     private fun triggerAlarmWakeup(minsAway: Int) {

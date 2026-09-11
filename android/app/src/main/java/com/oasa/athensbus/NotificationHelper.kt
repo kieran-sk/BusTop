@@ -141,7 +141,9 @@ object NotificationHelper {
         )
 
         val timeFormatted = formatMinutesHuman(minutesAway)
-        val title = if (minutesAway <= 0) "🚨 Γραμμή $lineId • ΕΦΤΑΣΕ!" else "🚍 Γραμμή $lineId • σε $timeFormatted"
+        val shortText = if (minutesAway <= 0) "ΤΩΡΑ" else "${minutesAway}λ"
+        val dirPart = if (destination.isNotBlank()) " προς $destination" else ""
+        val title = if (minutesAway <= 0) "🚨 $lineId$dirPart • ΕΦΤΑΣΕ!" else "🚍 $lineId$dirPart • σε $timeFormatted"
         val content = "📍 Στάση: $stopName"
 
         val maxMins = kotlin.math.max(1, initialMinutes)
@@ -149,12 +151,15 @@ object NotificationHelper {
 
         val extras = android.os.Bundle().apply {
             putBoolean("android.requestPromotedOngoing", true)
+            putCharSequence("android.shortCriticalText", shortText)
+            putCharSequence("android.substName", shortText)
         }
 
-        val notification = NotificationCompat.Builder(context, LIVE_CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, LIVE_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(content)
+            .setSubText(shortText)
             .setProgress(maxMins, progress, false)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -165,7 +170,17 @@ object NotificationHelper {
             .setContentIntent(pendingIntent)
             .addExtras(extras)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "🛑 Τερματισμός", pStop)
-            .build()
+
+        try {
+            val method = builder.javaClass.getMethod("setShortCriticalText", CharSequence::class.java)
+            method.invoke(builder, shortText)
+        } catch (e: Throwable) {}
+
+        val notification = builder.build()
+        try {
+            notification.extras.putCharSequence("android.shortCriticalText", shortText)
+            notification.extras.putBoolean("android.requestPromotedOngoing", true)
+        } catch (e: Throwable) {}
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(LIVE_NOTIF_ID, notification)

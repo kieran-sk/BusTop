@@ -220,6 +220,7 @@ class SearchManager {
       try {
         const stops = await window.API.getClosestStops(lat, lng);
         this.nearbyStops = Array.isArray(stops) ? stops : [];
+        this.sortStopsWithFavorites();
         this.renderNearbyStops(lat, lng);
         if (window.App && window.App.mapManager) {
           window.App.mapManager.renderNearbyStops(this.nearbyStops);
@@ -295,30 +296,20 @@ class SearchManager {
   sortStopsWithFavorites() {
     if (!Array.isArray(this.nearbyStops)) return;
     this.nearbyStops.sort((a, b) => {
-      const isFavA = window.Favorites && window.Favorites.isStopFav(a.StopCode);
-      const isFavB = window.Favorites && window.Favorites.isStopFav(b.StopCode);
       const aHas = Array.isArray(a.serving_lines) && a.serving_lines.length > 0;
       const bHas = Array.isArray(b.serving_lines) && b.serving_lines.length > 0;
 
-      if (isFavA && isFavB) {
-        if (aHas && !bHas) return -1;
-        if (!aHas && bHas) return 1;
-        return (a.distanceMeters || 0) - (b.distanceMeters || 0);
-      }
-      if (isFavA && !isFavB) {
-        if (aHas) return -1;
-        if (!aHas && bHas) return 1;
-        return -1;
-      }
-      if (!isFavA && isFavB) {
-        if (bHas) return 1;
-        if (!bHas && aHas) return -1;
-        return 1;
-      }
-
-      // If no routes are routed through them, show them at the bottom
+      // FIRST: Stops with NO routes/arrivals always go strictly to the bottom
       if (aHas && !bHas) return -1;
-      // Sort primarily by walking distance
+      if (!aHas && bHas) return 1;
+
+      const isFavA = window.Favorites && window.Favorites.isStopFav(a.StopCode);
+      const isFavB = window.Favorites && window.Favorites.isStopFav(b.StopCode);
+
+      if (isFavA && !isFavB) return -1;
+      if (!isFavA && isFavB) return 1;
+
+      // Sort by walking distance
       return (a.distanceMeters || 0) - (b.distanceMeters || 0);
     });
 

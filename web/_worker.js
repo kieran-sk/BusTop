@@ -112,6 +112,7 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
         line_id: route.LineID || arr.line_id || 'BUS',
         line_descr: route.LineDescr || route.RouteDescr || 'Λεωφορείο ΟΑΣΑ',
         route_descr: route.RouteDescr || '',
+        destination: cleanRouteDestination(route),
         direction: /κυκλικη|circular/i.test(route.LineDescr || '') ? 'Κυκλική' : (route.RouteType === '2' ? 'Επιστροφή' : 'Μετάβαση'),
         veh_code: arr.veh_code || null,
         btime2: btime2,
@@ -163,6 +164,7 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
             estimated_arrival_time: estFormatted,
             is_live: false,
             departure_time: depFormatted,
+            destination: cleanRouteDestination(route),
             departure_terminal: cleanRouteDestination(route),
             status_label: 'Προγραμματισμένη (' + depFormatted + ')',
             source: 'timetable_estimate'
@@ -255,7 +257,7 @@ export default {
           }
 
           const sorted = Array.from(merged.values()).sort((a, b) => (a.distanceMeters || 0) - (b.distanceMeters || 0));
-          const topStops = sorted.slice(0, 30);
+          const topStops = sorted.slice(0, 45);
 
           const enriched = await Promise.all(topStops.map(async s => {
             try {
