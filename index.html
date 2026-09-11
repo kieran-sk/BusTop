@@ -29,7 +29,7 @@
   <!-- Stylesheets (Relative paths with cache-busting for PWA updates) -->
   <link rel="stylesheet" href="css/m3-expressive.css?v=20260911_1300">
   <link rel="stylesheet" href="css/airport-ticker.css?v=20260911_1300">
-  <link rel="stylesheet" href="css/dot-matrix.css?v=1789147727">
+  <link id="theme-dot-matrix" rel="stylesheet" href="css/dot-matrix.css?v=20260911_2050" disabled>
 </head>
 <body>
 
@@ -44,6 +44,9 @@
     </button>
     <div id="top-bar-filler" style="flex: 1;"></div>
     <div style="display: flex; align-items: center; gap: 0.5rem;">
+      <button id="theme-mode-toggle-btn" class="m3-btn m3-btn-tonal" style="font-size: 0.75rem; padding: 3px 10px; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px; font-weight: 700; cursor: pointer;" onclick="window.App.toggleDotMatrixTheme()" title="Εναλλαγή εμφάνισης (M3 / Dot-Matrix LED)">
+        <span>👾 Matrix</span>
+      </button>
       <span class="m3-badge m3-badge-live">
         <span class="m3-pulse-dot"></span> Τηλεματική Ενεργή
       </span>

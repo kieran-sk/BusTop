@@ -51,8 +51,41 @@ class AppController {
     }
   }
 
+  toggleDotMatrixTheme() {
+    const link = document.getElementById('theme-dot-matrix');
+    const btn = document.getElementById('theme-mode-toggle-btn');
+    if (!link) return;
+    const isEnabled = !link.disabled;
+    const nextState = !isEnabled;
+    link.disabled = !nextState;
+    localStorage.setItem('OASA_DOT_MATRIX_THEME', nextState ? 'true' : 'false');
+    if (btn) {
+      btn.innerHTML = nextState ? '<span>🎨 M3</span>' : '<span>👾 Matrix</span>';
+      btn.classList.toggle('m3-btn-primary', nextState);
+      btn.classList.toggle('m3-btn-tonal', !nextState);
+    }
+    this.triggerHaptic('light');
+  }
+
+  applyStoredTheme() {
+    const isExpUrl = window.location.hostname.includes('experimental') || window.location.search.includes('theme=matrix');
+    const stored = localStorage.getItem('OASA_DOT_MATRIX_THEME');
+    const shouldEnable = stored === 'true' || (stored === null && isExpUrl);
+    const link = document.getElementById('theme-dot-matrix');
+    const btn = document.getElementById('theme-mode-toggle-btn');
+    if (link) {
+      link.disabled = !shouldEnable;
+    }
+    if (btn) {
+      btn.innerHTML = shouldEnable ? '<span>🎨 M3</span>' : '<span>👾 Matrix</span>';
+      btn.classList.toggle('m3-btn-primary', shouldEnable);
+      btn.classList.toggle('m3-btn-tonal', !shouldEnable);
+    }
+  }
+
   async init() {
     console.log('[Athens OASA Bus Suite] Initializing Material 3 Expressive & Leaflet Map in Greek...');
+    this.applyStoredTheme();
 
     // Initialize Ticker
     this.ticker = new AirportTicker('ticker-container');
