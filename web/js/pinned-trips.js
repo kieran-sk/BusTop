@@ -17,27 +17,34 @@ class PinnedTripsManager {
     this.renderUI();
   }
 
-  isPinned(stopCode, lineId, routeCode) {
+  isPinned(stopCode, lineId) {
+    if (!stopCode || !lineId) return false;
+    const sCode = String(stopCode).trim();
+    const lId = String(lineId).trim().toUpperCase();
     return this.pinnedItems.some(item => 
-      String(item.stopCode) === String(stopCode) && 
-      String(item.lineId) === String(lineId) &&
-      (!routeCode || !item.routeCode || String(item.routeCode) === String(routeCode))
+      String(item.stopCode).trim() === sCode && 
+      String(item.lineId).trim().toUpperCase() === lId
     );
   }
 
   togglePin(arrival, stopInfo) {
-    const stopCode = String(stopInfo.StopCode);
-    const lineId = String(arrival.line_id || arrival.LineID || 'BUS');
-    const routeCode = String(arrival.route_code || arrival.RouteCode || '');
+    if (!stopInfo || !arrival) return;
+    const stopCode = String(stopInfo.StopCode).trim();
+    const lineId = String(arrival.line_id || arrival.LineID || 'BUS').trim();
+    const routeCode = String(arrival.route_code || arrival.RouteCode || '').trim();
 
     const existingIdx = this.pinnedItems.findIndex(item =>
-      String(item.stopCode) === stopCode && String(item.lineId) === lineId
+      String(item.stopCode).trim() === stopCode &&
+      String(item.lineId).trim().toUpperCase() === lineId.toUpperCase()
     );
 
     if (existingIdx !== -1) {
       this.pinnedItems.splice(existingIdx, 1);
       this.save();
       this.showToast(`Ξεκαρφιτσώθηκε η γραμμή ${lineId}`);
+      if (window.App && typeof window.App.triggerHaptic === 'function') {
+        window.App.triggerHaptic('light');
+      }
       if (this.pinnedItems.length === 0) {
         if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
           try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
@@ -61,10 +68,21 @@ class PinnedTripsManager {
       this.pinnedItems.push(newItem);
       this.save();
       this.showToast(`📌 Ζωντανή παρακολούθηση: ${lineId} (${newItem.stopName})`);
+      if (window.App && typeof window.App.triggerHaptic === 'function') {
+        window.App.triggerHaptic('success');
+      }
       if (window.Alarms) {
         window.Alarms.playTone(659.25, 0.12);
         setTimeout(() => window.Alarms.playTone(880, 0.15), 100);
       }
+
+      // Check if an active alarm exists for this stop and line to preserve threshold & ringing!
+      const activeAlarm = (window.Alarms && Array.isArray(window.Alarms.alarms))
+        ? window.Alarms.alarms.find(a => !a.triggered && String(a.stopCode).trim() === stopCode && String(a.lineId).trim().toUpperCase() === lineId.toUpperCase())
+        : null;
+
+      const threshold = activeAlarm ? (activeAlarm.thresholdMinutes || 5) : 0;
+      const ringUntilDismissed = activeAlarm ? (activeAlarm.ringUntilDismissed !== false) : false;
 
       // Start Android Live Tracking Notification immediately for this pinned bus
       if (window.AndroidBridge && typeof window.AndroidBridge.startLiveTracking === 'function') {
@@ -81,8 +99,8 @@ class PinnedTripsManager {
             String(newItem.stopName),
             String(arrival.destination || arrival.route_descr || ''),
             Number(walkMins),
-            0, // threshold 0 = quiet live tracking, no audible siren alarm!
-            false, // ringUntilDismissed = false
+            Number(threshold),
+            Boolean(ringUntilDismissed),
             Number(busMins)
           );
         } catch (e) {
@@ -100,12 +118,11 @@ class PinnedTripsManager {
   }
 
   pinArrival(arrival, stopInfo) {
-    if (!stopInfo) return;
-    const stopCode = String(stopInfo.StopCode);
-    const lineId = String(arrival.line_id || arrival.LineID || 'BUS');
-    const routeCode = String(arrival.route_code || arrival.RouteCode || '');
+    if (!stopInfo || !arrival) return;
+    const stopCode = String(stopInfo.StopCode).trim();
+    const lineId = String(arrival.line_id || arrival.LineID || 'BUS').trim();
 
-    const exists = this.isPinned(stopCode, lineId, routeCode);
+    const exists = this.isPinned(stopCode, lineId);
     if (!exists) {
       this.togglePin(arrival, stopInfo);
     }

@@ -118,12 +118,51 @@ class AirportTicker {
    * Calculate walk time in minutes along pedestrian urban network
    */
   getWalkMinutes(stopLat, stopLng) {
-    if (!this.userLocation || !stopLat || !stopLng) return null;
+    const userLoc = this.userLocation || (window.App && window.App.userLocation) || (() => {
+      try { return JSON.parse(localStorage.getItem('OASA_LAST_USER_LOCATION') || 'null'); } catch (e) { return null; }
+    })();
+    if (!userLoc || !userLoc.lat || !userLoc.lng) return null;
+
+    let sLat = parseFloat(stopLat);
+    let sLng = parseFloat(stopLng);
+
+    // If stop coords are missing, try cached coordinates or lookup from nearby stops
+    if ((isNaN(sLat) || isNaN(sLng)) && this.currentStop && this.currentStop.StopCode) {
+      try {
+        const cached = JSON.parse(localStorage.getItem('OASA_STOP_COORDS_' + this.currentStop.StopCode) || 'null');
+        if (cached && cached.lat && cached.lng) {
+          sLat = parseFloat(cached.lat);
+          sLng = parseFloat(cached.lng);
+        }
+      } catch (e) {}
+
+      if ((isNaN(sLat) || isNaN(sLng)) && window.Search && Array.isArray(window.Search.nearbyStops)) {
+        const found = window.Search.nearbyStops.find(s => String(s.StopCode) === String(this.currentStop.StopCode));
+        if (found && found.StopLat && found.StopLng) {
+          sLat = parseFloat(found.StopLat);
+          sLng = parseFloat(found.StopLng);
+        }
+      }
+
+      if (!isNaN(sLat) && !isNaN(sLng)) {
+        this.currentStop.StopLat = sLat;
+        this.currentStop.StopLng = sLng;
+        localStorage.setItem('OASA_STOP_COORDS_' + this.currentStop.StopCode, JSON.stringify({ lat: sLat, lng: sLng }));
+      }
+    }
+
+    if (isNaN(sLat) || isNaN(sLng)) return null;
+
+    // Cache valid coords for future queries
+    if (this.currentStop && this.currentStop.StopCode) {
+      localStorage.setItem('OASA_STOP_COORDS_' + this.currentStop.StopCode, JSON.stringify({ lat: sLat, lng: sLng }));
+    }
+
     const meters = this.calculateWalkingDistance(
-      this.userLocation.lat,
-      this.userLocation.lng,
-      parseFloat(stopLat),
-      parseFloat(stopLng)
+      userLoc.lat,
+      userLoc.lng,
+      sLat,
+      sLng
     );
     const walkMins = Math.ceil(meters / 75) + 2;
     return {
@@ -230,10 +269,14 @@ class AirportTicker {
     }
 
     // Check if an alarm is active for this route
-    const isAlarmSet = window.Alarms && window.Alarms.alarms && window.Alarms.alarms.some(a => a.stopCode === this.currentStop.StopCode && a.lineId === arr.line_id && !a.triggered);
+    const isAlarmSet = window.Alarms && Array.isArray(window.Alarms.alarms) && window.Alarms.alarms.some(a => 
+      String(a.stopCode).trim() === String(this.currentStop.StopCode).trim() && 
+      String(a.lineId).trim().toUpperCase() === String(arr.line_id).trim().toUpperCase() && 
+      !a.triggered
+    );
 
     // Check if pinned for complex trips
-    const isPinned = window.PinnedTrips && window.PinnedTrips.isPinned(this.currentStop.StopCode, arr.line_id, arr.route_code);
+    const isPinned = window.PinnedTrips && window.PinnedTrips.isPinned(this.currentStop.StopCode, arr.line_id);
 
     // Live location report latency string
     const reportAgo = arr.last_contact_ago_gr || arr.last_contact_ago;
@@ -378,7 +421,7 @@ class AirportTicker {
               }
 
               return `
-                <div class="m3-card" style="padding: 0.9rem; display: flex; flex-direction: column; justify-content: space-between; gap: 0.65rem; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; border: ${isFav ? '2px solid #eab308; background: #fffdf5;' : (hasRoutes ? '1px solid var(--md-sys-color-outline-variant); background: #ffffff;' : '1px dashed #cbd5e1; background: #f8fafc; opacity: 0.85;')}" onclick="window.App.selectStop('${sCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})" onmouseover="this.style.borderColor='var(--md-sys-color-primary)'" onmouseout="this.style.borderColor='${isFav ? '#eab308' : (hasRoutes ? 'var(--md-sys-color-outline-variant)' : '#cbd5e1')}'">
+                <div class="m3-card stop-interactive-card" data-stop-code="${sCode}" data-stop-title="${safeTitle}" data-stop-lat="${s.StopLat}" data-stop-lng="${s.StopLng}" style="padding: 0.9rem; display: flex; flex-direction: column; justify-content: space-between; gap: 0.65rem; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; border: ${isFav ? '2px solid #eab308; background: #fffdf5;' : (hasRoutes ? '1px solid var(--md-sys-color-outline-variant); background: #ffffff;' : '1px dashed #cbd5e1; background: #f8fafc; opacity: 0.85;')}" onclick="window.App.selectStop('${sCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})" onmouseover="this.style.borderColor='var(--md-sys-color-primary)'" onmouseout="this.style.borderColor='${isFav ? '#eab308' : (hasRoutes ? 'var(--md-sys-color-outline-variant)' : '#cbd5e1')}'">
                   <div>
                     <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem;">
                       <div style="font-weight: 800; font-size: 0.98rem; color: #0f172a; line-height: 1.25;">
@@ -449,6 +492,17 @@ class AirportTicker {
 
     const stopName = this.currentStop.StopDescr || ('ΣΤΑΣΗ ' + this.currentStop.StopCode);
     const walk = this.getWalkMinutes(this.currentStop.StopLat, this.currentStop.StopLng);
+
+    // Keep the top walking time pill in the stop banner perpetually synchronized
+    const walkPill = document.getElementById('selected-stop-walk-pill');
+    if (walkPill) {
+      if (walk && typeof walk.minutes === 'number') {
+        walkPill.style.display = 'inline-flex';
+        walkPill.innerText = `🚶 ${walk.minutes}λ (${walk.meters}μ)`;
+      } else {
+        walkPill.style.display = 'none';
+      }
+    }
 
     // Extract unique line IDs for interactive show/hide filtering
     const uniqueLines = Array.from(new Set(this.arrivals.map(a => String(a.line_id || '').trim()).filter(Boolean)));

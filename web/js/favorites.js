@@ -99,7 +99,7 @@ class FavoritesManager {
           ${this.favStops.map(s => {
             const safeName = (s.name || '').replace(/'/g, "\\'");
             return `
-              <div class="m3-card" style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.85rem 1rem; margin-bottom: 0; cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-left: 3.5px solid var(--md-sys-color-primary);" onclick="window.App.selectStop('${s.code}', '${safeName}', '${s.lat || ''}', '${s.lng || ''}')">
+              <div class="m3-card stop-interactive-card" data-stop-code="${s.code}" data-stop-title="${safeName}" data-stop-lat="${s.lat || ''}" data-stop-lng="${s.lng || ''}" style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.85rem 1rem; margin-bottom: 0; cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-left: 3.5px solid var(--md-sys-color-primary);" onclick="window.App.selectStop('${s.code}', '${safeName}', '${s.lat || ''}', '${s.lng || ''}')">
                 <div style="display: flex; align-items: center; gap: 0.75rem; min-width: 0; flex: 1;">
                   <div class="m3-icon-btn" style="width: 36px; height: 36px; background: #eff6ff; color: var(--md-sys-color-primary); border: 1.5px solid #bfdbfe; flex-shrink: 0;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"></path><circle cx="12" cy="9" r="2.5"></circle></svg>

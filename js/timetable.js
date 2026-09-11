@@ -165,7 +165,7 @@ class TimetableManager {
       });
 
       return `
-        <div class="route-stop-item" style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0.9rem; border-radius: 12px; margin-bottom: 0.4rem; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); cursor: pointer; transition: all 0.2s;" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', ${lat}, ${lng}, true)" title="Κλικ για προβολή αφίξεων στη στάση ${stopTitle}">
+        <div class="route-stop-item stop-interactive-card" data-stop-code="${s.StopCode}" data-stop-title="${safeTitle}" data-stop-lat="${lat}" data-stop-lng="${lng}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0.9rem; border-radius: 12px; margin-bottom: 0.4rem; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); cursor: pointer; transition: all 0.2s;" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', ${lat}, ${lng}, true)" title="Κλικ για προβολή αφίξεων στη στάση ${stopTitle}">
           <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1;">
             <div style="width: 28px; height: 28px; border-radius: 50%; background: #1e3a8a; color: #93c5fd; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.78rem; flex-shrink: 0; border: 1.5px solid #3b82f6;">
               ${stopOrder}

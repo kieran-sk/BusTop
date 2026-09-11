@@ -137,7 +137,7 @@ class SearchManager {
             const stopTitle = s.StopDescr || `Στάση #${s.StopCode}`;
             const safeTitle = stopTitle.replace(/'/g, "\\'");
             return `
-              <div class="m3-card" style="display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1rem; margin-bottom: 0; cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})">
+              <div class="m3-card stop-interactive-card" data-stop-code="${s.StopCode}" data-stop-title="${safeTitle}" data-stop-lat="${s.StopLat}" data-stop-lng="${s.StopLng}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1rem; margin-bottom: 0; cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})">
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
                   <div class="m3-icon-btn" style="width: 38px; height: 38px; background: #ecfdf5; color: #047857; border: 1.5px solid #a7f3d0;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -420,7 +420,7 @@ class SearchManager {
           const isFav = window.Favorites && window.Favorites.isStopFav(s.StopCode);
 
           return `
-            <div class="m3-card" style="display: flex; flex-direction: column; padding: 0.9rem 1.1rem; cursor: pointer; background: ${isFav ? '#fffdf5' : (hasRoutes ? 'var(--md-sys-color-surface-container)' : '#f8fafc')}; margin-bottom: 0; border: ${isFav ? '2px solid #eab308' : (hasRoutes ? '1px solid var(--md-sys-color-outline-variant)' : '1px dashed #cbd5e1')}; opacity: ${hasRoutes ? '1' : '0.8'};" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', '${s.StopLat}', '${s.StopLng}')">
+            <div class="m3-card stop-interactive-card" data-stop-code="${s.StopCode}" data-stop-title="${safeTitle}" data-stop-lat="${s.StopLat}" data-stop-lng="${s.StopLng}" style="display: flex; flex-direction: column; padding: 0.9rem 1.1rem; cursor: pointer; background: ${isFav ? '#fffdf5' : (hasRoutes ? 'var(--md-sys-color-surface-container)' : '#f8fafc')}; margin-bottom: 0; border: ${isFav ? '2px solid #eab308' : (hasRoutes ? '1px solid var(--md-sys-color-outline-variant)' : '1px dashed #cbd5e1')}; opacity: ${hasRoutes ? '1' : '0.8'};" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', '${s.StopLat}', '${s.StopLng}')">
               <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
                 <div style="min-width: 0; flex: 1;">
                   <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">

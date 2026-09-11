@@ -111,10 +111,17 @@ class LiveTrackingService : Service() {
         stopName = intent?.getStringExtra(EXTRA_STOP_NAME) ?: "Στάση ΟΑΣΑ"
         destination = intent?.getStringExtra(EXTRA_DESTINATION) ?: ""
         walkMinutes = intent?.getIntExtra(EXTRA_WALK_MINUTES, 0) ?: 0
-        thresholdMinutes = intent?.getIntExtra(EXTRA_THRESHOLD, 5) ?: 5
+        val newThreshold = intent?.getIntExtra(EXTRA_THRESHOLD, 5) ?: 5
+        // If an alarm is already actively set (> 0), don't allow a quiet pin (0) to disarm it
+        if (newThreshold > 0 || thresholdMinutes == 0) {
+            thresholdMinutes = newThreshold
+        }
+        val newRing = intent?.getBooleanExtra(EXTRA_RING_UNTIL_DISMISSED, true) ?: true
+        if (newThreshold > 0) {
+            ringUntilDismissed = newRing
+        }
         initialMinutes = intent?.getIntExtra(EXTRA_INITIAL_MINS, 10) ?: 10
         startedAtMs = System.currentTimeMillis()
-        ringUntilDismissed = intent?.getBooleanExtra(EXTRA_RING_UNTIL_DISMISSED, true) ?: true
         isAlarmTriggered = false
 
         NotificationHelper.createLiveNotificationChannel(this)
@@ -164,7 +171,7 @@ class LiveTrackingService : Service() {
 
                     updateNotification(remainingMins)
 
-                    if (remainingMins <= thresholdMinutes && !isAlarmTriggered) {
+                    if (thresholdMinutes > 0 && remainingMins <= thresholdMinutes && !isAlarmTriggered) {
                         isAlarmTriggered = true
                         triggerAlarmWakeup(remainingMins)
                     }

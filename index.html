@@ -319,6 +319,53 @@
     </div>
   </div>
 
+  <!-- Stop Quick Action Sheet Modal (Long-Press) -->
+  <div id="stop-actions-modal" class="m3-dialog-backdrop">
+    <div class="m3-dialog-content" style="max-width: 400px; padding: 1.25rem;">
+      <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; margin-bottom: 1rem;">
+        <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
+          <div class="m3-icon-btn" style="background: var(--md-sys-color-primary-container); color: var(--md-sys-color-primary); border: none; width: 42px; height: 42px; flex-shrink: 0;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"></path>
+              <circle cx="12" cy="9" r="2.5"></circle>
+            </svg>
+          </div>
+          <div style="min-width: 0; flex: 1;">
+            <h3 id="stop-action-title" style="font-size: 1.05rem; font-weight: 800; color: var(--md-sys-color-on-surface); line-height: 1.25; margin: 0; word-break: break-word;">Στάση</h3>
+            <span id="stop-action-code" class="m3-badge" style="font-size: 0.7rem; font-weight: 800; background: #f1f5f9; color: #475569; margin-top: 3px; display: inline-block;">#--</span>
+          </div>
+        </div>
+        <button class="m3-icon-btn" onclick="window.App.closeModal('stop-actions-modal')" style="border: none; width: 32px; height: 32px; flex-shrink: 0;" aria-label="Κλείσιμο">✕</button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem;">
+        <!-- Option 1: Mark as Favourite -->
+        <button id="stop-action-fav-btn" class="m3-btn m3-btn-tonal" style="width: 100%; justify-content: flex-start; padding: 0.75rem 1rem; border-radius: 12px; font-weight: 700; gap: 10px; font-size: 0.9rem;">
+          <span style="font-size: 1.15rem;">⭐</span>
+          <span id="stop-action-fav-text">Αποθήκευση στα Αγαπημένα</span>
+        </button>
+
+        <!-- Option 2: Focus on Map -->
+        <button id="stop-action-map-btn" class="m3-btn m3-btn-tonal" style="width: 100%; justify-content: flex-start; padding: 0.75rem 1rem; border-radius: 12px; font-weight: 700; gap: 10px; font-size: 0.9rem;">
+          <span style="font-size: 1.15rem;">🗺️</span>
+          <span>Εστίαση στον Χάρτη</span>
+        </button>
+
+        <!-- Option 3: View Arrivals -->
+        <button id="stop-action-arrivals-btn" class="m3-btn m3-btn-primary" style="width: 100%; justify-content: flex-start; padding: 0.75rem 1rem; border-radius: 12px; font-weight: 700; gap: 10px; font-size: 0.9rem;">
+          <span style="font-size: 1.15rem;">🚍</span>
+          <span>Προβολή Αφίξεων Στάσης</span>
+        </button>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end;">
+        <button class="m3-btn m3-btn-tonal" style="font-size: 0.8rem; border-radius: 9999px; padding: 0.35rem 0.9rem;" onclick="window.App.closeModal('stop-actions-modal')">
+          Κλείσιμο
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Bottom Navigation Bar (Search, Arrivals, Notifications, Pinned Trips, Saved) -->
   <nav class="m3-nav-bar">
     <div class="m3-nav-item active" data-tab="search" onclick="window.App.switchTab('search')">
@@ -364,14 +411,14 @@
   </nav>
 
   <!-- Scripts (Cache-busted for live updates) -->
-  <script src="js/api.js?v=20260911_1610"></script>
-  <script src="js/map-manager.js?v=20260911_1610"></script>
-  <script src="js/ticker.js?v=20260911_1610"></script>
-  <script src="js/alarms.js?v=20260911_1610"></script>
-  <script src="js/pinned-trips.js?v=20260911_1610"></script>
-  <script src="js/timetable.js?v=20260911_1610"></script>
-  <script src="js/search.js?v=20260911_1610"></script>
-  <script src="js/favorites.js?v=20260911_1610"></script>
-  <script src="js/app.js?v=20260911_1610"></script>
+  <script src="js/api.js?v=20260911_1830"></script>
+  <script src="js/map-manager.js?v=20260911_1830"></script>
+  <script src="js/ticker.js?v=20260911_1830"></script>
+  <script src="js/alarms.js?v=20260911_1830"></script>
+  <script src="js/pinned-trips.js?v=20260911_1830"></script>
+  <script src="js/timetable.js?v=20260911_1830"></script>
+  <script src="js/search.js?v=20260911_1830"></script>
+  <script src="js/favorites.js?v=20260911_1830"></script>
+  <script src="js/app.js?v=20260911_1830"></script>
 </body>
 </html>

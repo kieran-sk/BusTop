@@ -17,6 +17,9 @@ class AlarmManager {
       // Will request upon setting first alarm
     }
 
+    // Render active alarms immediately into UI
+    this.renderUI();
+
     // Start background watcher
     this.startWatcher();
   }
@@ -157,25 +160,46 @@ class AlarmManager {
     const initialMins = options.targetMinutes || 10;
     const destination = options.destination || '';
     const walkMinutes = options.walkMinutes || 0;
-    const ringUntilDismissed = options.ringUntilDismissed !== false;
-    const createdAt = Date.now();
+    const stopCodeStr = String(options.stopCode);
+    const lineIdStr = String(options.lineId).trim();
 
-    const alarm = {
-      id,
-      stopCode: String(options.stopCode),
-      stopName: options.stopName,
-      lineId: String(options.lineId).trim(),
-      routeCode: options.routeCode ? String(options.routeCode) : '',
-      destination,
-      walkMinutes,
-      initialMinutes: initialMins,
-      thresholdMinutes: threshold,
-      ringUntilDismissed,
-      createdAt,
-      triggered: false
-    };
+    // Check if an alarm already exists for this line and stop (deduplicate)
+    const existingIdx = this.alarms.findIndex(a =>
+      String(a.stopCode) === stopCodeStr &&
+      String(a.lineId).trim().toUpperCase() === lineIdStr.toUpperCase()
+    );
 
-    this.alarms.push(alarm);
+    let alarm;
+    if (existingIdx !== -1) {
+      alarm = this.alarms[existingIdx];
+      alarm.stopName = options.stopName || alarm.stopName;
+      alarm.routeCode = options.routeCode ? String(options.routeCode) : alarm.routeCode;
+      alarm.destination = destination || alarm.destination;
+      alarm.walkMinutes = walkMinutes || alarm.walkMinutes;
+      alarm.initialMinutes = initialMins;
+      alarm.thresholdMinutes = threshold;
+      alarm.ringUntilDismissed = ringUntilDismissed;
+      alarm.createdAt = createdAt;
+      alarm.triggered = false;
+      alarm.triggeredAt = null;
+    } else {
+      alarm = {
+        id,
+        stopCode: stopCodeStr,
+        stopName: options.stopName,
+        lineId: lineIdStr,
+        routeCode: options.routeCode ? String(options.routeCode) : '',
+        destination,
+        walkMinutes,
+        initialMinutes: initialMins,
+        thresholdMinutes: threshold,
+        ringUntilDismissed,
+        createdAt,
+        triggered: false
+      };
+      this.alarms.push(alarm);
+    }
+
     this.save();
 
     // 1. Dispatch to Service Worker for background alerting even if app is closed
@@ -229,9 +253,12 @@ class AlarmManager {
     // 3. Live Notification initialization immediately
     this.updateLiveNotification(alarm, initialMins);
 
-    // Play subtle confirmation chime
+    // Play subtle confirmation chime & haptic feedback
     this.playTone(523.25, 0.15); // C5
     setTimeout(() => this.playTone(659.25, 0.15), 150); // E5
+    if (window.App && typeof window.App.triggerHaptic === 'function') {
+      window.App.triggerHaptic('success');
+    }
 
     // Re-render departures if ticker is visible
     if (window.App && window.App.ticker) {
@@ -343,6 +370,9 @@ class AlarmManager {
     }
     this.alarms = this.alarms.filter(a => a.id !== id);
     this.save();
+    if (window.App && typeof window.App.triggerHaptic === 'function') {
+      window.App.triggerHaptic('light');
+    }
   }
 
   formatMinutesHuman(mins) {
@@ -419,18 +449,22 @@ class AlarmManager {
       if (currentMins === null) {
         const elapsedMs = now - alarm.createdAt;
         const elapsedMins = Math.floor(elapsedMs / 60000);
+        currentMins = Math.max(0, alarm.initialMinutes - elapsedMins);
+      }
+
       // Save live minutes so notifications tab and notification remain perfectly synced
       alarm.currentMinutes = currentMins;
       alarm.lastUpdated = now;
 
       // 3. Trigger alarm if threshold is reached!
-      if (currentMins <= alarm.thresholdMinutes) {
+      if (typeof currentMins === 'number' && currentMins <= alarm.thresholdMinutes) {
         this.triggerAlarm(alarm, currentMins);
       } else {
         // Update live notification with updated countdown
         this.updateLiveNotification(alarm, currentMins);
       }
     }
+
     this.save();
     this.renderUI();
   }

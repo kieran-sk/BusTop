@@ -10,7 +10,11 @@ class AppController {
     this.currentStop = null;
     this.currentLine = null;
     this.currentRoute = null;
-    this.userLocation = null;
+    try {
+      this.userLocation = JSON.parse(localStorage.getItem('OASA_LAST_USER_LOCATION') || 'null');
+    } catch (e) {
+      this.userLocation = null;
+    }
     this.pollInterval = null;
     this.mapManager = null;
     this.ticker = null;
@@ -19,6 +23,32 @@ class AppController {
     this.notifiedBuses = new Set();
     this.navHistory = [];
     this.arrivalsTargetDay = 'today';
+  }
+
+  /**
+   * System Haptic Vibration Feedback
+   * Uses AndroidBridge native vibrator when available, or Web Vibration API
+   */
+  triggerHaptic(type = 'light') {
+    const patterns = {
+      light: 35,
+      medium: 65,
+      heavy: 110,
+      success: [35, 50, 45],
+      warning: [60, 60, 60]
+    };
+    const pattern = patterns[type] || 35;
+    if (window.AndroidBridge && typeof window.AndroidBridge.vibrate === 'function') {
+      try {
+        const ms = Array.isArray(pattern) ? pattern[0] : pattern;
+        window.AndroidBridge.vibrate(Number(ms));
+      } catch (e) {}
+    }
+    if ('vibrate' in navigator) {
+      try {
+        navigator.vibrate(pattern);
+      } catch (e) {}
+    }
   }
 
   async init() {
@@ -41,7 +71,8 @@ class AppController {
       window.PinnedTrips.renderUI();
     }
 
-
+    // Setup stop card long-press handler (quick actions / favorites / focus on map)
+    this.setupStopLongPressListener();
 
     // Default: Scan and display stops near me immediately
     if (window.Search) {
@@ -138,6 +169,9 @@ class AppController {
 
   setUserLocation(lat, lng) {
     this.userLocation = { lat, lng };
+    try {
+      localStorage.setItem('OASA_LAST_USER_LOCATION', JSON.stringify({ lat, lng }));
+    } catch (e) {}
     if (this.ticker) {
       this.ticker.setUserLocation(lat, lng);
     }
@@ -147,7 +181,19 @@ class AppController {
     if (window.PinnedTrips) {
       window.PinnedTrips.renderUI();
     }
-
+    // Update selected stop walk pill if stop is active
+    if (this.currentStop && this.ticker) {
+      const walk = this.ticker.getWalkMinutes(this.currentStop.StopLat, this.currentStop.StopLng);
+      const walkPill = document.getElementById('selected-stop-walk-pill');
+      if (walkPill) {
+        if (walk && typeof walk.minutes === 'number') {
+          walkPill.style.display = 'inline-flex';
+          walkPill.innerText = `🚶 ${walk.minutes}λ (${walk.meters}μ)`;
+        } else {
+          walkPill.style.display = 'none';
+        }
+      }
+    }
   }
 
   fitMapToUserArea(radiusMeters = 500) {
@@ -379,11 +425,40 @@ class AppController {
     this.currentStopRequestId++;
     const reqId = this.currentStopRequestId;
 
+    let parsedLat = parseFloat(lat);
+    let parsedLng = parseFloat(lng);
+    const stopCodeStr = String(stopCode).trim();
+
+    if ((isNaN(parsedLat) || isNaN(parsedLng))) {
+      try {
+        const cachedCoords = JSON.parse(localStorage.getItem('OASA_STOP_COORDS_' + stopCodeStr) || 'null');
+        if (cachedCoords && cachedCoords.lat && cachedCoords.lng) {
+          parsedLat = parseFloat(cachedCoords.lat);
+          parsedLng = parseFloat(cachedCoords.lng);
+        }
+      } catch (e) {}
+
+      if ((isNaN(parsedLat) || isNaN(parsedLng)) && window.Search && Array.isArray(window.Search.nearbyStops)) {
+        const found = window.Search.nearbyStops.find(s => String(s.StopCode) === stopCodeStr);
+        if (found && found.StopLat && found.StopLng) {
+          parsedLat = parseFloat(found.StopLat);
+          parsedLng = parseFloat(found.StopLng);
+        }
+      }
+    }
+
+    if (!isNaN(parsedLat) && !isNaN(parsedLng)) {
+      try {
+        localStorage.setItem('OASA_STOP_COORDS_' + stopCodeStr, JSON.stringify({ lat: parsedLat, lng: parsedLng }));
+      } catch (e) {}
+    }
+
     this.currentStop = {
-      StopCode: String(stopCode),
+      StopCode: stopCodeStr,
       StopDescr: stopName,
-      StopLat: lat,
-      StopLng: lng
+      StopLat: !isNaN(parsedLat) ? parsedLat : null,
+      StopLng: !isNaN(parsedLng) ? parsedLng : null,
+      distanceMeters: null
     };
 
     // Update stop banner immediately with new stop info
@@ -391,16 +466,17 @@ class AppController {
     if (banner) {
       banner.style.display = 'flex';
       banner.querySelector('#selected-stop-title').innerText = stopName;
-      banner.querySelector('#selected-stop-code').innerText = `Στάση #${stopCode}`;
+      banner.querySelector('#selected-stop-code').innerText = `Στάση #${stopCodeStr}`;
 
       // Populate walking time pill if user location is available
       const walkPill = banner.querySelector('#selected-stop-walk-pill');
       if (walkPill) {
         let walkInfo = null;
         if (this.ticker && typeof this.ticker.getWalkMinutes === 'function') {
-          walkInfo = this.ticker.getWalkMinutes(lat, lng);
+          walkInfo = this.ticker.getWalkMinutes(parsedLat, parsedLng);
         }
         if (walkInfo && typeof walkInfo.minutes === 'number') {
+          this.currentStop.distanceMeters = walkInfo.meters;
           walkPill.style.display = 'inline-flex';
           walkPill.innerText = `🚶 ${walkInfo.minutes}λ (${walkInfo.meters}μ)`;
         } else {
@@ -677,21 +753,7 @@ class AppController {
       walkMins = Math.ceil(this.currentStop.distanceMeters / 80) + 2;
     }
 
-    if (window.Alarms) {
-      window.Alarms.addAlarm({
-        stopCode: stopCode,
-        stopName: stopName,
-        lineId,
-        routeCode,
-        destination: lineDescr,
-        walkMinutes: walkMins,
-        targetMinutes: dueMins,
-        thresholdMinutes: threshold,
-        ringUntilDismissed: ringUntilDismissed
-      });
-    }
-
-    // Automatically pin the notification when setting an alarm
+    // 1. Automatically pin the notification first (without triggering alarm noise)
     if (window.PinnedTrips && typeof window.PinnedTrips.pinArrival === 'function') {
       try {
         window.PinnedTrips.pinArrival({
@@ -712,7 +774,163 @@ class AppController {
       }
     }
 
+    // 2. Set alarm with user's threshold and ring settings (arms the alarm)
+    if (window.Alarms) {
+      window.Alarms.addAlarm({
+        stopCode: stopCode,
+        stopName: stopName,
+        lineId,
+        routeCode,
+        destination: lineDescr,
+        walkMinutes: walkMins,
+        targetMinutes: dueMins,
+        thresholdMinutes: threshold,
+        ringUntilDismissed: ringUntilDismissed
+      });
+    }
+
     this.closeModal('set-alarm-modal');
+  }
+
+  /**
+   * Stop Quick Action Dialog (triggered on Long-Press of any stop card)
+   * Allows adding/removing from favourites or focusing stop on map.
+   */
+  openStopActionModal(stopCode, stopName, lat = null, lng = null) {
+    const modal = document.getElementById('stop-actions-modal');
+    if (!modal) return;
+
+    const sCode = String(stopCode || '').trim();
+    const sName = (stopName || `Στάση #${sCode}`).replace(/^[⭐\s]+/, '');
+    let sLat = parseFloat(lat);
+    let sLng = parseFloat(lng);
+
+    if (isNaN(sLat) || isNaN(sLng)) {
+      try {
+        const cached = JSON.parse(localStorage.getItem('OASA_STOP_COORDS_' + sCode) || 'null');
+        if (cached && cached.lat && cached.lng) {
+          sLat = parseFloat(cached.lat);
+          sLng = parseFloat(cached.lng);
+        }
+      } catch (e) {}
+    }
+
+    modal.querySelector('#stop-action-title').innerText = sName;
+    modal.querySelector('#stop-action-code').innerText = `Στάση #${sCode}`;
+
+    // 1. Favorite button setup
+    const favBtn = modal.querySelector('#stop-action-fav-btn');
+    const favText = modal.querySelector('#stop-action-fav-text');
+    const isFav = window.Favorites ? window.Favorites.isStopFav(sCode) : false;
+    if (favText) {
+      favText.innerText = isFav ? 'Αφαίρεση από τα Αγαπημένα' : 'Αποθήκευση στα Αγαπημένα';
+    }
+    if (favBtn) {
+      favBtn.onclick = () => {
+        if (window.Favorites) {
+          window.Favorites.toggleStop(sCode, sName, !isNaN(sLat) ? sLat : null, !isNaN(sLng) ? sLng : null);
+          this.triggerHaptic('success');
+          if (window.PinnedTrips && typeof window.PinnedTrips.showToast === 'function') {
+            window.PinnedTrips.showToast(window.Favorites.isStopFav(sCode) ? '⭐ Αποθηκεύτηκε στα Αγαπημένα' : 'Αφαιρέθηκε από τα Αγαπημένα');
+          }
+        }
+        this.closeModal('stop-actions-modal');
+      };
+    }
+
+    // 2. Map Focus button setup
+    const mapBtn = modal.querySelector('#stop-action-map-btn');
+    if (mapBtn) {
+      mapBtn.onclick = () => {
+        this.closeModal('stop-actions-modal');
+        this.triggerHaptic('light');
+        this.switchTab('search');
+        if (!isNaN(sLat) && !isNaN(sLng) && this.mapManager) {
+          this.mapManager.focusStop(sLat, sLng, sName);
+        }
+        const mapCard = document.getElementById('map-container');
+        if (mapCard) mapCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      };
+    }
+
+    // 3. Arrivals button setup
+    const arrBtn = modal.querySelector('#stop-action-arrivals-btn');
+    if (arrBtn) {
+      arrBtn.onclick = () => {
+        this.closeModal('stop-actions-modal');
+        this.triggerHaptic('light');
+        this.selectStop(sCode, sName, !isNaN(sLat) ? sLat : null, !isNaN(sLng) ? sLng : null);
+      };
+    }
+
+    modal.classList.add('open');
+    this.updateBackButtonsVisibility();
+  }
+
+  setupStopLongPressListener() {
+    let pressTimer = null;
+    let longPressed = false;
+    let startPoint = { x: 0, y: 0 };
+
+    const clearPress = () => {
+      if (pressTimer) {
+        clearTimeout(pressTimer);
+        pressTimer = null;
+      }
+    };
+
+    document.addEventListener('pointerdown', (e) => {
+      // Don't trigger if user clicked an explicit button or input
+      if (e.target.closest('button, input, select, a, .ticker-alarm-btn, .ticker-pin-btn')) {
+        return;
+      }
+      const card = e.target.closest('.stop-interactive-card, [data-stop-code], .route-stop-item');
+      if (!card) return;
+
+      startPoint = { x: e.clientX, y: e.clientY };
+      longPressed = false;
+
+      clearPress();
+      pressTimer = setTimeout(() => {
+        longPressed = true;
+        this.triggerHaptic('medium');
+        const code = card.dataset.stopCode;
+        const title = card.dataset.stopTitle || card.querySelector('div, h2, h3, span')?.innerText || 'Στάση';
+        const lat = card.dataset.stopLat;
+        const lng = card.dataset.stopLng;
+        if (code) {
+          this.openStopActionModal(code, title, lat, lng);
+        }
+      }, 480);
+    }, { passive: true });
+
+    document.addEventListener('pointermove', (e) => {
+      if (!pressTimer) return;
+      if (Math.hypot(e.clientX - startPoint.x, e.clientY - startPoint.y) > 12) {
+        clearPress();
+      }
+    }, { passive: true });
+
+    document.addEventListener('pointerup', () => {
+      clearPress();
+      if (longPressed) {
+        setTimeout(() => { longPressed = false; }, 120);
+      }
+    }, { passive: true });
+
+    document.addEventListener('pointercancel', () => {
+      clearPress();
+      longPressed = false;
+    }, { passive: true });
+
+    // Intercept click if long-press triggered
+    document.addEventListener('click', (e) => {
+      if (longPressed) {
+        e.preventDefault();
+        e.stopPropagation();
+        longPressed = false;
+      }
+    }, true);
   }
 
 }
