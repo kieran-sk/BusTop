@@ -120,12 +120,15 @@ class AirportTicker {
   }
 
   /**
-   * Get Commute Advice: Signed time difference only (+20λ, -2λ, +1ω 15λ)
+   * Get Commute Advice: Signed time difference (+20λ, -2λ, +1ω 15λ)
+   * Explains whether user has plenty of time (+), should leave immediately (0λ / 1-4λ), or if bus will arrive before user reaches the stop (-).
    */
   getCommuteAdvice(busMinutes, walkMinutes) {
     if (walkMinutes === null) {
       return {
         label: '--',
+        displayLabel: '--',
+        tooltip: 'Άγνωστη απόσταση στάσης',
         className: 'commute-relax',
         buffer: null
       };
@@ -139,18 +142,24 @@ class AirportTicker {
     if (buffer >= 5) {
       return {
         label: sign,
+        displayLabel: `⏱️ ${sign}`,
+        tooltip: `Περιθώριο αναχώρησης: Έχετε ${formattedBuf} διαθέσιμα πριν ξεκινήσετε για να προλάβετε το λεωφορείο!`,
         className: 'commute-relax',
         buffer
       };
     } else if (buffer >= 0) {
       return {
         label: sign,
+        displayLabel: `⚡ ${sign}`,
+        tooltip: `Ξεκινήστε τώρα! Το λεωφορείο φτάνει σχεδόν ταυτόχρονα με εσάς (${sign}).`,
         className: 'commute-leave-now',
         buffer
       };
     } else {
       return {
         label: sign,
+        displayLabel: `⚠️ ${sign}`,
+        tooltip: `Το λεωφορείο αναμένεται ${formattedBuf} πριν φτάσετε στη στάση (χρειάζεστε ${walkMinutes}λ περπάτημα).`,
         className: 'commute-hurry',
         buffer
       };
@@ -217,7 +226,7 @@ class AirportTicker {
     // Live location report latency string
     const reportAgo = arr.last_contact_ago_gr || arr.last_contact_ago;
 
-    const walkTimeDisplay = walk ? `${walk.minutes}λ` : '—';
+    const walkTimeDisplay = walk ? `🚶 ${walk.minutes}λ` : '—';
 
     return `
       <div class="ticker-row" onclick="window.App.openLineTimetableBothDirections('${arr.line_code}', '${arr.line_id}', '${safeDescr}')" title="Κλικ για προβολή πλήρους δρομολογίου και στάσεων">
@@ -238,22 +247,22 @@ class AirportTicker {
           </div>
         </div>
 
-        <!-- 3. Due Time with Split-Flap (Clean tiles without comment below) -->
-        <div class="ticker-cell-due ticker-due">
+        <!-- 3. Due Time with Split-Flap (Arrival Countdown / Due Time) -->
+        <div class="ticker-cell-due ticker-due" title="Εκτιμώμενος χρόνος άφιξης λεωφορείου στη στάση">
           ${dueDisplay}
         </div>
 
         <!-- 4. Distance Column (shows walking time with +2m buffer) -->
-        <div class="ticker-cell-walk ticker-col-walk ticker-walk-time" title="${walk ? `Χρόνος περπατήματος: ${walk.minutes}λ (+2λ περιθώριο) • Απόσταση: ${walk.meters}μ` : ''}">
+        <div class="ticker-cell-walk ticker-col-walk ticker-walk-time" title="${walk ? `Χρόνος περπατήματος μέχρι τη στάση: ${walk.minutes}λ (+2λ ασφάλεια) • Απόσταση: ${walk.meters}μ` : 'Υπολογισμός απόστασης...'}">
           <span class="ticker-walk-text">
             ${walkTimeDisplay}
           </span>
         </div>
 
-        <!-- 5. Commute Difference -->
-        <div class="ticker-cell-commute">
+        <!-- 5. Commute Difference / Departure Margin -->
+        <div class="ticker-cell-commute" title="${advice.tooltip || 'Περιθώριο αναχώρησης'}">
           <span class="ticker-commute-badge ${advice.className}">
-            ${advice.label}
+            ${advice.displayLabel || advice.label}
           </span>
         </div>
 
@@ -505,11 +514,11 @@ class AirportTicker {
         <div class="ticker-col-headers">
           <div>ΓΡΑΜΜΗ</div>
           <div>ΠΡΟΟΡΙΣΜΟΣ &amp; ΚΑΤΕΥΘΥΝΣΗ</div>
-          <div>ΑΦΙΞΗ</div>
-          <div class="ticker-col-walk">ΑΠΟΣΤΑΣΗ</div>
-          <div>ΔΙΑΦΟΡΑ</div>
-          <div style="text-align: center;">ΕΙΔ/ΣΗ</div>
-          <div style="text-align: center;">📌</div>
+          <div title="Χρόνος άφιξης λεωφορείου στη στάση">ΑΦΙΞΗ</div>
+          <div class="ticker-col-walk" title="Χρόνος περπατήματος μέχρι τη στάση">🚶 ΠΕΡΠΑΤΗΜΑ</div>
+          <div title="Χρονικό περιθώριο αναχώρησης">ΠΕΡΙΘΩΡΙΟ</div>
+          <div style="text-align: center;" title="Ειδοποίηση / Ξυπνητήρι">ΕΙΔ/ΣΗ</div>
+          <div style="text-align: center;" title="Καρφίτσωμα άφιξης">📌</div>
         </div>
 
         <div class="ticker-rows">

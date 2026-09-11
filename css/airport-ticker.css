@@ -323,6 +323,30 @@
 }
 
 @media (max-width: 640px) {
+  .ticker-board {
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0.5rem 0.15rem !important;
+    margin-bottom: 0.5rem !important;
+    background: transparent !important;
+  }
+
+  .ticker-board-header {
+    padding: 0.25rem 0.35rem 0.6rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .ticker-board-title {
+    font-size: 0.92rem;
+  }
+
+  .ticker-filter-bar {
+    padding: 0.4rem 0.25rem;
+    margin-bottom: 0.4rem;
+    border-radius: 8px;
+  }
+
   .ticker-col-headers {
     display: none;
   }
@@ -334,8 +358,13 @@
       "line dest due"
       "walk commute actions";
     gap: 0.45rem 0.5rem;
-    padding: 0.75rem 0.65rem;
+    padding: 0.65rem 0.35rem;
     align-items: center;
+    border-bottom: 1px solid rgba(203, 213, 225, 0.6);
+    background: #ffffff;
+    border-radius: 12px;
+    margin-bottom: 0.4rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
   }
 
   .ticker-cell-line {
