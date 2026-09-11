@@ -22,6 +22,8 @@ import androidx.activity.ComponentActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.maps.MapsInitializer
+import android.content.res.Configuration
+import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
 
@@ -104,6 +106,7 @@ class MainActivity : ComponentActivity() {
                 super.onPageFinished(view, url)
                 isPageLoaded = true
                 dispatchPendingStop()
+                view?.evaluateJavascript("if (window.App && typeof window.App.applyMaterialYou === 'function') window.App.applyMaterialYou();", null)
             }
         }
 
@@ -165,6 +168,55 @@ class MainActivity : ComponentActivity() {
     }
 
     inner class WebAppInterface(private val context: Context) {
+
+        @JavascriptInterface
+        fun getMaterialYouColors(): String {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return "{}"
+            return try {
+                val isDark = (context.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+                fun hex(resId: Int): String {
+                    val color = ContextCompat.getColor(context, resId)
+                    return String.format("#%06X", 0xFFFFFF and color)
+                }
+
+                val primary = if (isDark) hex(android.R.color.system_accent1_200) else hex(android.R.color.system_accent1_600)
+                val onPrimary = if (isDark) hex(android.R.color.system_accent1_800) else "#FFFFFF"
+                val primaryContainer = if (isDark) hex(android.R.color.system_accent1_700) else hex(android.R.color.system_accent1_100)
+                val onPrimaryContainer = if (isDark) hex(android.R.color.system_accent1_100) else hex(android.R.color.system_accent1_900)
+
+                val secondary = if (isDark) hex(android.R.color.system_accent2_200) else hex(android.R.color.system_accent2_600)
+                val secondaryContainer = if (isDark) hex(android.R.color.system_accent2_700) else hex(android.R.color.system_accent2_100)
+
+                val surface = if (isDark) hex(android.R.color.system_neutral1_900) else hex(android.R.color.system_neutral1_10)
+                val onSurface = if (isDark) hex(android.R.color.system_neutral1_100) else hex(android.R.color.system_neutral1_900)
+
+                val surfaceContainer = if (isDark) hex(android.R.color.system_neutral2_800) else hex(android.R.color.system_neutral2_50)
+                val surfaceContainerHigh = if (isDark) hex(android.R.color.system_neutral2_700) else hex(android.R.color.system_neutral2_100)
+                val surfaceContainerHighest = if (isDark) hex(android.R.color.system_neutral2_600) else hex(android.R.color.system_neutral2_200)
+
+                val outline = hex(android.R.color.system_neutral2_400)
+                val outlineVariant = hex(android.R.color.system_neutral2_200)
+
+                JSONObject().apply {
+                    put("primary", primary)
+                    put("onPrimary", onPrimary)
+                    put("primaryContainer", primaryContainer)
+                    put("onPrimaryContainer", onPrimaryContainer)
+                    put("secondary", secondary)
+                    put("secondaryContainer", secondaryContainer)
+                    put("surface", surface)
+                    put("onSurface", onSurface)
+                    put("surfaceContainer", surfaceContainer)
+                    put("surfaceContainerHigh", surfaceContainerHigh)
+                    put("surfaceContainerHighest", surfaceContainerHighest)
+                    put("outline", outline)
+                    put("outlineVariant", outlineVariant)
+                    put("isDark", isDark)
+                }.toString()
+            } catch (e: Exception) {
+                "{}"
+            }
+        }
 
         @JavascriptInterface
         fun showToast(toast: String) {

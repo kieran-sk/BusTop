@@ -274,6 +274,12 @@ class LiveTrackingService : Service() {
             putCharSequence("android.substName", shortText)
         }
 
+        val accentColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            androidx.core.content.ContextCompat.getColor(this, android.R.color.system_accent1_600)
+        } else {
+            0xFF005AC1.toInt()
+        }
+
         val builder = NotificationCompat.Builder(this, NotificationHelper.LIVE_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
@@ -285,7 +291,7 @@ class LiveTrackingService : Service() {
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
-            .setColor(0xFF005AC1.toInt())
+            .setColor(accentColor)
             .setContentIntent(pLaunch)
             .addExtras(extras)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "🛑 Τερματισμός", pStop)

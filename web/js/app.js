@@ -23,6 +23,7 @@ class AppController {
 
   async init() {
     console.log('[Athens OASA Bus Suite] Initializing Material 3 Expressive & Leaflet Map in Greek...');
+    this.applyMaterialYou();
 
     // Initialize Ticker
     this.ticker = new AirportTicker('ticker-container');
@@ -665,6 +666,40 @@ class AppController {
     });
 
     this.closeModal('set-alarm-modal');
+  }
+
+  applyMaterialYou() {
+    if (window.AndroidBridge && typeof window.AndroidBridge.getMaterialYouColors === 'function') {
+      try {
+        const jsonStr = window.AndroidBridge.getMaterialYouColors();
+        const colors = JSON.parse(jsonStr);
+        if (colors && colors.primary) {
+          const root = document.documentElement;
+          root.style.setProperty('--md-sys-color-primary', colors.primary);
+          root.style.setProperty('--md-sys-color-on-primary', colors.onPrimary);
+          root.style.setProperty('--md-sys-color-primary-container', colors.primaryContainer);
+          root.style.setProperty('--md-sys-color-on-primary-container', colors.onPrimaryContainer);
+          if (colors.secondary) root.style.setProperty('--md-sys-color-secondary', colors.secondary);
+          if (colors.secondaryContainer) root.style.setProperty('--md-sys-color-secondary-container', colors.secondaryContainer);
+          if (colors.surface) {
+            root.style.setProperty('--md-sys-color-surface', colors.surface);
+            document.body.style.backgroundColor = colors.surface;
+          }
+          if (colors.onSurface) {
+            root.style.setProperty('--md-sys-color-on-surface', colors.onSurface);
+            document.body.style.color = colors.onSurface;
+          }
+          if (colors.surfaceContainer) root.style.setProperty('--md-sys-color-surface-container', colors.surfaceContainer);
+          if (colors.surfaceContainerHigh) root.style.setProperty('--md-sys-color-surface-container-high', colors.surfaceContainerHigh);
+          if (colors.surfaceContainerHighest) root.style.setProperty('--md-sys-color-surface-container-highest', colors.surfaceContainerHighest);
+          if (colors.outline) root.style.setProperty('--md-sys-color-outline', colors.outline);
+          if (colors.outlineVariant) root.style.setProperty('--md-sys-color-outline-variant', colors.outlineVariant);
+          console.log('[BusTop] Material You dynamic palette successfully applied from device wallpaper:', colors);
+        }
+      } catch (e) {
+        console.warn('Material You application error:', e);
+      }
+    }
   }
 }
 
