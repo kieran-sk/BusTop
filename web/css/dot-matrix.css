@@ -76,6 +76,12 @@ body {
   box-shadow: 2px 2px 0 var(--matrix-border) !important;
 }
 
+/* Headings & Subtitles */
+h1, h2, h3, h4, .m3-title {
+  font-family: var(--font-matrix-greek), var(--font-matrix-mono), monospace !important;
+  letter-spacing: -0.02em !important;
+}
+
 /* Search Bar (Telematics Command Box) */
 .m3-search-bar {
   border-radius: 4px !important;
@@ -117,6 +123,26 @@ body {
   color: var(--matrix-text-main) !important;
 }
 
+.m3-btn-outlined {
+  background: #ffffff !important;
+  border: 2px solid var(--matrix-border) !important;
+  color: var(--matrix-text-main) !important;
+}
+
+/* Filter Chips */
+.m3-filter-chip {
+  border-radius: 4px !important;
+  border: 1.5px solid var(--matrix-border) !important;
+  font-family: var(--font-matrix-mono), monospace !important;
+  font-weight: 700 !important;
+  box-shadow: 1px 1px 0 var(--matrix-border) !important;
+}
+
+.m3-filter-chip.active {
+  background: var(--matrix-border) !important;
+  color: #fbbf24 !important;
+}
+
 /* Line Badges: Physical Amber / Dark LED plates */
 .ticker-line-badge {
   border-radius: 3px !important;
@@ -153,19 +179,49 @@ body {
   text-shadow: 0 0 6px rgba(239, 68, 68, 0.7) !important;
 }
 
+/* Ticker Clock */
+.ticker-clock {
+  font-family: var(--font-matrix-display) !important;
+  border: 2px solid var(--matrix-border) !important;
+  border-radius: 4px !important;
+  background: #0f172a !important;
+  color: #38bdf8 !important;
+  text-shadow: 0 0 4px rgba(56, 189, 248, 0.4) !important;
+  box-shadow: 2px 2px 0 var(--matrix-border) !important;
+}
+
 /* Ticker Rows (Hardware Departures Board) */
 .ticker-row {
   border-radius: 4px !important;
-  border: 1.5px solid var(--matrix-border) !important;
+  border: 2px solid var(--matrix-border) !important;
   background: #ffffff !important;
-  box-shadow: 2px 2px 0 rgba(15, 23, 42, 0.1) !important;
-  margin-bottom: 0.6rem !important;
+  box-shadow: 2px 2px 0 var(--matrix-border) !important;
+  margin-bottom: 0.65rem !important;
+  transition: transform 0.08s ease !important;
+}
+
+.ticker-row:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 3px 3px 0 var(--matrix-border) !important;
 }
 
 .ticker-dest-name {
   font-family: var(--font-matrix-greek), var(--font-matrix-mono), monospace !important;
   font-weight: 700 !important;
   letter-spacing: -0.01em !important;
+}
+
+/* Action Buttons inside Ticker rows */
+.ticker-alarm-btn, .ticker-pin-btn {
+  border: 1.5px solid var(--matrix-border) !important;
+  border-radius: 4px !important;
+  background: var(--matrix-surface-sunken) !important;
+  box-shadow: 1px 1px 0 var(--matrix-border) !important;
+}
+
+.ticker-alarm-btn.active, .ticker-pin-btn.active {
+  background: #0f172a !important;
+  color: #fbbf24 !important;
 }
 
 /* Bottom Navigation Bar (Hardware Deck) */
@@ -188,12 +244,28 @@ body {
   box-shadow: 2px 2px 0 rgba(0,0,0,0.2) !important;
 }
 
-/* Badges */
-.m3-badge {
+/* Badges & Commute Advice */
+.m3-badge, .ticker-commute-badge {
   border-radius: 3px !important;
   border: 1px solid currentColor !important;
   font-family: var(--font-matrix-mono), monospace !important;
   font-weight: 700 !important;
+}
+
+/* Modals & Dialogs: Physical Hardware Terminal */
+.m3-dialog, .m3-dialog-content {
+  border-radius: 6px !important;
+  border: 3px solid var(--matrix-border) !important;
+  box-shadow: 6px 6px 0 var(--matrix-border) !important;
+  background: #ffffff !important;
+}
+
+.m3-dialog input, .m3-dialog select,
+.m3-dialog-content input, .m3-dialog-content select {
+  border-radius: 4px !important;
+  border: 2px solid var(--matrix-border) !important;
+  font-family: var(--font-matrix-mono), monospace !important;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.08) !important;
 }
 
 /* Custom Scrollbars: Flat Pixel Sliders */

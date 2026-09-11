@@ -51,36 +51,67 @@ class AppController {
     }
   }
 
-  toggleDotMatrixTheme() {
-    const link = document.getElementById('theme-dot-matrix');
-    const btn = document.getElementById('theme-mode-toggle-btn');
-    if (!link) return;
-    const isEnabled = !link.disabled;
-    const nextState = !isEnabled;
-    link.disabled = !nextState;
-    localStorage.setItem('OASA_DOT_MATRIX_THEME', nextState ? 'true' : 'false');
-    if (btn) {
-      btn.innerHTML = nextState ? '<span>🎨 M3</span>' : '<span>👾 Matrix</span>';
-      btn.classList.toggle('m3-btn-primary', nextState);
-      btn.classList.toggle('m3-btn-tonal', !nextState);
+  openSettingsModal() {
+    const modal = document.getElementById('settings-modal');
+    if (modal) {
+      modal.classList.add('open');
+      this.updateBackButtonsVisibility();
     }
+  }
+
+  closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.classList.remove('open');
+      modal.classList.remove('active');
+    }
+    this.updateBackButtonsVisibility();
+  }
+
+  setThemeMode(mode) {
+    const isMatrix = mode === 'matrix';
+    const link = document.getElementById('theme-dot-matrix');
+    if (link) {
+      link.disabled = !isMatrix;
+    }
+    localStorage.setItem('OASA_DOT_MATRIX_THEME', isMatrix ? 'true' : 'false');
+    this.updateThemeButtonsUI(isMatrix);
     this.triggerHaptic('light');
   }
 
-  applyStoredTheme() {
-    const isExpUrl = window.location.hostname.includes('experimental') || window.location.search.includes('theme=matrix');
-    const stored = localStorage.getItem('OASA_DOT_MATRIX_THEME');
-    const shouldEnable = stored === 'true' || (stored === null && isExpUrl);
+  updateThemeButtonsUI(isMatrix) {
+    const btnM3 = document.getElementById('theme-btn-m3');
+    const btnMatrix = document.getElementById('theme-btn-matrix');
+    if (btnM3 && btnMatrix) {
+      if (isMatrix) {
+        btnM3.className = 'm3-btn m3-btn-tonal';
+        btnMatrix.className = 'm3-btn m3-btn-primary';
+      } else {
+        btnM3.className = 'm3-btn m3-btn-primary';
+        btnMatrix.className = 'm3-btn m3-btn-tonal';
+      }
+    }
+  }
+
+  toggleDotMatrixTheme() {
     const link = document.getElementById('theme-dot-matrix');
-    const btn = document.getElementById('theme-mode-toggle-btn');
+    if (!link) return;
+    const isEnabled = !link.disabled;
+    const nextState = !isEnabled;
+    this.setThemeMode(nextState ? 'matrix' : 'm3');
+  }
+
+  applyStoredTheme() {
+    const isExpUrl = window.location.hostname.includes('experimental') || 
+                     window.location.search.includes('theme=matrix') || 
+                     window.location.pathname.includes('experimental');
+    const stored = localStorage.getItem('OASA_DOT_MATRIX_THEME');
+    const shouldEnableMatrix = stored === 'true' || (stored === null && isExpUrl);
+    const link = document.getElementById('theme-dot-matrix');
     if (link) {
-      link.disabled = !shouldEnable;
+      link.disabled = !shouldEnableMatrix;
     }
-    if (btn) {
-      btn.innerHTML = shouldEnable ? '<span>🎨 M3</span>' : '<span>👾 Matrix</span>';
-      btn.classList.toggle('m3-btn-primary', shouldEnable);
-      btn.classList.toggle('m3-btn-tonal', !shouldEnable);
-    }
+    this.updateThemeButtonsUI(shouldEnableMatrix);
   }
 
   async init() {
