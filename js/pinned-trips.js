@@ -99,6 +99,18 @@ class PinnedTripsManager {
     }
   }
 
+  pinArrival(arrival, stopInfo) {
+    if (!stopInfo) return;
+    const stopCode = String(stopInfo.StopCode);
+    const lineId = String(arrival.line_id || arrival.LineID || 'BUS');
+    const routeCode = String(arrival.route_code || arrival.RouteCode || '');
+
+    const exists = this.isPinned(stopCode, lineId, routeCode);
+    if (!exists) {
+      this.togglePin(arrival, stopInfo);
+    }
+  }
+
   removePin(pinId) {
     this.pinnedItems = this.pinnedItems.filter(p => p.id !== pinId);
     this.save();

@@ -278,7 +278,7 @@
 /* Table Column Headers */
 .ticker-col-headers {
   display: grid;
-  grid-template-columns: 56px 1fr 125px 80px 75px 40px 40px;
+  grid-template-columns: 56px 1fr 125px 95px 40px 40px;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
   font-size: 0.72rem;
@@ -299,7 +299,7 @@
 /* Rows */
 .ticker-row {
   display: grid;
-  grid-template-columns: 56px 1fr 125px 80px 75px 40px 40px;
+  grid-template-columns: 56px 1fr 125px 95px 40px 40px;
   gap: 0.5rem;
   align-items: center;
   padding: 0.65rem 0.75rem;
@@ -356,7 +356,7 @@
     grid-template-columns: auto 1fr auto;
     grid-template-areas:
       "line dest due"
-      "walk commute actions";
+      "commute commute actions";
     gap: 0.45rem 0.5rem;
     padding: 0.65rem 0.35rem;
     align-items: center;

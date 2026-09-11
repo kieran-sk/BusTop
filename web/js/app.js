@@ -23,7 +23,6 @@ class AppController {
 
   async init() {
     console.log('[Athens OASA Bus Suite] Initializing Material 3 Expressive & Leaflet Map in Greek...');
-    this.applyMaterialYou();
 
     // Initialize Ticker
     this.ticker = new AirportTicker('ticker-container');
@@ -393,6 +392,21 @@ class AppController {
       banner.style.display = 'flex';
       banner.querySelector('#selected-stop-title').innerText = stopName;
       banner.querySelector('#selected-stop-code').innerText = `Στάση #${stopCode}`;
+
+      // Populate walking time pill if user location is available
+      const walkPill = banner.querySelector('#selected-stop-walk-pill');
+      if (walkPill) {
+        let walkInfo = null;
+        if (this.ticker && typeof this.ticker.getWalkMinutes === 'function') {
+          walkInfo = this.ticker.getWalkMinutes(lat, lng);
+        }
+        if (walkInfo && typeof walkInfo.minutes === 'number') {
+          walkPill.style.display = 'inline-flex';
+          walkPill.innerText = `🚶 ${walkInfo.minutes}λ περπάτημα (${walkInfo.meters}μ)`;
+        } else {
+          walkPill.style.display = 'none';
+        }
+      }
       
       const optBar = document.getElementById('arrivals-options-bar');
       if (optBar) {
@@ -677,33 +691,30 @@ class AppController {
       });
     }
 
+    // Automatically pin the notification when setting an alarm
+    if (window.PinnedTrips && typeof window.PinnedTrips.pinArrival === 'function') {
+      try {
+        window.PinnedTrips.pinArrival({
+          line_id: lineId,
+          route_code: routeCode,
+          destination: lineDescr,
+          route_descr: lineDescr,
+          btime2: dueMins
+        }, {
+          StopCode: stopCode,
+          StopDescr: stopName,
+          distanceMeters: this.currentStop ? this.currentStop.distanceMeters : null,
+          StopLat: this.currentStop ? this.currentStop.StopLat : null,
+          StopLng: this.currentStop ? this.currentStop.StopLng : null
+        });
+      } catch (e) {
+        console.warn('Could not auto-pin arrival for alarm:', e);
+      }
+    }
+
     this.closeModal('set-alarm-modal');
   }
 
-  applyMaterialYou() {
-    if (window.AndroidBridge && typeof window.AndroidBridge.getMaterialYouColors === 'function') {
-      try {
-        const jsonStr = window.AndroidBridge.getMaterialYouColors();
-        const colors = JSON.parse(jsonStr);
-        if (colors && colors.primary) {
-          const root = document.documentElement;
-          // Only replace where the app used to have blue highlights / primary accents
-          root.style.setProperty('--md-sys-color-primary', colors.primary);
-          root.style.setProperty('--md-sys-color-on-primary', colors.onPrimary || '#ffffff');
-          if (colors.primaryContainer) {
-            root.style.setProperty('--md-sys-color-primary-container', colors.primaryContainer);
-          }
-          if (colors.onPrimaryContainer) {
-            root.style.setProperty('--md-sys-color-on-primary-container', colors.onPrimaryContainer);
-          }
-          // Do NOT touch surface, surfaceContainer, background, or text colors so cards and dark mode stay crisp
-          console.log('[BusTop] Material You accent highlight applied (blue replaced with):', colors.primary);
-        }
-      } catch (e) {
-        console.warn('[BusTop] Failed to parse Material You colors:', e);
-      }
-    }
-  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
