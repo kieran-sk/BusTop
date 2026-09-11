@@ -442,6 +442,34 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+
+        @JavascriptInterface
+        fun syncFavorites(favStopsJson: String, favLinesJson: String) {
+            try {
+                val prefs = context.getSharedPreferences("OASA_PERSISTENT_DATA", Context.MODE_PRIVATE)
+                prefs.edit()
+                    .putString("OASA_FAV_STOPS", favStopsJson)
+                    .putString("OASA_FAV_LINES", favLinesJson)
+                    .apply()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        @JavascriptInterface
+        fun getSavedFavorites(): String {
+            return try {
+                val prefs = context.getSharedPreferences("OASA_PERSISTENT_DATA", Context.MODE_PRIVATE)
+                val stops = prefs.getString("OASA_FAV_STOPS", "[]") ?: "[]"
+                val lines = prefs.getString("OASA_FAV_LINES", "[]") ?: "[]"
+                val json = JSONObject()
+                json.put("stops", stops)
+                json.put("lines", lines)
+                json.toString()
+            } catch (e: Exception) {
+                "{}"
+            }
+        }
     }
 
     @Deprecated("Deprecated in Java")

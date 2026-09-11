@@ -1,0 +1,211 @@
+/**
+ * BusTop Dot-Matrix Transit Edition (Light Mode)
+ * Authentic Athens Transit Telematics aesthetic:
+ * LED matrix digit styling, phosphor/amber accents, sharp 90-degree pixel frames,
+ * tactile hardware buttons, and crisp monospace Greek typography.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=DotGothic16&family=VT323&family=Silkscreen:wght@400;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+
+:root {
+  /* Dot-Matrix Light Mode Palette */
+  --matrix-bg: #f5f4ef;
+  --matrix-surface: #ffffff;
+  --matrix-surface-sunken: #edece5;
+  --matrix-surface-raised: #fbfbfa;
+  --matrix-border: #1e293b;
+  --matrix-border-light: #cbd5e1;
+  --matrix-text-main: #0f172a;
+  --matrix-text-muted: #475569;
+  
+  /* Telematics Display Colors */
+  --led-amber: #d97706;
+  --led-amber-glow: rgba(217, 119, 6, 0.25);
+  --led-green: #059669;
+  --led-green-glow: rgba(5, 150, 105, 0.2);
+  --led-blue: #0284c7;
+  --led-red: #dc2626;
+
+  /* Typography */
+  --font-matrix-display: 'Silkscreen', 'VT323', monospace;
+  --font-matrix-greek: 'DotGothic16', 'Space Mono', monospace;
+  --font-matrix-mono: 'Space Mono', monospace;
+}
+
+/* Background subtle LED grid */
+body {
+  background-color: var(--matrix-bg) !important;
+  background-image: radial-gradient(#0000000d 1px, transparent 1px) !important;
+  background-size: 8px 8px !important;
+  font-family: var(--font-matrix-mono), monospace !important;
+  color: var(--matrix-text-main) !important;
+  image-rendering: pixelated;
+}
+
+/* Sharp Pixel Container & App Bar */
+.m3-top-app-bar {
+  background: var(--matrix-surface) !important;
+  border-bottom: 2px solid var(--matrix-border) !important;
+  box-shadow: 0 3px 0 rgba(0,0,0,0.06) !important;
+  font-family: var(--font-matrix-display) !important;
+  letter-spacing: 0.05em;
+}
+
+/* Telematics Live Status Dot */
+.m3-badge-live {
+  background: #ecfdf5 !important;
+  border: 1.5px solid var(--led-green) !important;
+  color: var(--led-green) !important;
+  border-radius: 2px !important;
+  font-family: var(--font-matrix-display) !important;
+  font-size: 0.75rem !important;
+  box-shadow: 1px 1px 0 var(--matrix-border) !important;
+}
+
+/* Dot-Matrix Cards */
+.m3-card {
+  border-radius: 4px !important;
+  border: 2px solid var(--matrix-border) !important;
+  box-shadow: 3px 3px 0 var(--matrix-border) !important;
+  background: var(--matrix-surface) !important;
+  transition: transform 0.1s ease, box-shadow 0.1s ease !important;
+}
+
+.m3-card:active {
+  transform: translate(1px, 1px) !important;
+  box-shadow: 2px 2px 0 var(--matrix-border) !important;
+}
+
+/* Search Bar (Telematics Command Box) */
+.m3-search-bar {
+  border-radius: 4px !important;
+  border: 2px solid var(--matrix-border) !important;
+  background: #ffffff !important;
+  box-shadow: 3px 3px 0 var(--matrix-border) !important;
+}
+
+.m3-search-bar input {
+  font-family: var(--font-matrix-mono), monospace !important;
+  font-size: 0.9rem !important;
+  letter-spacing: -0.02em;
+}
+
+/* Chunky Physical Tactile Buttons */
+.m3-btn {
+  border-radius: 4px !important;
+  border: 2px solid var(--matrix-border) !important;
+  font-family: var(--font-matrix-mono), monospace !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.04em !important;
+  box-shadow: 2px 2px 0 var(--matrix-border) !important;
+  transition: all 0.08s ease !important;
+}
+
+.m3-btn:active {
+  transform: translate(2px, 2px) !important;
+  box-shadow: 0 0 0 var(--matrix-border) !important;
+}
+
+.m3-btn-primary {
+  background: var(--matrix-border) !important;
+  color: #ffffff !important;
+}
+
+.m3-btn-tonal {
+  background: var(--matrix-surface-sunken) !important;
+  color: var(--matrix-text-main) !important;
+}
+
+/* Line Badges: Physical Amber / Dark LED plates */
+.ticker-line-badge {
+  border-radius: 3px !important;
+  border: 2px solid var(--matrix-border) !important;
+  background: #0f172a !important;
+  color: #fbbf24 !important;
+  font-family: var(--font-matrix-display) !important;
+  font-weight: 700 !important;
+  text-shadow: 0 0 6px rgba(251, 191, 36, 0.4) !important;
+  letter-spacing: 0.08em !important;
+  padding: 3px 8px !important;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.15) !important;
+}
+
+/* Dot-Matrix Split Flap Digit Tiles */
+.flap-digit-box {
+  border-radius: 2px !important;
+  border: 1.5px solid #334155 !important;
+  background: #090d16 !important;
+  color: #38bdf8 !important;
+  font-family: var(--font-matrix-display) !important;
+  font-weight: 700 !important;
+  text-shadow: 0 0 4px rgba(56, 189, 248, 0.5) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2) !important;
+}
+
+.split-flap-board.urgency-soon .flap-digit-box {
+  color: #fbbf24 !important;
+  text-shadow: 0 0 5px rgba(251, 191, 36, 0.6) !important;
+}
+
+.split-flap-board.urgency-now .flap-digit-box {
+  color: #ef4444 !important;
+  text-shadow: 0 0 6px rgba(239, 68, 68, 0.7) !important;
+}
+
+/* Ticker Rows (Hardware Departures Board) */
+.ticker-row {
+  border-radius: 4px !important;
+  border: 1.5px solid var(--matrix-border) !important;
+  background: #ffffff !important;
+  box-shadow: 2px 2px 0 rgba(15, 23, 42, 0.1) !important;
+  margin-bottom: 0.6rem !important;
+}
+
+.ticker-dest-name {
+  font-family: var(--font-matrix-greek), var(--font-matrix-mono), monospace !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.01em !important;
+}
+
+/* Bottom Navigation Bar (Hardware Deck) */
+.m3-nav-bar {
+  background: var(--matrix-surface) !important;
+  border-top: 2px solid var(--matrix-border) !important;
+  box-shadow: 0 -3px 0 rgba(0,0,0,0.04) !important;
+}
+
+.m3-nav-item span {
+  font-family: var(--font-matrix-mono), monospace !important;
+  font-weight: 700 !important;
+  font-size: 0.72rem !important;
+}
+
+.m3-nav-item.active .m3-nav-pill {
+  background: #0f172a !important;
+  color: #fbbf24 !important;
+  border-radius: 4px !important;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.2) !important;
+}
+
+/* Badges */
+.m3-badge {
+  border-radius: 3px !important;
+  border: 1px solid currentColor !important;
+  font-family: var(--font-matrix-mono), monospace !important;
+  font-weight: 700 !important;
+}
+
+/* Custom Scrollbars: Flat Pixel Sliders */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--matrix-surface-sunken);
+  border-left: 1px solid var(--matrix-border-light);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--matrix-border);
+  border: 1px solid #ffffff;
+}
