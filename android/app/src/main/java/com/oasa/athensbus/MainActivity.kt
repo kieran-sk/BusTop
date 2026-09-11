@@ -99,10 +99,69 @@ class MainActivity : ComponentActivity() {
                     view?.loadUrl("file:///android_asset/web/index.html")
                 }
             }
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                isPageLoaded = true
+                dispatchPendingStop()
+            }
         }
 
         webView.addJavascriptInterface(WebAppInterface(this), "AndroidBridge")
+        handleIntent(intent)
         webView.loadUrl("https://bustop.pages.dev")
+    }
+
+    private var isPageLoaded = false
+    private var pendingStopCode: String? = null
+    private var pendingStopName: String? = null
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        intent?.let { handleIntent(it) }
+    }
+
+    private fun handleIntent(intent: Intent) {
+        val stopCode = intent.getStringExtra(EXTRA_STOP_CODE)
+        val stopName = intent.getStringExtra(EXTRA_STOP_NAME) ?: ""
+        if (!stopCode.isNullOrBlank()) {
+            pendingStopCode = stopCode
+            pendingStopName = stopName
+            if (isPageLoaded) {
+                dispatchPendingStop()
+            }
+        }
+    }
+
+    private fun dispatchPendingStop() {
+        val code = pendingStopCode
+        val name = (pendingStopName ?: "").replace("'", "\\'")
+        if (!code.isNullOrBlank()) {
+            pendingStopCode = null
+            pendingStopName = null
+            val js = """
+                (function() {
+                    if (window.App && typeof window.App.selectStop === 'function') {
+                        window.App.switchTab('ticker');
+                        window.App.selectStop('$code', '$name');
+                    } else {
+                        setTimeout(function() {
+                            if (window.App && typeof window.App.selectStop === 'function') {
+                                window.App.switchTab('ticker');
+                                window.App.selectStop('$code', '$name');
+                            }
+                        }, 1000);
+                    }
+                })();
+            """.trimIndent()
+            webView.evaluateJavascript(js, null)
+        }
+    }
+
+    companion object {
+        const val EXTRA_STOP_CODE = "EXTRA_STOP_CODE"
+        const val EXTRA_STOP_NAME = "EXTRA_STOP_NAME"
     }
 
     inner class WebAppInterface(private val context: Context) {
@@ -134,7 +193,8 @@ class MainActivity : ComponentActivity() {
             stopName: String,
             minutesAway: Double,
             triggerInSeconds: Double,
-            ringUntilDismissed: Boolean = true
+            ringUntilDismissed: Boolean = true,
+            stopCode: String = ""
         ) {
             try {
                 val mins = minutesAway.toInt()
@@ -146,6 +206,7 @@ class MainActivity : ComponentActivity() {
                     putExtra("EXTRA_STOP_NAME", stopName)
                     putExtra("EXTRA_MINUTES_AWAY", mins)
                     putExtra("EXTRA_RING_UNTIL_DISMISSED", ringUntilDismissed)
+                    putExtra("EXTRA_STOP_CODE", stopCode)
                 }
                 val pendingIntent = PendingIntent.getBroadcast(
                     context,
@@ -156,7 +217,10 @@ class MainActivity : ComponentActivity() {
 
                 val triggerTime = System.currentTimeMillis() + (trigSecs * 1000L)
 
-                val showIntent = Intent(context, MainActivity::class.java)
+                val showIntent = Intent(context, MainActivity::class.java).apply {
+                    putExtra(EXTRA_STOP_CODE, stopCode)
+                    putExtra(EXTRA_STOP_NAME, stopName)
+                }
                 val pShow = PendingIntent.getActivity(
                     context,
                     0,
@@ -252,7 +316,9 @@ class MainActivity : ComponentActivity() {
             minutesAway: Double,
             stopName: String,
             destination: String = "",
-            walkMinutes: Double = 0.0
+            walkMinutes: Double = 0.0,
+            stopCode: String = "",
+            initialMinutes: Double = 10.0
         ) {
             try {
                 NotificationHelper.updateLiveArrivalNotification(
@@ -261,7 +327,9 @@ class MainActivity : ComponentActivity() {
                     minutesAway.toInt(),
                     stopName,
                     destination,
-                    walkMinutes.toInt()
+                    walkMinutes.toInt(),
+                    stopCode,
+                    initialMinutes.toInt()
                 )
             } catch (e: Exception) {
                 e.printStackTrace()

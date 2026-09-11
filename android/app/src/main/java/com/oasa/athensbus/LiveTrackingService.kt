@@ -195,15 +195,32 @@ class LiveTrackingService : Service() {
                 val json = JSONObject(response)
                 val arrivals = json.optJSONArray("arrivals")
                 if (arrivals != null) {
+                    val elapsedMins = ((System.currentTimeMillis() - startedAtMs) / 60000L).toInt()
+                    val expectedMins = kotlin.math.max(0, initialMinutes - elapsedMins)
+
+                    var bestDiff = Int.MAX_VALUE
+                    var bestArrivalMins: Int? = null
+
                     for (i in 0 until arrivals.length()) {
                         val arr = arrivals.getJSONObject(i)
                         val arrLine = arr.optString("line_id", "")
                         val arrRoute = arr.optString("route_code", "")
 
                         if (arrLine.equals(lineId, ignoreCase = true) &&
-                            (routeCode.isBlank() || arrRoute == routeCode)) {
-                            return arr.optInt("btime2", 0)
+                            (routeCode.isBlank() || arrRoute.isBlank() || arrRoute == routeCode)) {
+                            val btime2 = arr.optInt("btime2", -1)
+                            if (btime2 >= 0) {
+                                val diff = kotlin.math.abs(btime2 - expectedMins)
+                                // Only consider arrivals within a reasonable window of the expected tracked bus
+                                if (diff < bestDiff && (btime2 <= expectedMins + 20 || diff <= 15)) {
+                                    bestDiff = diff
+                                    bestArrivalMins = btime2
+                                }
+                            }
                         }
+                    }
+                    if (bestArrivalMins != null) {
+                        return bestArrivalMins
                     }
                 }
             }
@@ -221,7 +238,9 @@ class LiveTrackingService : Service() {
 
     private fun buildLiveNotification(mins: Int): Notification {
         val launchIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(MainActivity.EXTRA_STOP_CODE, stopCode)
+            putExtra(MainActivity.EXTRA_STOP_NAME, stopName)
         }
         val pLaunch = PendingIntent.getActivity(
             this,
@@ -241,47 +260,38 @@ class LiveTrackingService : Service() {
         )
 
         val timeFormatted = NotificationHelper.formatMinutesHuman(mins)
-        val title = if (mins <= 0) "🚨 Γραμμή $lineId • ΕΦΤΑΣΕ ΣΤΗ ΣΤΑΣΗ!" else "🚍 Γραμμή $lineId • σε $timeFormatted"
-        val subtitle = if (destination.isNotBlank()) "Προς $destination" else "Live Tracker"
+        val title = if (mins <= 0) "🚨 Γραμμή $lineId • ΕΦΤΑΣΕ!" else "🚍 Γραμμή $lineId • σε $timeFormatted"
+        val content = "📍 Στάση: $stopName"
 
-        val sb = StringBuilder()
-        sb.append("📍 Στάση: ").append(stopName).append("\n")
-        if (destination.isNotBlank()) {
-            sb.append("🏁 Προορισμός: ").append(destination).append("\n")
+        val maxMins = kotlin.math.max(1, initialMinutes)
+        val progress = kotlin.math.min(maxMins, kotlin.math.max(0, maxMins - mins))
+
+        val extras = android.os.Bundle().apply {
+            putBoolean("android.requestPromotedOngoing", true)
         }
-        if (walkMinutes > 0) {
-            sb.append("🚶 Χρόνος βαδίσματος: ~").append(NotificationHelper.formatMinutesHuman(walkMinutes)).append(" (απόσταση)\n")
-        }
-        sb.append("⏳ Εκτίμηση άφιξης: ")
-        if (mins <= 0) {
-            sb.append("ΤΩΡΑ στη στάση!\n")
-        } else {
-            sb.append("σε ").append(timeFormatted).append(" (ειδοποίηση στα ").append(NotificationHelper.formatMinutesHuman(thresholdMinutes)).append(")\n")
-        }
-        sb.append("📡 Ζωντανή τηλεματική GPS ΟΑΣΑ")
 
         return NotificationCompat.Builder(this, NotificationHelper.LIVE_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
-            .setContentText("Στάση: $stopName • σε $timeFormatted")
-            .setSubText(subtitle)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(sb.toString()))
+            .setContentText(content)
+            .setProgress(maxMins, progress, false)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setColor(0xFF005AC1.toInt())
             .setContentIntent(pLaunch)
+            .addExtras(extras)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "🛑 Τερματισμός", pStop)
             .build()
     }
 
     private fun triggerAlarmWakeup(minsAway: Int) {
         if (ringUntilDismissed) {
-            AlarmRingingService.start(this, lineId, stopName, minsAway)
+            AlarmRingingService.start(this, lineId, stopName, minsAway, stopCode)
         } else {
-            NotificationHelper.showBusAlarmNotification(this, lineId, stopName, minsAway)
+            NotificationHelper.showBusAlarmNotification(this, lineId, stopName, minsAway, stopCode)
         }
     }
 

@@ -31,16 +31,18 @@ class AlarmRingingService : Service() {
         const val EXTRA_LINE_ID = "EXTRA_LINE_ID"
         const val EXTRA_STOP_NAME = "EXTRA_STOP_NAME"
         const val EXTRA_MINS = "EXTRA_MINS"
+        const val EXTRA_STOP_CODE = "EXTRA_STOP_CODE"
 
         const val NOTIFICATION_ID = 3001
         const val CHANNEL_ID = "oasa_bus_continuous_alarm_v5"
 
-        fun start(context: Context, lineId: String, stopName: String, minsAway: Int) {
+        fun start(context: Context, lineId: String, stopName: String, minsAway: Int, stopCode: String = "") {
             val intent = Intent(context, AlarmRingingService::class.java).apply {
                 action = ACTION_START
                 putExtra(EXTRA_LINE_ID, lineId)
                 putExtra(EXTRA_STOP_NAME, stopName)
                 putExtra(EXTRA_MINS, minsAway)
+                putExtra(EXTRA_STOP_CODE, stopCode)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
@@ -70,11 +72,12 @@ class AlarmRingingService : Service() {
         val lineId = intent?.getStringExtra(EXTRA_LINE_ID) ?: "BUS"
         val stopName = intent?.getStringExtra(EXTRA_STOP_NAME) ?: "Στάση ΟΑΣΑ"
         val minsAway = intent?.getIntExtra(EXTRA_MINS, 5) ?: 5
+        val stopCode = intent?.getStringExtra(EXTRA_STOP_CODE) ?: ""
 
         acquireWakeLock()
         createNotificationChannel()
 
-        val notification = buildAlarmNotification(lineId, stopName, minsAway)
+        val notification = buildAlarmNotification(lineId, stopName, minsAway, stopCode)
         startForeground(NOTIFICATION_ID, notification)
 
         startSoundAndVibration()
@@ -114,9 +117,11 @@ class AlarmRingingService : Service() {
         }
     }
 
-    private fun buildAlarmNotification(lineId: String, stopName: String, minsAway: Int): Notification {
+    private fun buildAlarmNotification(lineId: String, stopName: String, minsAway: Int, stopCode: String = ""): Notification {
         val openAppIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(MainActivity.EXTRA_STOP_CODE, stopCode)
+            putExtra(MainActivity.EXTRA_STOP_NAME, stopName)
         }
         val pOpenApp = PendingIntent.getActivity(
             this,

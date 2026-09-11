@@ -47,11 +47,13 @@ object NotificationHelper {
         }
     }
 
-    fun showBusAlarmNotification(context: Context, lineId: String, stopName: String, minutesAway: Int) {
+    fun showBusAlarmNotification(context: Context, lineId: String, stopName: String, minutesAway: Int, stopCode: String = "") {
         createNotificationChannel(context)
 
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(MainActivity.EXTRA_STOP_CODE, stopCode)
+            putExtra(MainActivity.EXTRA_STOP_NAME, stopName)
         }
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -92,7 +94,7 @@ object NotificationHelper {
 
     fun createLiveNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(LIVE_CHANNEL_ID, LIVE_CHANNEL_NAME, NotificationManager.IMPORTANCE_DEFAULT).apply {
+            val channel = NotificationChannel(LIVE_CHANNEL_ID, LIVE_CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH).apply {
                 description = "Rich Ongoing Live Activity pill showing bus arrival countdown, stop, and status"
                 setShowBadge(true)
                 setSound(null, null)
@@ -110,12 +112,16 @@ object NotificationHelper {
         minutesAway: Int,
         stopName: String,
         destination: String = "",
-        walkMinutes: Int = 0
+        walkMinutes: Int = 0,
+        stopCode: String = "",
+        initialMinutes: Int = 10
     ) {
         createLiveNotificationChannel(context)
 
         val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(MainActivity.EXTRA_STOP_CODE, stopCode)
+            putExtra(MainActivity.EXTRA_STOP_NAME, stopName)
         }
         val pendingIntent = PendingIntent.getActivity(
             context,
@@ -135,38 +141,29 @@ object NotificationHelper {
         )
 
         val timeFormatted = formatMinutesHuman(minutesAway)
-        val title = if (minutesAway <= 0) "🚨 Γραμμή $lineId • ΕΦΤΑΣΕ ΣΤΗ ΣΤΑΣΗ!" else "🚍 Γραμμή $lineId • σε $timeFormatted"
-        val subtitle = if (destination.isNotBlank()) "Προς $destination" else "Live Tracker"
+        val title = if (minutesAway <= 0) "🚨 Γραμμή $lineId • ΕΦΤΑΣΕ!" else "🚍 Γραμμή $lineId • σε $timeFormatted"
+        val content = "📍 Στάση: $stopName"
 
-        val sb = StringBuilder()
-        sb.append("📍 Στάση: ").append(stopName).append("\n")
-        if (destination.isNotBlank()) {
-            sb.append("🏁 Προορισμός: ").append(destination).append("\n")
+        val maxMins = kotlin.math.max(1, initialMinutes)
+        val progress = kotlin.math.min(maxMins, kotlin.math.max(0, maxMins - minutesAway))
+
+        val extras = android.os.Bundle().apply {
+            putBoolean("android.requestPromotedOngoing", true)
         }
-        if (walkMinutes > 0) {
-            sb.append("🚶 Χρόνος βαδίσματος: ~").append(formatMinutesHuman(walkMinutes)).append(" (απόσταση)\n")
-        }
-        sb.append("⏳ Εκτίμηση άφιξης: ")
-        if (minutesAway <= 0) {
-            sb.append("ΤΩΡΑ στη στάση!\n")
-        } else {
-            sb.append("σε ").append(timeFormatted).append("\n")
-        }
-        sb.append("📡 Ζωντανή τηλεματική GPS ΟΑΣΑ")
 
         val notification = NotificationCompat.Builder(context, LIVE_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
-            .setContentText("Στάση: $stopName • σε $timeFormatted")
-            .setSubText(subtitle)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(sb.toString()))
+            .setContentText(content)
+            .setProgress(maxMins, progress, false)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setColor(0xFF005AC1.toInt())
             .setContentIntent(pendingIntent)
+            .addExtras(extras)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "🛑 Τερματισμός", pStop)
             .build()
 

@@ -16,9 +16,10 @@ class AlarmReceiver : BroadcastReceiver() {
         val stopName = intent.getStringExtra("EXTRA_STOP_NAME") ?: "Στάση ΟΑΣΑ"
         val minutesAway = intent.getIntExtra("EXTRA_MINUTES_AWAY", 5)
         val ringUntilDismissed = intent.getBooleanExtra("EXTRA_RING_UNTIL_DISMISSED", true)
+        val stopCode = intent.getStringExtra("EXTRA_STOP_CODE") ?: ""
 
         if (ringUntilDismissed) {
-            AlarmRingingService.start(context, lineId, stopName, minutesAway)
+            AlarmRingingService.start(context, lineId, stopName, minutesAway, stopCode)
         } else {
             val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
             @Suppress("DEPRECATION")

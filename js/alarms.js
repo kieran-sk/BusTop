@@ -200,7 +200,8 @@ class AlarmManager {
             String(alarm.stopName),
             Number(threshold),
             Number(triggerInSecs),
-            Boolean(ringUntilDismissed)
+            Boolean(ringUntilDismissed),
+            String(alarm.stopCode)
           );
         }
         if (typeof window.AndroidBridge.startLiveTracking === 'function') {
@@ -245,7 +246,9 @@ class AlarmManager {
           Number(minutes),
           String(alarm.stopName),
           String(alarm.destination || ''),
-          Number(alarm.walkMinutes || 0)
+          Number(alarm.walkMinutes || 0),
+          String(alarm.stopCode),
+          Number(alarm.initialMinutes || 10)
         );
       } catch (e) {}
     }
@@ -384,17 +387,25 @@ class AlarmManager {
         const data = await window.API.getStopArrivals(alarm.stopCode);
         const arrivals = (data && data.arrivals) ? data.arrivals : [];
         const normLine = String(alarm.lineId || '').trim().toUpperCase();
-        
-        // Flexible matching by line and route
-        const match = arrivals.find(a => 
-          String(a.line_id || '').trim().toUpperCase() === normLine &&
-          (!alarm.routeCode || String(a.route_code || '') === String(alarm.routeCode))
-        ) || arrivals.find(a => 
-          String(a.line_id || '').trim().toUpperCase() === normLine
-        );
+        const elapsedMs = now - alarm.createdAt;
+        const elapsedMins = Math.floor(elapsedMs / 60000);
+        const expectedMins = Math.max(0, alarm.initialMinutes - elapsedMins);
 
-        if (match && typeof match.btime2 === 'number') {
-          currentMins = match.btime2;
+        // Filter all arrivals matching this line
+        const matchingArrivals = arrivals.filter(a => {
+          const lId = String(a.line_id || '').trim().toUpperCase();
+          if (lId !== normLine) return false;
+          if (alarm.routeCode && a.route_code && String(a.route_code) !== String(alarm.routeCode)) return false;
+          return typeof a.btime2 === 'number';
+        });
+
+        if (matchingArrivals.length > 0) {
+          // Sort by proximity to expected remaining time so we don't pick a scheduled bus 5 hours away!
+          matchingArrivals.sort((a, b) => Math.abs(a.btime2 - expectedMins) - Math.abs(b.btime2 - expectedMins));
+          const best = matchingArrivals[0];
+          if (Math.abs(best.btime2 - expectedMins) <= 20 || best.btime2 <= expectedMins + 15) {
+            currentMins = best.btime2;
+          }
         }
       } catch (err) {
         console.warn(`Live arrival check failed for stop ${alarm.stopCode}:`, err);
@@ -529,8 +540,9 @@ class AlarmManager {
               triggeredNote = ` • Αυτόματη αφαίρεση σε ${remainingBeforeDismiss}λ`;
             }
 
+            const cleanStopName = (a.stopName || '').replace(/'/g, "\\'");
             return `
-              <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem; margin-bottom: 0; background: ${a.triggered ? '#fef2f2' : '#ffffff'}; border-left: 4px solid ${a.triggered ? '#dc2626' : (isUrgent ? '#ea580c' : '#005ac1')};">
+              <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem; margin-bottom: 0; background: ${a.triggered ? '#fef2f2' : '#ffffff'}; border-left: 4px solid ${a.triggered ? '#dc2626' : (isUrgent ? '#ea580c' : '#005ac1')}; cursor: pointer;" onclick="window.App.switchTab('ticker'); window.App.selectStop('${a.stopCode}', '${cleanStopName}');">
                 <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
                   <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
                     <span class="ticker-line-badge" style="font-size: 1rem; min-width: 48px; flex-shrink: 0;">
@@ -538,7 +550,7 @@ class AlarmManager {
                     </span>
                     <div style="min-width: 0; flex: 1;">
                       <div style="font-weight: 800; font-size: 0.95rem; color: #0f172a; line-height: 1.3; word-break: break-word;">${a.stopName}</div>
-                      <div style="font-size: 0.76rem; color: #64748b; margin-top: 2px;">Στάση #${a.stopCode}</div>
+                      <div style="font-size: 0.76rem; color: #64748b; margin-top: 2px;">Στάση #${a.stopCode} • <span style="color: #005ac1; text-decoration: underline;">Προβολή στάσης ➜</span></div>
                     </div>
                   </div>
                   <div style="text-align: right; flex-shrink: 0;">
@@ -552,7 +564,7 @@ class AlarmManager {
                     Όριο: <strong style="color: #0f172a;">${this.formatMinutesHuman(a.thresholdMinutes)}</strong> πριν την άφιξη${triggeredNote}
                   </div>
                   <div style="display: flex; gap: 0.5rem;">
-                    <button class="m3-btn m3-btn-tonal" onclick="window.Alarms.removeAlarm('${a.id}')" style="padding: 0.3rem 0.75rem; font-size: 0.78rem; border-radius: 9999px;">
+                    <button class="m3-btn m3-btn-tonal" onclick="event.stopPropagation(); window.Alarms.removeAlarm('${a.id}')" style="padding: 0.3rem 0.75rem; font-size: 0.78rem; border-radius: 9999px;">
                       ${a.triggered ? 'Διαγραφή' : 'Ακύρωση'}
                     </button>
                   </div>
