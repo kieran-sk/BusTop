@@ -8,12 +8,109 @@ class FavoritesManager {
     this.favStops = JSON.parse(localStorage.getItem('OASA_FAV_STOPS') || '[]');
     this.favLines = JSON.parse(localStorage.getItem('OASA_FAV_LINES') || '[]');
     this.activeFilter = 'all'; // 'all', 'stops', 'lines'
+    this.restoreFromNativeBridge();
+  }
+
+  restoreFromNativeBridge() {
+    // If running in Android APK and localStorage is empty (e.g. fresh reinstall), restore from native SharedPreferences
+    if (window.AndroidBridge && typeof window.AndroidBridge.getSavedFavorites === 'function') {
+      try {
+        const raw = window.AndroidBridge.getSavedFavorites();
+        if (raw && raw !== '{}') {
+          const parsed = JSON.parse(raw);
+          const stops = typeof parsed.stops === 'string' ? JSON.parse(parsed.stops) : parsed.stops;
+          const lines = typeof parsed.lines === 'string' ? JSON.parse(parsed.lines) : parsed.lines;
+          let changed = false;
+          if (this.favStops.length === 0 && Array.isArray(stops) && stops.length > 0) {
+            this.favStops = stops;
+            localStorage.setItem('OASA_FAV_STOPS', JSON.stringify(this.favStops));
+            changed = true;
+          }
+          if (this.favLines.length === 0 && Array.isArray(lines) && lines.length > 0) {
+            this.favLines = lines;
+            localStorage.setItem('OASA_FAV_LINES', JSON.stringify(this.favLines));
+            changed = true;
+          }
+          if (changed) {
+            console.log('[Favorites] Restored from Android SharedPreferences auto-backup!');
+          }
+        }
+      } catch (e) {
+        console.warn('Could not restore favorites from native bridge:', e);
+      }
+    }
   }
 
   save() {
     localStorage.setItem('OASA_FAV_STOPS', JSON.stringify(this.favStops));
     localStorage.setItem('OASA_FAV_LINES', JSON.stringify(this.favLines));
+    // Mirror to native Android SharedPreferences for automatic cloud backup
+    if (window.AndroidBridge && typeof window.AndroidBridge.syncFavorites === 'function') {
+      try {
+        window.AndroidBridge.syncFavorites(
+          JSON.stringify(this.favStops),
+          JSON.stringify(this.favLines)
+        );
+      } catch (e) {}
+    }
     this.render();
+  }
+
+  exportBackup() {
+    const data = {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      stops: this.favStops,
+      lines: this.favLines
+    };
+    const jsonStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `bustop_favorites_backup_${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    if (window.App && typeof window.App.showPushNotification === 'function') {
+      window.App.triggerHaptic('success');
+    }
+  }
+
+  importBackup(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const parsed = JSON.parse(e.target.result);
+        if (Array.isArray(parsed.stops) || Array.isArray(parsed.lines)) {
+          if (Array.isArray(parsed.stops)) {
+            // Merge deduplicated stops
+            parsed.stops.forEach(s => {
+              if (s && s.code && !this.isStopFav(s.code)) {
+                this.favStops.push(s);
+              }
+            });
+          }
+          if (Array.isArray(parsed.lines)) {
+            // Merge deduplicated lines
+            parsed.lines.forEach(l => {
+              if (l && l.code && !this.isLineFav(l.code)) {
+                this.favLines.push(l);
+              }
+            });
+          }
+          this.save();
+          alert(`Επιτυχής επαναφορά! Αποθηκευμένες: ${this.favStops.length} στάσεις, ${this.favLines.length} γραμμές.`);
+        } else {
+          alert('Μη έγκυρη μορφή αντιγράφου ασφαλείας.');
+        }
+      } catch (err) {
+        alert('Σφάλμα κατά την ανάγνωση του αρχείου.');
+      }
+    };
+    reader.readAsText(file);
   }
 
   setFilter(filter) {
@@ -59,18 +156,30 @@ class FavoritesManager {
     const totalLines = this.favLines.length;
     const totalAll = totalStops + totalLines;
 
-    // Segmented tab selector header differentiating Lines and Stops
+    // Segmented tab selector header differentiating Lines and Stops, plus Backup / Restore tools
     const tabsHeaderHtml = `
-      <div style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem; background: var(--md-sys-color-surface-container); padding: 4px; border-radius: 9999px; max-width: 420px;">
-        <button class="m3-btn ${this.activeFilter === 'all' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="flex: 1; padding: 0.4rem 0.6rem; font-size: 0.8rem; border-radius: 9999px;" onclick="window.Favorites.setFilter('all')">
-          Όλα (${totalAll})
-        </button>
-        <button class="m3-btn ${this.activeFilter === 'stops' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="flex: 1; padding: 0.4rem 0.6rem; font-size: 0.8rem; border-radius: 9999px;" onclick="window.Favorites.setFilter('stops')">
-          🚏 Στάσεις (${totalStops})
-        </button>
-        <button class="m3-btn ${this.activeFilter === 'lines' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="flex: 1; padding: 0.4rem 0.6rem; font-size: 0.8rem; border-radius: 9999px;" onclick="window.Favorites.setFilter('lines')">
-          🚌 Γραμμές (${totalLines})
-        </button>
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.25rem;">
+        <div style="display: flex; gap: 0.4rem; background: var(--md-sys-color-surface-container); padding: 4px; border-radius: 9999px; max-width: 420px; flex: 1;">
+          <button class="m3-btn ${this.activeFilter === 'all' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="flex: 1; padding: 0.4rem 0.6rem; font-size: 0.8rem; border-radius: 9999px;" onclick="window.Favorites.setFilter('all')">
+            Όλα (${totalAll})
+          </button>
+          <button class="m3-btn ${this.activeFilter === 'stops' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="flex: 1; padding: 0.4rem 0.6rem; font-size: 0.8rem; border-radius: 9999px;" onclick="window.Favorites.setFilter('stops')">
+            🚏 Στάσεις (${totalStops})
+          </button>
+          <button class="m3-btn ${this.activeFilter === 'lines' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="flex: 1; padding: 0.4rem 0.6rem; font-size: 0.8rem; border-radius: 9999px;" onclick="window.Favorites.setFilter('lines')">
+            🚌 Γραμμές (${totalLines})
+          </button>
+        </div>
+
+        <div style="display: flex; gap: 0.4rem; align-items: center;">
+          <button class="m3-btn m3-btn-tonal" style="font-size: 0.75rem; padding: 0.35rem 0.75rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px;" onclick="window.Favorites.exportBackup()" title="Εξαγωγή αντιγράφου ασφαλείας σε αρχείο .json">
+            📤 Αντίγραφο
+          </button>
+          <label class="m3-btn m3-btn-tonal" style="font-size: 0.75rem; padding: 0.35rem 0.75rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; margin-bottom: 0;" title="Επαναφορά από αρχείο αντιγράφου">
+            📥 Επαναφορά
+            <input type="file" accept=".json" style="display: none;" onchange="if (this.files[0]) window.Favorites.importBackup(this.files[0])">
+          </label>
+        </div>
       </div>
     `;
 
