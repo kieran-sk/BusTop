@@ -116,10 +116,10 @@ class MainActivity : ComponentActivity() {
     private var pendingStopCode: String? = null
     private var pendingStopName: String? = null
 
-    override fun onNewIntent(intent: Intent?) {
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        intent?.let { handleIntent(it) }
+        handleIntent(intent)
     }
 
     private fun handleIntent(intent: Intent) {
