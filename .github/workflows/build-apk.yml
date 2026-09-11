@@ -25,29 +25,60 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
+      - name: Generate Release Notes
+        id: release_notes
+        run: |
+          VERSION="v1.0.${{ github.run_number }}"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          
+          # Extract commit title and body
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          
+          # Generate changelog of recent commits
+          RECENT_COMMITS=$(git log -5 --pretty=format:"* %s (%h)")
+          
+          cat << 'EOF' > release_body.md
+          ### 🚍 BusTop Android Release ${{ env.VERSION }}
+          
+          #### 📝 Changes in this release:
+          EOF
+          echo "$COMMIT_MSG" >> release_body.md
+          cat << 'EOF' >> release_body.md
+          
+          #### 📜 Recent Commits:
+          EOF
+          echo "$RECENT_COMMITS" >> release_body.md
+          cat << 'EOF' >> release_body.md
+          
+          ---
+          **Download**: Install `BusTop-v1.0.${{ github.run_number }}.apk` below.
+          EOF
+
       - name: Build Android Debug APK
         working-directory: ./android
         run: |
           gradle wrapper
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug -PbuildNumber=${{ github.run_number }} --stacktrace
+          
+          # Ensure file is explicitly named with version
+          cd app/build/outputs/apk/debug
+          APK_FILE=$(ls *.apk | head -n 1)
+          cp "$APK_FILE" "BusTop-v1.0.${{ github.run_number }}.apk"
+          echo "Built APK: BusTop-v1.0.${{ github.run_number }}.apk"
 
       - name: Upload APK to Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: BusTop-Android-APK
-          path: android/app/build/outputs/apk/debug/*.apk
+          name: BusTop-v1.0.${{ github.run_number }}-APK
+          path: android/app/build/outputs/apk/debug/BusTop-v1.0.${{ github.run_number }}.apk
 
       - name: Release APK on GitHub
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: BusTop Android v1.0.${{ github.run_number }}
-          body: |
-            ### 🚍 BusTop Android APK Release
-            - Αυτόματο build από GitHub Actions
-            - Υποστήριξη Live Android Notifications & Split-Flap Ticker
-            - Αυτόματη σύνδεση με την παραγωγική έκδοση Cloudflare Pages
-          files: android/app/build/outputs/apk/debug/*.apk
+          body_path: release_body.md
+          files: android/app/build/outputs/apk/debug/BusTop-v1.0.${{ github.run_number }}.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

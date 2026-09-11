@@ -11,12 +11,19 @@ android {
         applicationId = "com.oasa.athensbus"
         minSdk = 26
         targetSdk = 34
-        versionCode = 10
-        versionName = "1.0.10"
+        versionCode = project.findProperty("buildNumber")?.toString()?.toIntOrNull() ?: 12
+        versionName = "1.0.${versionCode}"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
+        }
+    }
+
+    applicationVariants.all {
+        outputs.all {
+            val output = this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            output?.outputFileName = "BusTop-v${versionName}.apk"
         }
     }
 
