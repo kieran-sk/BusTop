@@ -206,6 +206,8 @@ class AlarmManager {
     const walkMinutes = options.walkMinutes || 0;
     const stopCodeStr = String(options.stopCode);
     const lineIdStr = String(options.lineId).trim();
+    const createdAt = Date.now();
+    const ringUntilDismissed = options.ringUntilDismissed !== false;
 
     // Check if an alarm already exists for this line and stop (deduplicate)
     const existingIdx = this.alarms.findIndex(a =>

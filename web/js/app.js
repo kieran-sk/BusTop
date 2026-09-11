@@ -735,7 +735,7 @@ class AppController {
 
     const lineId = modal.dataset.lineId;
     const routeCode = modal.dataset.routeCode;
-    const dueMins = parseInt(modal.dataset.dueMins, 10);
+    const dueMins = parseInt(modal.dataset.dueMins, 10) || 10;
     const lineDescr = modal.dataset.lineDescr || '';
     const stopCode = modal.dataset.stopCode || (this.currentStop ? this.currentStop.StopCode : '');
     const stopName = modal.dataset.stopName || (this.currentStop ? this.currentStop.StopDescr : '') || 'Στάση ΟΑΣΑ';
