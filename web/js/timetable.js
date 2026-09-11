@@ -165,16 +165,16 @@ class TimetableManager {
       });
 
       return `
-        <div class="route-stop-item" style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0.9rem; border-radius: 12px; margin-bottom: 0.4rem; background: #ffffff; border: 1px solid #e2e8f0; cursor: pointer; transition: all 0.2s;" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', ${lat}, ${lng}, true)" title="Κλικ για προβολή αφίξεων στη στάση ${stopTitle}">
+        <div class="route-stop-item" style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0.9rem; border-radius: 12px; margin-bottom: 0.4rem; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); cursor: pointer; transition: all 0.2s;" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', ${lat}, ${lng}, true)" title="Κλικ για προβολή αφίξεων στη στάση ${stopTitle}">
           <div style="display: flex; align-items: center; gap: 0.75rem; flex: 1;">
-            <div style="width: 28px; height: 28px; border-radius: 50%; background: #eff6ff; color: var(--md-sys-color-primary); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.78rem; flex-shrink: 0; border: 1.5px solid #bfdbfe;">
+            <div style="width: 28px; height: 28px; border-radius: 50%; background: #1e3a8a; color: #93c5fd; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.78rem; flex-shrink: 0; border: 1.5px solid #3b82f6;">
               ${stopOrder}
             </div>
             <div>
-              <div style="font-weight: 800; font-size: 0.92rem; color: #0f172a; line-height: 1.25;">
+              <div style="font-weight: 800; font-size: 0.92rem; color: var(--md-sys-color-on-surface); line-height: 1.25;">
                 ${stopTitle}
               </div>
-              <div style="font-size: 0.75rem; color: #64748b; margin-top: 1px;">
+              <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 1px;">
                 ${s.StopStreet ? s.StopStreet + ' • ' : ''}Στάση #${s.StopCode}
               </div>
               ${nearBus ? `
@@ -468,9 +468,9 @@ class TimetableManager {
 
     if (isMapMode) {
       mainContentHtml = `
-        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 0.4rem; margin-top: 0.25rem; margin-bottom: 0;">
+        <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 16px; padding: 0.4rem; margin-top: 0.25rem; margin-bottom: 0;">
           <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.35rem; padding: 0 0.2rem;">
-            <div style="font-weight: 800; font-size: 0.95rem; color: #005ac1; display: flex; align-items: center; gap: 6px;">
+            <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-primary); display: flex; align-items: center; gap: 6px;">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
               Χάρτης Διαδρομής
             </div>
@@ -482,16 +482,16 @@ class TimetableManager {
               </div>
             ` : ''}
           </div>
-          <div id="line-route-map" style="height: 60vh; min-height: 380px; width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid #cbd5e1; background: #e2e8f0;"></div>
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.35rem; font-size: 0.75rem; color: #64748b; flex-wrap: wrap; gap: 0.35rem; padding: 0 0.2rem;">
+          <div id="line-route-map" style="height: 60vh; min-height: 380px; width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid var(--md-sys-color-outline-variant); background: #0b0f19;"></div>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.35rem; font-size: 0.75rem; color: #94a3b8; flex-wrap: wrap; gap: 0.35rem; padding: 0 0.2rem;">
             <div style="display: flex; align-items: center; gap: 12px;">
               <span style="display: inline-flex; align-items: center; gap: 4px;">
-                <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #005ac1;"></span>
+                <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #3b82f6;"></span>
                 Μετάβαση
               </span>
               ${!isCircular && inRoute.RouteCode ? `
                 <span style="display: inline-flex; align-items: center; gap: 4px;">
-                  <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #047857;"></span>
+                  <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #10b981;"></span>
                   Επιστροφή
                 </span>
               ` : ''}
@@ -506,16 +506,16 @@ class TimetableManager {
       `;
     } else if (isCircular) {
       mainContentHtml = `
-        <div style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 1.15rem;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.85rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.6rem;">
+        <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 16px; padding: 1.15rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.85rem; border-bottom: 1px solid var(--md-sys-color-outline-variant); padding-bottom: 0.6rem;">
             <div>
               <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <span style="font-weight: 800; font-size: 1rem; color: #005ac1;">Κυκλική Διαδρομή</span>
-                <span class="m3-badge" style="background: #e0f2fe; color: #005ac1; font-size: 0.72rem; font-weight: 800; padding: 2px 8px;">
+                <span style="font-weight: 800; font-size: 1rem; color: var(--md-sys-color-primary);">Κυκλική Διαδρομή</span>
+                <span class="m3-badge" style="background: #1e3a8a; color: #93c5fd; font-size: 0.72rem; font-weight: 800; padding: 2px 8px;">
                   🔄 Κυκλική
                 </span>
               </div>
-              <div style="font-size: 0.78rem; color: #64748b; margin-top: 2px;">
+              <div style="font-size: 0.78rem; color: #94a3b8; margin-top: 2px;">
                 ${outRoute.RouteDescr || this.currentLine.lineDescr || 'Πλήρης Κύκλος Διαδρομής'} • ${isStopsMode ? `${outStops.length} στάσεις` : `${goTrips.length} δρομολόγια`}
               </div>
             </div>
@@ -529,15 +529,15 @@ class TimetableManager {
       mainContentHtml = `
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 1.25rem;">
           <!-- Direction 1: Outbound / Μετάβαση -->
-          <div style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 1rem;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.5rem;">
+          <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 16px; padding: 1rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; border-bottom: 1px solid var(--md-sys-color-outline-variant); padding-bottom: 0.5rem;">
               <div>
-                <div style="font-weight: 800; font-size: 0.95rem; color: #005ac1;">Κατεύθυνση 1: Μετάβαση</div>
-                <div style="font-size: 0.75rem; color: #64748b;">
+                <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-primary);">Κατεύθυνση 1: Μετάβαση</div>
+                <div style="font-size: 0.75rem; color: #94a3b8;">
                   ${outRoute.RouteDescr || 'Προς Τέρμα'} • ${isStopsMode ? `${outStops.length} στάσεις` : `${goTrips.length} δρομολόγια`}
                 </div>
               </div>
-              <span class="m3-badge" style="background: #e0f2fe; color: #005ac1; font-size: 0.65rem;">Μετάβαση</span>
+              <span class="m3-badge" style="background: #1e3a8a; color: #93c5fd; font-size: 0.65rem;">Μετάβαση</span>
             </div>
             <div style="max-height: 480px; overflow-y: auto; padding-right: 4px;">
               ${isStopsMode ? outStopsHtml : outScheduleHtml}
@@ -545,15 +545,15 @@ class TimetableManager {
           </div>
 
           <!-- Direction 2: Inbound / Επιστροφή -->
-          <div style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 1rem;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.5rem;">
+          <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 16px; padding: 1rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; border-bottom: 1px solid var(--md-sys-color-outline-variant); padding-bottom: 0.5rem;">
               <div>
-                <div style="font-weight: 800; font-size: 0.95rem; color: #047857;">Κατεύθυνση 2: Επιστροφή</div>
-                <div style="font-size: 0.75rem; color: #64748b;">
+                <div style="font-weight: 800; font-size: 0.95rem; color: #34d399;">Κατεύθυνση 2: Επιστροφή</div>
+                <div style="font-size: 0.75rem; color: #94a3b8;">
                   ${inRoute.RouteDescr || 'Προς Αφετηρία'} • ${isStopsMode ? `${inStops.length} στάσεις` : `${comeTrips.length} δρομολόγια`}
                 </div>
               </div>
-              <span class="m3-badge" style="background: #ecfdf5; color: #047857; font-size: 0.65rem;">Επιστροφή</span>
+              <span class="m3-badge" style="background: #064e3b; color: #6ee7b7; font-size: 0.65rem;">Επιστροφή</span>
             </div>
             <div style="max-height: 480px; overflow-y: auto; padding-right: 4px;">
               ${isStopsMode ? inStopsHtml : inScheduleHtml}
@@ -564,7 +564,7 @@ class TimetableManager {
     }
 
     container.innerHTML = `
-      <div class="m3-card" style="margin-bottom: ${isMapMode ? '0.5rem' : '1.5rem'}; background: #ffffff;">
+      <div class="m3-card" style="margin-bottom: ${isMapMode ? '0.5rem' : '1.5rem'}; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);">
         <!-- Header -->
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
           <div>
@@ -572,9 +572,9 @@ class TimetableManager {
               <span class="ticker-line-badge" style="font-size: 1.05rem;">
                 ${this.currentLine.lineId || 'BUS'}
               </span>
-              <h2 style="font-size: 1.2rem; font-weight: 900; color: #0f172a;">${this.currentLine.lineDescr || 'Γραμμή ΟΑΣΑ'}</h2>
+              <h2 style="font-size: 1.2rem; font-weight: 900; color: var(--md-sys-color-on-surface);">${this.currentLine.lineDescr || 'Γραμμή ΟΑΣΑ'}</h2>
               ${isCircular ? `
-                <span class="m3-badge" style="background: #e0f2fe; color: #005ac1; font-weight: 800; font-size: 0.72rem; padding: 2px 8px;">
+                <span class="m3-badge" style="background: #1e3a8a; color: #93c5fd; font-weight: 800; font-size: 0.72rem; padding: 2px 8px;">
                   🔄 Κυκλική Διαδρομή
                 </span>
               ` : ''}

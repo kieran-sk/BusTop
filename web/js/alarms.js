@@ -514,10 +514,10 @@ class AlarmManager {
     let contentHtml = '';
     if (this.alarms.length === 0) {
       contentHtml = `
-        <div class="m3-card" style="text-align: center; padding: 2.5rem 1.25rem; background: #ffffff;">
+        <div class="m3-card" style="text-align: center; padding: 2.5rem 1.25rem; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);">
           <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">🔔</div>
-          <div style="font-weight: 800; font-size: 1.1rem; color: #0f172a; margin-bottom: 0.4rem;">Δεν υπάρχουν ενεργές ειδοποιήσεις</div>
-          <p style="color: #64748b; font-size: 0.85rem; max-width: 380px; margin: 0 auto 1.25rem; line-height: 1.4;">
+          <div style="font-weight: 800; font-size: 1.1rem; color: var(--md-sys-color-on-surface); margin-bottom: 0.4rem;">Δεν υπάρχουν ενεργές ειδοποιήσεις</div>
+          <p style="color: var(--md-sys-color-outline); font-size: 0.85rem; max-width: 380px; margin: 0 auto 1.25rem; line-height: 1.4;">
             Πατήστε το κουδουνάκι δίπλα σε οποιαδήποτε άφιξη στον πίνακα για να ορίσετε ηχητική ειδοποίηση και δόνηση όταν πλησιάζει το λεωφορείο.
           </p>
           <button class="m3-btn m3-btn-primary" style="border-radius: 9999px; padding: 0.5rem 1.2rem; font-weight: 800;" onclick="window.App.switchTab('ticker')">
@@ -528,7 +528,7 @@ class AlarmManager {
     } else {
       contentHtml = `
         <div style="display: flex; justify-content: flex-end; margin-bottom: 0.75rem;">
-          <button class="m3-btn m3-btn-outlined" style="font-size: 0.75rem; padding: 3px 10px; border-radius: 9999px; color: var(--md-sys-color-error); border-color: #fca5a5;" onclick="window.Alarms.clearAllAlarms()">
+          <button class="m3-btn m3-btn-outlined" style="font-size: 0.75rem; padding: 3px 10px; border-radius: 9999px; color: var(--md-sys-color-error); border-color: #ef4444;" onclick="window.Alarms.clearAllAlarms()">
             🗑️ Διαγραφή Όλων
           </button>
         </div>
@@ -551,28 +551,28 @@ class AlarmManager {
 
             const cleanStopName = (a.stopName || '').replace(/'/g, "\\'");
             return `
-              <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem; margin-bottom: 0; background: ${a.triggered ? '#fef2f2' : '#ffffff'}; border-left: 4px solid ${a.triggered ? '#dc2626' : (isUrgent ? '#ea580c' : '#005ac1')}; cursor: pointer;" onclick="window.App.switchTab('ticker'); window.App.selectStop('${a.stopCode}', '${cleanStopName}');">
+              <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem; margin-bottom: 0; background: ${a.triggered ? '#450a0a' : 'var(--md-sys-color-surface-container)'}; border: 1px solid var(--md-sys-color-outline-variant); border-left: 4px solid ${a.triggered ? '#ef4444' : (isUrgent ? '#f97316' : 'var(--md-sys-color-primary)')}; cursor: pointer;" onclick="window.App.switchTab('ticker'); window.App.selectStop('${a.stopCode}', '${cleanStopName}');">
                 <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
                   <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
                     <span class="ticker-line-badge" style="font-size: 1rem; min-width: 48px; flex-shrink: 0;">
                       ${a.lineId}
                     </span>
                     <div style="min-width: 0; flex: 1;">
-                      <div style="font-weight: 800; font-size: 0.95rem; color: #0f172a; line-height: 1.3; word-break: break-word;">${a.stopName}</div>
-                      <div style="font-size: 0.76rem; color: #64748b; margin-top: 2px;">
-                        ${a.destination ? `<strong style="color: var(--md-sys-color-primary); margin-right: 4px;">προς ${a.destination}</strong> • ` : ''}Στάση #${a.stopCode} • <span style="color: #005ac1; text-decoration: underline;">Προβολή στάσης ➜</span>
+                      <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: break-word;">${a.stopName}</div>
+                      <div style="font-size: 0.76rem; color: var(--md-sys-color-outline); margin-top: 2px;">
+                        ${a.destination ? `<strong style="color: var(--md-sys-color-primary); margin-right: 4px;">προς ${a.destination}</strong> • ` : ''}Στάση #${a.stopCode} • <span style="color: var(--md-sys-color-primary); text-decoration: underline;">Προβολή στάσης ➜</span>
                       </div>
                     </div>
                   </div>
                   <div style="text-align: right; flex-shrink: 0;">
-                    <span class="m3-badge" style="background: ${a.triggered ? '#fee2e2' : '#e0f2fe'}; color: ${a.triggered ? '#b91c1c' : '#005ac1'}; font-size: 0.72rem; font-weight: 800; padding: 2px 7px;">
+                    <span class="m3-badge" style="background: ${a.triggered ? '#7f1d1d' : '#1e3a8a'}; color: ${a.triggered ? '#fca5a5' : '#93c5fd'}; font-size: 0.72rem; font-weight: 800; padding: 2px 7px;">
                       ${a.triggered ? '🚨 Συναγερμός' : `⏳ ~${formattedTime}`}
                     </span>
                   </div>
                 </div>
-                <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px dashed #e2e8f0; padding-top: 0.5rem; font-size: 0.8rem; color: #64748b;">
+                <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px dashed var(--md-sys-color-outline-variant); padding-top: 0.5rem; font-size: 0.8rem; color: var(--md-sys-color-outline);">
                   <div>
-                    Όριο: <strong style="color: #0f172a;">${this.formatMinutesHuman(a.thresholdMinutes)}</strong> πριν την άφιξη${triggeredNote}
+                    Όριο: <strong style="color: var(--md-sys-color-on-surface);">${this.formatMinutesHuman(a.thresholdMinutes)}</strong> πριν την άφιξη${triggeredNote}
                   </div>
                   <div style="display: flex; gap: 0.5rem;">
                     <button class="m3-btn m3-btn-tonal" onclick="event.stopPropagation(); window.Alarms.removeAlarm('${a.id}')" style="padding: 0.3rem 0.75rem; font-size: 0.78rem; border-radius: 9999px;">

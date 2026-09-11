@@ -291,20 +291,20 @@ class PinnedTripsManager {
 
     if (this.pinnedItems.length === 0) {
       container.innerHTML = `
-        <div class="m3-card" style="text-align: center; padding: 3rem 1.5rem; background: #ffffff;">
-          <div style="width: 54px; height: 54px; border-radius: 50%; background: #eff6ff; color: var(--md-sys-color-primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem;">
+        <div class="m3-card" style="text-align: center; padding: 3rem 1.5rem; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);">
+          <div style="width: 54px; height: 54px; border-radius: 50%; background: #1e293b; color: var(--md-sys-color-primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem;">
             <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="12" y1="17" x2="12" y2="22"></line>
               <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
             </svg>
           </div>
-          <h3 style="font-size: 1.2rem; font-weight: 800; color: #0f172a; margin-bottom: 0.5rem;">
+          <h3 style="font-size: 1.2rem; font-weight: 800; color: var(--md-sys-color-on-surface); margin-bottom: 0.5rem;">
             Καρφίτσες • Καρφιτσωμένες Αφίξεις
           </h3>
-          <p style="font-size: 0.9rem; color: #64748b; max-width: 440px; margin: 0 auto 1.5rem; line-height: 1.5;">
+          <p style="font-size: 0.9rem; color: var(--md-sys-color-outline); max-width: 440px; margin: 0 auto 1.5rem; line-height: 1.5;">
             Καρφιτσώστε λεωφορεία από οποιαδήποτε στάση για να παρακολουθείτε ζωντανά τις αφίξεις τους σε έναν συγκεντρωτικό πίνακα!
           </p>
-          <div style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.82rem; font-weight: 700; color: var(--md-sys-color-primary); background: var(--md-sys-color-surface-container); padding: 8px 16px; border-radius: 9999px;">
+          <div style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.82rem; font-weight: 700; color: var(--md-sys-color-primary); background: var(--md-sys-color-surface-container-high); padding: 8px 16px; border-radius: 9999px;">
             <span>Πατήστε το εικονίδιο</span>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 12V4H17V2H7V4H8V12L6 14V16H11V22H13V16H18V14L16 12Z"/></svg>
             <span>σε οποιαδήποτε άφιξη</span>
@@ -371,25 +371,25 @@ class PinnedTripsManager {
       }
 
       return `
-        <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.75rem; padding: 1.1rem; background: #ffffff; margin-bottom: 0.75rem; border-left: 4px solid var(--md-sys-color-primary);">
+        <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.75rem; padding: 1.1rem; background: var(--md-sys-color-surface-container); margin-bottom: 0.75rem; border: 1px solid var(--md-sys-color-outline-variant); border-left: 4px solid var(--md-sys-color-primary);">
           <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
             <div style="display: flex; align-items: center; gap: 0.6rem;">
-              <span class="m3-badge" style="background: #0f172a; color: #ffffff; font-weight: 800; font-size: 0.72rem;">
+              <span class="m3-badge" style="background: #334155; color: #f8fafc; font-weight: 800; font-size: 0.72rem;">
                 Σκέλος ${idx + 1}
               </span>
               <span class="ticker-line-badge" style="font-size: 1rem;">
                 ${item.lineId}
               </span>
-              <div style="font-weight: 800; font-size: 1.05rem; color: #0f172a;">
+              <div style="font-weight: 800; font-size: 1.05rem; color: var(--md-sys-color-on-surface);">
                 ${item.stopName}
               </div>
             </div>
             ${dueBadgeHtml}
           </div>
 
-          <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: #64748b; flex-wrap: wrap; gap: 0.5rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: var(--md-sys-color-outline); flex-wrap: wrap; gap: 0.5rem;">
             <div>
-              <span style="font-weight: 700; color: #0f172a;">${item.direction || 'Μετάβαση'}</span>
+              <span style="font-weight: 700; color: var(--md-sys-color-on-surface);">${item.direction || 'Μετάβαση'}</span>
               ${item.lineDescr ? ` • ${item.lineDescr}` : ''}
             </div>
             <div style="display: flex; align-items: center; gap: 0.75rem;">
@@ -409,13 +409,13 @@ class PinnedTripsManager {
     }).join('');
 
     container.innerHTML = `
-      <div class="m3-card" style="margin-bottom: 1.25rem; background: #ffffff;">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1px solid #e2e8f0; padding-bottom: 0.75rem;">
+      <div class="m3-card" style="margin-bottom: 1.25rem; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1px solid var(--md-sys-color-outline-variant); padding-bottom: 0.75rem;">
           <div>
-            <h2 style="font-size: 1.25rem; font-weight: 900; color: #0f172a; margin: 0;">
+            <h2 style="font-size: 1.25rem; font-weight: 900; color: var(--md-sys-color-on-surface); margin: 0;">
               Καρφίτσες • Καρφιτσωμένες Αφίξεις
             </h2>
-            <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">
+            <div style="font-size: 0.8rem; color: var(--md-sys-color-outline); margin-top: 2px;">
               ${this.pinnedItems.length} καρφιτσωμένες γραμμές
             </div>
           </div>

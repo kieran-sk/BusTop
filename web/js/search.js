@@ -91,7 +91,7 @@ class SearchManager {
     // Render Lines
     if (matchingLines.length > 0) {
       html += `
-        <div style="font-size: 0.82rem; font-weight: 800; color: #005ac1; margin: 0.5rem 0 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">
+        <div style="font-size: 0.82rem; font-weight: 800; color: var(--md-sys-color-primary); margin: 0.5rem 0 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">
           Γραμμές Λεωφορείων (${matchingLines.length})
         </div>
         <div style="display: grid; gap: 0.55rem; margin-bottom: 1.25rem;">
@@ -99,22 +99,22 @@ class SearchManager {
             const safeDescr = (l.LineDescr || '').replace(/'/g, "\\'");
             const isLineFav = window.Favorites && window.Favorites.isLineFav(l.LineCode);
             return `
-              <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.65rem; padding: 0.85rem 1rem; margin-bottom: 0; cursor: pointer; background: #ffffff; border: 1px solid var(--md-sys-color-outline-variant);" onclick="window.App.openLineTimetableBothDirections('${l.LineCode}', '${l.LineID}', '${safeDescr}')">
+              <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.65rem; padding: 0.85rem 1rem; margin-bottom: 0; cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);" onclick="window.App.openLineTimetableBothDirections('${l.LineCode}', '${l.LineID}', '${safeDescr}')">
                 <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.65rem;">
                   <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
                     <span class="ticker-line-badge" style="font-size: 0.95rem; min-width: 46px; flex-shrink: 0;">
                       ${l.LineID}
                     </span>
                     <div style="min-width: 0; flex: 1;">
-                      <div style="font-weight: 800; font-size: 0.95rem; color: #0f172a; line-height: 1.3; word-break: break-word;">${l.LineDescr}</div>
-                      <div style="font-size: 0.76rem; color: #64748b; margin-top: 2px;">Γραμμή #${l.LineCode}</div>
+                      <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: break-word;">${l.LineDescr}</div>
+                      <div style="font-size: 0.76rem; color: var(--md-sys-color-outline); margin-top: 2px;">Γραμμή #${l.LineCode}</div>
                     </div>
                   </div>
                   <button class="m3-icon-btn" style="width: 36px; height: 36px; border: none; cursor: pointer; background: none; flex-shrink: 0;" title="Αποθήκευση γραμμής" onclick="event.stopPropagation(); const isFav = window.Favorites.toggleLine('${l.LineCode}', '${l.LineID}', '${safeDescr}'); this.querySelector('svg').setAttribute('fill', isFav ? '#eab308' : 'none'); this.querySelector('svg').setAttribute('stroke', isFav ? '#ca8a04' : '#64748b');">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="${isLineFav ? '#eab308' : 'none'}" stroke="${isLineFav ? '#ca8a04' : '#64748b'}" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
                   </button>
                 </div>
-                <div style="display: flex; align-items: center; justify-content: flex-end; border-top: 1px dashed #e2e8f0; padding-top: 0.45rem;">
+                <div style="display: flex; align-items: center; justify-content: flex-end; border-top: 1px dashed var(--md-sys-color-outline-variant); padding-top: 0.45rem;">
                   <button class="m3-btn m3-btn-primary" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px;" onclick="event.stopPropagation(); window.App.openLineTimetableBothDirections('${l.LineCode}', '${l.LineID}', '${safeDescr}')">
                     🗺️ Δρομολόγιο &amp; Στάσεις ➜
                   </button>
@@ -129,7 +129,7 @@ class SearchManager {
     // Render Stops
     if (matchingStops.length > 0) {
       html += `
-        <div style="font-size: 0.82rem; font-weight: 800; color: #047857; margin: 0.5rem 0 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">
+        <div style="font-size: 0.82rem; font-weight: 800; color: #10b981; margin: 0.5rem 0 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">
           Στάσεις Λεωφορείων (${matchingStops.length})
         </div>
         <div style="display: grid; gap: 0.45rem;">
@@ -137,17 +137,17 @@ class SearchManager {
             const stopTitle = s.StopDescr || `Στάση #${s.StopCode}`;
             const safeTitle = stopTitle.replace(/'/g, "\\'");
             return `
-              <div class="m3-card" style="display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1rem; margin-bottom: 0; cursor: pointer; background: #ffffff;" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})">
+              <div class="m3-card" style="display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1rem; margin-bottom: 0; cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})">
                 <div style="display: flex; align-items: center; gap: 0.75rem;">
-                  <div class="m3-icon-btn" style="width: 38px; height: 38px; background: #ecfdf5; color: #047857; border: 1.5px solid #a7f3d0;">
+                  <div class="m3-icon-btn" style="width: 38px; height: 38px; background: #064e3b; color: #34d399; border: 1.5px solid #059669;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                       <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"></path>
                       <circle cx="12" cy="9" r="2.5"></circle>
                     </svg>
                   </div>
                   <div>
-                    <div style="font-weight: 800; font-size: 0.95rem; color: #0f172a;">${stopTitle}</div>
-                    <div style="font-size: 0.78rem; color: #64748b;">
+                    <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface);">${stopTitle}</div>
+                    <div style="font-size: 0.78rem; color: var(--md-sys-color-outline); margin-top: 2px;">
                       ${s.StopStreet ? s.StopStreet + ' • ' : ''}Στάση #${s.StopCode}
                     </div>
                   </div>
@@ -420,22 +420,22 @@ class SearchManager {
           const isFav = window.Favorites && window.Favorites.isStopFav(s.StopCode);
 
           return `
-            <div class="m3-card" style="display: flex; flex-direction: column; padding: 0.9rem 1.1rem; cursor: pointer; background: ${isFav ? '#fffdf5' : (hasRoutes ? '#ffffff' : '#f8fafc')}; margin-bottom: 0; border: ${isFav ? '2px solid #eab308' : (hasRoutes ? '1px solid var(--md-sys-color-outline-variant)' : '1px dashed #cbd5e1')}; opacity: ${hasRoutes ? '1' : '0.8'};" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', '${s.StopLat}', '${s.StopLng}')">
+            <div class="m3-card" style="display: flex; flex-direction: column; padding: 0.9rem 1.1rem; cursor: pointer; background: ${isFav ? '#2d2510' : (hasRoutes ? 'var(--md-sys-color-surface-container)' : '#0b1120')}; margin-bottom: 0; border: ${isFav ? '1.5px solid #ca8a04' : (hasRoutes ? '1px solid var(--md-sys-color-outline-variant)' : '1px dashed var(--md-sys-color-outline-variant)')}; opacity: ${hasRoutes ? '1' : '0.8'};" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', '${s.StopLat}', '${s.StopLng}')">
               <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
                 <div style="min-width: 0; flex: 1;">
                   <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                    ${isFav ? '<span class="m3-badge" style="background: #fef08a; color: #854d0e; font-size: 0.68rem; font-weight: 800;">⭐ Αγαπημένη</span>' : ''}
-                    <div style="font-weight: 800; font-size: 0.94rem; color: #0f172a; line-height: 1.3; word-break: break-word;">${stopTitle}</div>
+                    ${isFav ? '<span class="m3-badge" style="background: #713f12; color: #fef08a; font-size: 0.68rem; font-weight: 800;">⭐ Αγαπημένη</span>' : ''}
+                    <div style="font-weight: 800; font-size: 0.94rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: break-word;">${stopTitle}</div>
                   </div>
-                  <div style="font-size: 0.75rem; color: #64748b; margin-top: 3px;">
+                  <div style="font-size: 0.75rem; color: var(--md-sys-color-outline); margin-top: 3px;">
                     ${s.StopStreet ? s.StopStreet + ' • ' : ''}Στάση #${s.StopCode}
                   </div>
                 </div>
                 <div style="text-align: right; flex-shrink: 0;">
-                  <div style="font-weight: 800; font-size: 0.85rem; color: var(--md-sys-color-primary); background: #f0f7ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 2px 8px;">
+                  <div style="font-weight: 800; font-size: 0.85rem; color: var(--md-sys-color-primary); background: #1e293b; border: 1px solid #3b82f6; border-radius: 6px; padding: 2px 8px;">
                     🚶 ${walkMins}λ
                   </div>
-                  <div style="font-size: 0.7rem; color: #64748b; margin-top: 3px;">
+                  <div style="font-size: 0.7rem; color: var(--md-sys-color-outline); margin-top: 3px;">
                     ${distanceMeters}μ.
                   </div>
                 </div>

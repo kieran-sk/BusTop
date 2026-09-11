@@ -353,10 +353,10 @@ class AppController {
     }
 
     routesListEl.innerHTML = uniqueRoutes.map(r => `
-      <div style="background: #ffffff; border: 1px solid var(--md-sys-color-outline-variant); border-radius: 9999px; padding: 3px 10px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; box-shadow: 0 1px 2px rgba(0,0,0,0.03); cursor: pointer;" onclick="window.App.openLineTimetableBothDirections('${r.LineCode}', '${r.LineID}', '${r.cleanDestination}')">
+      <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 9999px; padding: 3px 10px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; box-shadow: 0 1px 2px rgba(0,0,0,0.2); cursor: pointer;" onclick="window.App.openLineTimetableBothDirections('${r.LineCode}', '${r.LineID}', '${r.cleanDestination}')">
         <span style="font-weight: 800; color: var(--md-sys-color-primary);">${r.LineID || 'BUS'}</span>
         <span style="color: var(--md-sys-color-outline);">προς</span>
-        <span style="color: #0f172a; max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600;">${r.cleanDestination}</span>
+        <span style="color: var(--md-sys-color-on-surface); max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600;">${r.cleanDestination}</span>
         <span class="m3-badge" style="background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); font-size: 0.65rem; padding: 1px 6px;">${r.directionLabel}</span>
       </div>
     `).join('');
