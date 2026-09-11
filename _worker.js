@@ -290,7 +290,25 @@ export default {
           return jsonRes(enriched);
         }
         const mTimetable = path.match(/^\/api\/lines\/([^\/]+)\/timetable$/);
-        if (mTimetable) return jsonRes((await oasaRequest('getDailySchedule', { line_code: mTimetable[1] }, 600)) || {});
+        if (mTimetable) {
+          let lineCode = mTimetable[1];
+          // Check if lineCode is a LineID (e.g. A5, 040, 306) and resolve it
+          const lines = await oasaRequest('webGetLines', {}, 1800);
+          if (Array.isArray(lines)) {
+            const m = lines.find(l => String(l.LineID).trim().toLowerCase() === String(lineCode).trim().toLowerCase());
+            if (m) lineCode = m.LineCode;
+          }
+          const [daily, days] = await Promise.all([
+            oasaRequest('getDailySchedule', { line_code: lineCode }, 600),
+            oasaRequest('getScheduleDaysMasterline', { p1: lineCode }, 3600)
+          ]);
+          return jsonRes({
+            line_code: lineCode,
+            schedule_days: Array.isArray(days) ? days : [],
+            profiles: {},
+            daily_schedule: daily || {}
+          });
+        }
         return jsonRes({ error: 'Endpoint not found' }, 404);
       } catch(err) {
         return jsonRes({ error: err.message }, 500);

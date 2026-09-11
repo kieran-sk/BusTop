@@ -497,9 +497,14 @@ class AirportTicker {
     container.innerHTML = `
       <div class="ticker-board">
         <div class="ticker-board-header">
-          <div class="ticker-board-title">
-            <span class="m3-pulse-dot" style="background: var(--md-sys-color-primary);"></span>
-            ${stopName.toUpperCase()} • ΑΦΙΞΕΙΣ
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <button class="m3-btn m3-btn-outlined" style="font-size: 0.75rem; padding: 3px 10px; border-radius: 9999px; font-weight: 700; background: #ffffff;" onclick="event.stopPropagation(); window.App.showAllStopsInArrivals();" title="Επιστροφή σε όλες τις στάσεις">
+              ⬅ Όλες οι Στάσεις
+            </button>
+            <div class="ticker-board-title">
+              <span class="m3-pulse-dot" style="background: var(--md-sys-color-primary);"></span>
+              ${stopName.toUpperCase()} • ΑΦΙΞΕΙΣ
+            </div>
           </div>
           <div class="ticker-clock" id="ticker-live-clock">--:--:--</div>
         </div>

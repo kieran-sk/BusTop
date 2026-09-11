@@ -119,10 +119,18 @@ class AppController {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           this.setUserLocation(pos.coords.latitude, pos.coords.longitude);
+          // Center map immediately on user on app open
+          if (this.mapManager) {
+            const stops = window.Search ? window.Search.nearbyStops : [];
+            this.mapManager.fitAreaAroundUser(pos.coords.latitude, pos.coords.longitude, stops, 350);
+          }
         },
         (err) => {
           console.log('Default geolocation fallback (Athens Center):', err.message);
           this.setUserLocation(37.9845, 23.7335);
+          if (this.mapManager) {
+            this.mapManager.setView(37.9845, 23.7335, 15);
+          }
         },
         { enableHighAccuracy: true, timeout: 8000 }
       );
@@ -638,8 +646,7 @@ class AppController {
     const lineDescr = modal.dataset.lineDescr || '';
     const customInput = document.getElementById('alarm-threshold-custom');
     const threshold = customInput ? (parseInt(customInput.value, 10) || 5) : 5;
-    const continuousCheck = document.getElementById('alarm-ring-until-dismissed');
-    const ringUntilDismissed = continuousCheck ? continuousCheck.checked : true;
+    const ringUntilDismissed = true; // Always trigger loud siren alarm when threshold is reached
 
     if (!this.currentStop) return;
 

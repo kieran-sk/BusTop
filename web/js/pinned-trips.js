@@ -38,6 +38,12 @@ class PinnedTripsManager {
       this.pinnedItems.splice(existingIdx, 1);
       this.save();
       this.showToast(`Ξεκαρφιτσώθηκε η γραμμή ${lineId}`);
+      if (this.pinnedItems.length === 0) {
+        if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
+          try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
+        }
+      }
+      this.updateLiveAndroidNotification();
     } else {
       const newItem = {
         id: 'pin_' + Date.now(),
@@ -54,11 +60,37 @@ class PinnedTripsManager {
       };
       this.pinnedItems.push(newItem);
       this.save();
-      this.showToast(`Καρφιτσώθηκε η γραμμή ${lineId} (${newItem.stopName})`);
+      this.showToast(`📌 Ζωντανή παρακολούθηση: ${lineId} (${newItem.stopName})`);
       if (window.Alarms) {
         window.Alarms.playTone(659.25, 0.12);
         setTimeout(() => window.Alarms.playTone(880, 0.15), 100);
       }
+
+      // Start Android Live Tracking Notification immediately for this pinned bus
+      if (window.AndroidBridge && typeof window.AndroidBridge.startLiveTracking === 'function') {
+        try {
+          const busMins = (arrival && typeof arrival.btime2 === 'number') ? arrival.btime2 : 10;
+          let walkMins = 0;
+          if (stopInfo.distanceMeters) {
+            walkMins = Math.ceil(stopInfo.distanceMeters / 80) + 2;
+          }
+          window.AndroidBridge.startLiveTracking(
+            String(stopCode),
+            String(lineId),
+            String(routeCode || ''),
+            String(newItem.stopName),
+            String(arrival.destination || arrival.route_descr || ''),
+            Number(walkMins),
+            0, // threshold 0 = quiet live tracking, no audible siren alarm!
+            false, // ringUntilDismissed = false
+            Number(busMins)
+          );
+        } catch (e) {
+          console.warn('AndroidBridge startLiveTracking error:', e);
+        }
+      }
+
+      this.updateLiveAndroidNotification();
     }
 
     // Refresh departures board if open so pin button state updates
@@ -82,6 +114,9 @@ class PinnedTripsManager {
     if (confirm('Θέλετε να αφαιρέσετε όλες τις καρφιτσωμένες αφίξεις;')) {
       this.pinnedItems = [];
       this.save();
+      if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
+        try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
+      }
       this.updateLiveAndroidNotification();
       if (window.App && window.App.ticker) {
         window.App.ticker.render();

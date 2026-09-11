@@ -185,8 +185,8 @@ class TimetableManager {
               ` : ''}
             </div>
           </div>
-          <span class="m3-badge" style="background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-primary); font-size: 0.72rem; font-weight: 700; flex-shrink: 0; margin-left: 0.5rem;">
-            Αφίξεις ➔
+          <span class="m3-badge" style="background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-primary); font-size: 0.9rem; font-weight: 800; flex-shrink: 0; margin-left: 0.5rem; padding: 3px 8px;" title="Προβολή Αφίξεων">
+            ➔
           </span>
         </div>
       `;
@@ -348,14 +348,33 @@ class TimetableManager {
       }
     }
 
-    if (allBounds.length > 0) {
+    if (window.App && window.App.userLocation) {
+      const uLat = window.App.userLocation.lat;
+      const uLng = window.App.userLocation.lng;
+      // Add user location marker on route map
+      const userIcon = L.divIcon({
+        className: 'route-user-loc',
+        html: `
+          <div style="position: relative; width: 18px; height: 18px;">
+            <div style="position: absolute; width: 18px; height: 18px; border-radius: 50%; background: rgba(0, 90, 193, 0.25); animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;"></div>
+            <div style="position: absolute; top: 3px; left: 3px; width: 12px; height: 12px; border-radius: 50%; background: #005ac1; border: 2px solid #ffffff; box-shadow: 0 1px 4px rgba(0,0,0,0.3);"></div>
+          </div>
+        `,
+        iconSize: [18, 18],
+        iconAnchor: [9, 9]
+      });
+      L.marker([uLat, uLng], { icon: userIcon, zIndexOffset: 1000 }).addTo(this.routeMap).bindPopup('<strong>Η Τοποθεσία μου</strong>');
+
+      // Center route map on user location with high zoom so it starts focused near user
+      this.routeMap.setView([uLat, uLng], 15);
+    } else if (allBounds.length > 0) {
       let combined = allBounds[0];
       for (let i = 1; i < allBounds.length; i++) {
         combined = combined.extend(allBounds[i]);
       }
       this.routeMap.fitBounds(combined, { padding: [30, 30] });
     } else {
-      this.routeMap.setView([37.9845, 23.7335], 13);
+      this.routeMap.setView([37.9845, 23.7335], 14);
     }
   }
 
@@ -380,7 +399,10 @@ class TimetableManager {
       return;
     }
 
-    const { schedule_days, profiles, daily_schedule } = this.timetableData;
+    const timetableObj = this.timetableData || {};
+    const schedule_days = timetableObj.schedule_days;
+    const profiles = timetableObj.profiles || {};
+    const daily_schedule = timetableObj.daily_schedule || (timetableObj.go || timetableObj.come ? timetableObj : {});
     const days = schedule_days && schedule_days.length > 0 ? schedule_days : [
       { sdc_code: 'daily', sdc_descr: 'ΚΑΘΗΜΕΡΙΝΗ' },
       { sdc_code: 'sat', sdc_descr: 'ΣΑΒΒΑΤΟ' },
@@ -391,8 +413,8 @@ class TimetableManager {
     const profile = profiles && profiles[currentDay.sdc_code];
     const activeSchedule = (profile && profile.data) || daily_schedule || { go: [], come: [] };
 
-    const goTrips = activeSchedule.go || [];
-    const comeTrips = activeSchedule.come || [];
+    const goTrips = activeSchedule.go || activeSchedule.go_trips || [];
+    const comeTrips = activeSchedule.come || activeSchedule.come_trips || [];
 
     // Current Athens time in minutes
     const now = new Date();
@@ -446,8 +468,8 @@ class TimetableManager {
 
     if (isMapMode) {
       mainContentHtml = `
-        <div style="background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 16px; padding: 1rem; margin-top: 0.5rem;">
-          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem;">
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 0.5rem; margin-top: 0.5rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem; padding: 0 0.25rem;">
             <div style="font-weight: 800; font-size: 0.95rem; color: #005ac1; display: flex; align-items: center; gap: 6px;">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon><line x1="8" y1="2" x2="8" y2="18"></line><line x1="16" y1="6" x2="16" y2="22"></line></svg>
               Χάρτης Διαδρομής
@@ -460,7 +482,7 @@ class TimetableManager {
               </div>
             ` : ''}
           </div>
-          <div id="line-route-map" style="height: 440px; width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid #cbd5e1; background: #e2e8f0;"></div>
+          <div id="line-route-map" style="height: 60vh; min-height: 380px; width: 100%; border-radius: 12px; overflow: hidden; border: 1px solid #cbd5e1; background: #e2e8f0;"></div>
           <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 0.6rem; font-size: 0.75rem; color: #64748b; flex-wrap: wrap; gap: 0.5rem;">
             <div style="display: flex; align-items: center; gap: 12px;">
               <span style="display: inline-flex; align-items: center; gap: 4px;">
