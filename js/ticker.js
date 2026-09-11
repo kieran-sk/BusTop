@@ -321,23 +321,18 @@ class AirportTicker {
 
         return (a.distanceMeters || 0) - (b.distanceMeters || 0);
       });
-      const stops = rawStops;
-      const displayStops = this.showAllStops ? stops : stops.slice(0, 20);
+      const stops = rawStops.slice(0, 20);
+      const displayStops = stops;
       
       let stopsContent = '';
       if (stops.length > 0) {
         stopsContent = `
           <div style="margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; padding: 0 0.25rem;">
             <div>
-              <h2 style="font-size: 1.15rem; font-weight: 900; color: #0f172a; margin: 0;">📍 Κοντινές Στάσεις (${this.showAllStops ? stops.length : Math.min(20, stops.length)} από ${stops.length})</h2>
+              <h2 style="font-size: 1.15rem; font-weight: 900; color: #0f172a; margin: 0;">📍 Κοντινές Στάσεις (${displayStops.length})</h2>
               <div style="font-size: 0.78rem; color: #64748b; margin-top: 2px;">Επιλέξτε στάση για να δείτε ζωντανές αφίξεις και διερχόμενες γραμμές</div>
             </div>
             <div style="display: flex; align-items: center; gap: 0.5rem;">
-              ${stops.length > 20 ? `
-                <button class="m3-btn m3-btn-tonal" style="font-size: 0.75rem; padding: 0.35rem 0.75rem; border-radius: 9999px; cursor: pointer;" onclick="window.App.ticker.toggleShowAllStops()">
-                  ${this.showAllStops ? 'Προβολή 20 στάσεων' : `Προβολή όλων (${stops.length})`}
-                </button>
-              ` : ''}
               <button class="m3-btn m3-btn-tonal" style="font-size: 0.78rem; padding: 0.35rem 0.75rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;" onclick="window.Search.findNearbyStops()">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
                 Ανανέωση

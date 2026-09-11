@@ -318,10 +318,14 @@ class SearchManager {
 
       // If no routes are routed through them, show them at the bottom
       if (aHas && !bHas) return -1;
-      if (!aHas && bHas) return 1;
-
+      // Sort primarily by walking distance
       return (a.distanceMeters || 0) - (b.distanceMeters || 0);
     });
+
+    // Strictly limit to 20 nearest stops
+    if (this.nearbyStops.length > 20) {
+      this.nearbyStops = this.nearbyStops.slice(0, 20);
+    }
   }
 
   toggleShowAllNearby() {
@@ -371,18 +375,13 @@ class SearchManager {
       return;
     }
 
-    const displayStops = this.showAllNearby ? this.nearbyStops : this.nearbyStops.slice(0, 20);
+    const displayStops = this.nearbyStops.slice(0, 20);
 
     container.innerHTML = `
       <div style="display: flex; align-items: center; justify-content: space-between; margin: 0.5rem 0 0.75rem;">
         <div style="font-size: 0.85rem; font-weight: 800; color: var(--md-sys-color-primary); text-transform: uppercase; letter-spacing: 0.05em;">
-          Στάσεις Κοντά Σας (${this.showAllNearby ? this.nearbyStops.length : Math.min(20, this.nearbyStops.length)} από ${this.nearbyStops.length})
+          Στάσεις Κοντά Σας (${displayStops.length})
         </div>
-        ${this.nearbyStops.length > 20 ? `
-          <button class="m3-btn m3-btn-tonal" style="font-size: 0.75rem; padding: 0.25rem 0.65rem; border-radius: 9999px; cursor: pointer;" onclick="window.Search.toggleShowAllNearby()">
-            ${this.showAllNearby ? 'Προβολή 20 στάσεων' : `Προβολή όλων (${this.nearbyStops.length})`}
-          </button>
-        ` : ''}
       </div>
       <div style="display: grid; gap: 0.6rem;">
         ${displayStops.map(s => {
