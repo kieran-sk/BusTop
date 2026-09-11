@@ -61,17 +61,19 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug -PbuildNumber=${{ github.run_number }} --stacktrace
           
-          # Ensure file is explicitly named with version
+          # Move and ensure file is named bustop-v1.0.<version>.apk
           cd app/build/outputs/apk/debug
           APK_FILE=$(ls *.apk | head -n 1)
-          cp "$APK_FILE" "BusTop-v1.0.${{ github.run_number }}.apk"
-          echo "Built APK: BusTop-v1.0.${{ github.run_number }}.apk"
+          if [ "$APK_FILE" != "bustop-v1.0.${{ github.run_number }}.apk" ]; then
+            mv "$APK_FILE" "bustop-v1.0.${{ github.run_number }}.apk"
+          fi
+          echo "Built APK: bustop-v1.0.${{ github.run_number }}.apk"
 
       - name: Upload APK to Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: BusTop-v1.0.${{ github.run_number }}-APK
-          path: android/app/build/outputs/apk/debug/BusTop-v1.0.${{ github.run_number }}.apk
+          name: bustop-v1.0.${{ github.run_number }}-APK
+          path: android/app/build/outputs/apk/debug/bustop-v1.0.${{ github.run_number }}.apk
 
       - name: Release APK on GitHub
         uses: softprops/action-gh-release@v2
@@ -79,6 +81,6 @@ jobs:
           tag_name: v1.0.${{ github.run_number }}
           name: BusTop Android v1.0.${{ github.run_number }}
           body_path: release_body.md
-          files: android/app/build/outputs/apk/debug/BusTop-v1.0.${{ github.run_number }}.apk
+          files: android/app/build/outputs/apk/debug/bustop-v1.0.${{ github.run_number }}.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
