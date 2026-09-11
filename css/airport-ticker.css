@@ -192,7 +192,7 @@
   50% { opacity: 0.85; transform: scale(1.04); }
 }
 
-/* Live Header Clock */
+/* Live Header Clock & Compact Version */
 .ticker-clock {
   display: inline-flex;
   align-items: center;
@@ -201,6 +201,29 @@
   border-radius: 6px;
   border: 1px solid #cbd5e1;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.ticker-clock.ticker-clock-compact {
+  padding: 2px 6px;
+  height: 28px;
+  background: #ffffff;
+  border-radius: 9999px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  box-shadow: none;
+}
+
+.ticker-clock-compact .flap-digit-box {
+  min-width: 12px;
+  height: 18px;
+  line-height: 18px;
+  font-size: 0.75rem;
+  margin: 0 1px;
+}
+
+.ticker-clock-compact .flap-separator {
+  font-size: 0.8rem;
+  line-height: 18px;
+  margin: 0 1px;
 }
 
 /* Ticker Line Filter Bar (Show/Hide routes) */
@@ -275,51 +298,104 @@
   padding: 2px 6px;
 }
 
-/* Table Column Headers */
-.ticker-col-headers {
-  display: grid;
-  grid-template-columns: 56px 1fr 125px 95px 40px 40px;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.72rem;
-  font-weight: 800;
-  color: #64748b;
-  border-bottom: 1.5px dashed var(--md-sys-color-outline-variant);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  align-items: center;
-}
-
-.ticker-col-headers > div {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Rows */
+/* Ticker Rows - Modern Cards with Top and Bottom sections */
 .ticker-row {
-  display: grid;
-  grid-template-columns: 56px 1fr 125px 95px 40px 40px;
-  gap: 0.5rem;
-  align-items: center;
-  padding: 0.65rem 0.75rem;
-  border-bottom: 1px solid var(--md-sys-color-outline-variant);
-  transition: background 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+  margin-bottom: 0.55rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
   font-size: 0.95rem;
   cursor: pointer;
 }
 
-.ticker-row > div {
+.ticker-row:hover {
+  border-color: var(--md-sys-color-primary);
+  box-shadow: 0 3px 10px rgba(0, 90, 193, 0.08);
+}
+
+.ticker-row-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  width: 100%;
+}
+
+.ticker-dest-info {
+  flex: 1;
   min-width: 0;
 }
 
-.ticker-row:hover {
-  background: rgba(0, 90, 193, 0.04);
+.ticker-dest-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
-/* Desktop actions wrapper is transparent to grid */
+.ticker-dest-name {
+  color: #0f172a;
+  font-weight: 800;
+  font-size: 0.95rem;
+  line-height: 1.25;
+}
+
+.ticker-dir-badge {
+  background: #e0f2fe;
+  color: #005ac1;
+  font-weight: 800;
+  font-size: 0.68rem;
+  padding: 1px 6px;
+  border-radius: 9999px;
+}
+
+.ticker-dest-sub {
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ticker-row-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px dashed #e2e8f0;
+}
+
+.ticker-cell-due {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.ticker-cell-commute {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 .ticker-cell-actions {
-  display: contents;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.ticker-cell-alarm,
+.ticker-cell-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 @media (max-width: 640px) {
@@ -347,68 +423,14 @@
     border-radius: 8px;
   }
 
-  .ticker-col-headers {
-    display: none;
-  }
-
   .ticker-row {
-    display: grid;
-    grid-template-columns: auto 1fr auto;
-    grid-template-areas:
-      "line dest due"
-      "commute commute actions";
-    gap: 0.45rem 0.5rem;
-    padding: 0.65rem 0.35rem;
-    align-items: center;
-    border-bottom: 1px solid rgba(203, 213, 225, 0.6);
-    background: #ffffff;
-    border-radius: 12px;
-    margin-bottom: 0.4rem;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+    padding: 0.65rem 0.65rem;
+    margin-bottom: 0.45rem;
   }
 
-  .ticker-cell-line {
-    grid-area: line;
-    align-self: center;
-  }
-
-  .ticker-cell-dest {
-    grid-area: dest;
-    min-width: 0;
-    overflow: hidden;
-  }
-
-  .ticker-cell-due {
-    grid-area: due;
-    justify-self: end;
-  }
-
-  .ticker-cell-walk {
-    grid-area: walk;
-    display: flex;
-    align-items: center;
-  }
-
-  .ticker-cell-commute {
-    grid-area: commute;
-    display: flex;
-    align-items: center;
-  }
-
-  .ticker-cell-actions {
-    grid-area: actions;
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 8px;
-    justify-self: end;
-  }
-
-  .ticker-cell-alarm,
-  .ticker-cell-pin {
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  .ticker-row-bottom {
+    margin-top: 0.45rem;
+    padding-top: 0.45rem;
   }
 }
 

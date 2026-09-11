@@ -119,8 +119,8 @@
           </div>
         </div>
 
-        <!-- Direction Overview for Lines at this Stop -->
-        <div style="border-top: 1px solid var(--md-sys-color-outline-variant); padding-top: 0.55rem;">
+        <!-- Direction Overview for Lines at this Stop (Hidden per request) -->
+        <div style="display: none; border-top: 1px solid var(--md-sys-color-outline-variant); padding-top: 0.55rem;">
           <div style="font-weight: 800; margin-bottom: 0.35rem; color: var(--md-sys-color-primary); text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.05em;">
             Διερχομενες Γραμμες
           </div>
@@ -130,9 +130,9 @@
         </div>
       </div>
 
-      <!-- Arrival Display Options & Day Toggle -->
+      <!-- Arrival Display Options, Clock & Live/Scheduled Filters -->
       <div id="arrivals-options-bar" style="display: none; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; padding: 0 0.25rem;">
-        <div style="display: flex; align-items: center; gap: 0.5rem;">
+        <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
           <div style="display: flex; background: var(--md-sys-color-surface-container); padding: 3px; border-radius: 9999px; border: 1px solid var(--md-sys-color-outline-variant);">
             <button id="day-today-btn" class="m3-btn m3-btn-primary" style="padding: 0.25rem 0.65rem; font-size: 0.78rem; border-radius: 9999px;" onclick="window.App.setArrivalsDay('today')">
               Σήμερα
@@ -141,6 +141,23 @@
               Αύριο
             </button>
           </div>
+          <!-- Compact Live Clock next to day selector -->
+          <div class="ticker-clock ticker-clock-compact" id="ticker-live-clock" title="Τρέχουσα ώρα Αθήνας">
+            --:--:--
+          </div>
+        </div>
+
+        <!-- Filter for All / Live / Scheduled Buses -->
+        <div style="display: flex; background: var(--md-sys-color-surface-container); padding: 3px; border-radius: 9999px; border: 1px solid var(--md-sys-color-outline-variant);">
+          <button id="filter-all-btn" class="m3-btn m3-btn-primary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 9999px;" onclick="window.Ticker.setModeFilter('all')">
+            Όλα
+          </button>
+          <button id="filter-live-btn" class="m3-btn m3-btn-tonal" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 9999px;" onclick="window.Ticker.setModeFilter('live')">
+            ⚡ Ζωντανά
+          </button>
+          <button id="filter-sched-btn" class="m3-btn m3-btn-tonal" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 9999px;" onclick="window.Ticker.setModeFilter('scheduled')">
+            🕒 Προγρ.
+          </button>
         </div>
       </div>
 

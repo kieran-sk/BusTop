@@ -15,7 +15,21 @@ class AirportTicker {
     this.previousDigitsMap = new Map();
     this.hiddenLines = new Set();
     this.showAllStops = false;
+    this.modeFilter = 'all'; // 'all', 'live', 'scheduled'
     window.Ticker = this;
+  }
+
+  setModeFilter(mode) {
+    this.modeFilter = mode;
+    const allBtn = document.getElementById('filter-all-btn');
+    const liveBtn = document.getElementById('filter-live-btn');
+    const schedBtn = document.getElementById('filter-sched-btn');
+    if (allBtn && liveBtn && schedBtn) {
+      allBtn.className = mode === 'all' ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-tonal';
+      liveBtn.className = mode === 'live' ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-tonal';
+      schedBtn.className = mode === 'scheduled' ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-tonal';
+    }
+    this.render();
   }
 
   setUserLocation(lat, lng) {
@@ -37,7 +51,6 @@ class AirportTicker {
             <span class="m3-pulse-dot" style="background: var(--md-sys-color-primary);"></span>
             ${stopName.toUpperCase()} • ΑΦΙΞΕΙΣ
           </div>
-          <div class="ticker-clock" id="ticker-live-clock">--:--:--</div>
         </div>
         <div style="padding: 3rem 1rem; text-align: center;">
           <div class="m3-pulse-dot" style="width: 14px; height: 14px; margin: 0 auto 0.75rem; background: var(--md-sys-color-primary);"></div>
@@ -183,7 +196,7 @@ class AirportTicker {
     const lineDescr = arr.route_descr || arr.line_descr || 'Διαδρομή Λεωφορείου';
     const safeDescr = lineDescr.replace(/'/g, "\\'");
 
-    // Due time display: Separate split-flap digit tiles with urgency styling (colors preserved)
+    // Due time display: Separate split-flap digit tiles with urgency styling
     let dueDisplay = '';
     let urgencyClass = '';
     const fieldKey = `arr_${arr.line_id}_${arr.route_code}_${arrIdx}`;
@@ -206,7 +219,6 @@ class AirportTicker {
       dueDisplay = this.renderSplitFlapDigits(fieldKey, timeText, urgencyClass);
     } else {
       urgencyClass = 'urgency-scheduled';
-      // If arrival has estimated arrival clock or departure time, display it; otherwise format btime2
       const clockTime = arr.estimated_arrival_time || arr.departure_time;
       if (clockTime) {
         dueDisplay = this.renderSplitFlapDigits(fieldKey, clockTime, urgencyClass);
@@ -228,69 +240,64 @@ class AirportTicker {
 
     return `
       <div class="ticker-row" onclick="window.App.openLineTimetableBothDirections('${arr.line_code}', '${arr.line_id}', '${safeDescr}')" title="Κλικ για προβολή πλήρους δρομολογίου και στάσεων">
-        <!-- 1. Line Badge -->
-        <div class="ticker-cell-line">
-          <span class="ticker-line-badge">
-            ${arr.line_id}
-          </span>
-        </div>
-
-        <!-- 2. Destination & Direction on Line 1, Live Status & Latency on Line 2 -->
-        <div class="ticker-cell-dest ticker-dest">
-          <!-- Line 1: Destination & Direction Badge -->
-          <div class="ticker-dest-title" style="display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap;">
-            <span style="color: #0f172a; font-weight: 900; font-size: 0.95rem;">${arr.destination || lineDescr}</span>
-            <span class="m3-badge" style="background: #e0f2fe; color: #005ac1; font-weight: 800; font-size: 0.68rem; padding: 1px 6px;">${directionText}</span>
+        <!-- Top Section: Line Badge, Destination, Direction & Live/Scheduled Status (No colored chip) -->
+        <div class="ticker-row-top">
+          <div class="ticker-cell-line">
+            <span class="ticker-line-badge">
+              ${arr.line_id}
+            </span>
           </div>
-          <!-- Line 2: Dedicated Live Status (GPS and last ping report) -->
-          <div class="ticker-dest-sub" style="margin-top: 3px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-            ${isLive ? `
-              <span class="m3-badge m3-badge-live" style="font-size: 0.66rem; padding: 1px 6px; font-weight: 800;">
-                <span class="m3-pulse-dot" style="width: 5px; height: 5px;"></span>
-                Ζωντανό GPS
-              </span>
-              ${reportAgo ? `<span class="ticker-contact-ping" style="font-size: 0.72rem; color: #059669; font-weight: 600;">(Στίγμα: ${reportAgo})</span>` : ''}
-              ${arr.veh_code ? `<span style="font-size: 0.7rem; color: #64748b;">#${arr.veh_code}</span>` : ''}
-            ` : `
-              <span class="m3-badge m3-badge-scheduled" style="font-size: 0.66rem; padding: 1px 6px; font-weight: 700;">
-                🕒 Προγραμματισμένο
-              </span>
-              ${arr.departure_time ? `<span style="font-size: 0.72rem; color: #64748b;">(Αναχ. ${arr.departure_time})</span>` : ''}
-            `}
-            ${lineDescr && arr.destination && lineDescr !== arr.destination ? `<span style="font-size: 0.7rem; color: #94a3b8;">• ${lineDescr}</span>` : ''}
+          <div class="ticker-dest-info">
+            <div class="ticker-dest-title-row">
+              <span class="ticker-dest-name">${arr.destination || lineDescr}</span>
+              <span class="m3-badge ticker-dir-badge">${directionText}</span>
+            </div>
+            <div class="ticker-dest-sub">
+              ${isLive ? `
+                <span style="color: #059669; font-weight: 700; font-size: 0.74rem; display: inline-flex; align-items: center; gap: 4px;">
+                  <span class="m3-pulse-dot" style="width: 5px; height: 5px; background: #059669;"></span>
+                  Ζωντανό GPS${reportAgo ? ` (πριν ${reportAgo})` : ''}${arr.veh_code ? ` • #${arr.veh_code}` : ''}
+                </span>
+              ` : `
+                <span style="color: #64748b; font-weight: 600; font-size: 0.74rem;">
+                  🕒 Προγραμματισμένο${arr.departure_time ? ` (Αναχώρηση ${arr.departure_time})` : ''}
+                </span>
+              `}
+              ${lineDescr && arr.destination && lineDescr !== arr.destination ? `<span style="font-size: 0.7rem; color: #94a3b8;">• ${lineDescr}</span>` : ''}
+            </div>
           </div>
         </div>
 
-        <!-- 3. Due Time with Split-Flap (Arrival Countdown / Due Time) -->
-        <div class="ticker-cell-due ticker-due" title="Εκτιμώμενος χρόνος άφιξης λεωφορείου στη στάση">
-          ${dueDisplay}
-        </div>
-
-        <!-- 4. Commute Difference / Margin Column -->
-        <div class="ticker-cell-commute" title="${advice.tooltip || 'Χρονικό περιθώριο αναχώρησης'}">
-          <span class="ticker-commute-badge ${advice.className}">
-            ${advice.displayLabel || advice.label}
-          </span>
-        </div>
-
-        <!-- 5. Dedicated Alarm & Pin Actions (Grouped so buttons never shift across rows) -->
-        <div class="ticker-cell-actions">
-          <div class="ticker-cell-alarm">
-            <button class="ticker-alarm-btn ${isAlarmSet ? 'active' : ''}" title="${isAlarmSet ? 'Ειδοποίηση ενεργή' : 'Ρύθμιση ειδοποίησης άφιξης'}" onclick="event.stopPropagation(); const notifDest = '${(arr.destination || safeDescr).replace(/'/g, "\\'")}'; window.App.openAlarmDialog('${arr.line_id}', '${arr.route_code}', ${busMins}, notifDest)">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="${isAlarmSet ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-              </svg>
-            </button>
+        <!-- Bottom Section: Arrival Time, Commute Difference, Alarm and Pin -->
+        <div class="ticker-row-bottom">
+          <div class="ticker-cell-due" title="Εκτιμώμενος χρόνος άφιξης στη στάση">
+            ${dueDisplay}
           </div>
 
-          <div class="ticker-cell-pin">
-            <button class="ticker-pin-btn ${isPinned ? 'active' : ''}" title="${isPinned ? 'Καρφιτσωμένο (κλικ για αφαίρεση)' : 'Καρφίτσωμα άφιξης στις Καρφίτσες'}" onclick="event.stopPropagation(); window.PinnedTrips.togglePin(${JSON.stringify(arr).replace(/"/g, '&quot;')}, window.App.currentStop)">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="${isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="17" x2="12" y2="22"></line>
-                <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
-              </svg>
-            </button>
+          <div class="ticker-cell-commute" title="${advice.tooltip || 'Χρονικό περιθώριο αναχώρησης'}">
+            <span class="ticker-commute-badge ${advice.className}">
+              ${advice.displayLabel || advice.label}
+            </span>
+          </div>
+
+          <div class="ticker-cell-actions">
+            <div class="ticker-cell-alarm">
+              <button class="ticker-alarm-btn ${isAlarmSet ? 'active' : ''}" title="${isAlarmSet ? 'Ειδοποίηση ενεργή' : 'Ρύθμιση ειδοποίησης άφιξης'}" onclick="event.stopPropagation(); const notifDest = '${(arr.destination || safeDescr).replace(/'/g, "\\'")}'; window.App.openAlarmDialog('${arr.line_id}', '${arr.route_code}', ${busMins}, notifDest)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="${isAlarmSet ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                </svg>
+              </button>
+            </div>
+
+            <div class="ticker-cell-pin">
+              <button class="ticker-pin-btn ${isPinned ? 'active' : ''}" title="${isPinned ? 'Καρφιτσωμένο (κλικ για αφαίρεση)' : 'Καρφίτσωμα άφιξης στις Καρφίτσες'}" onclick="event.stopPropagation(); window.PinnedTrips.togglePin(${JSON.stringify(arr).replace(/"/g, '&quot;')}, window.App.currentStop)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="${isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="17" x2="12" y2="22"></line>
+                  <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -352,7 +359,7 @@ class AirportTicker {
               const sStreet = s.StopStreet || '';
               const walk = this.getWalkMinutes(s.StopLat, s.StopLng);
               const distText = s.Distance ? `${Math.round(s.Distance)}m` : (walk ? `${walk.meters}m` : '');
-              const walkText = walk ? `~${walk.minutes}λ περπάτημα` : '';
+              const walkText = walk ? `~${walk.minutes}λ` : '';
               
               const hasRoutes = Array.isArray(s.serving_lines) && s.serving_lines.length > 0;
               let linesPills = '';
@@ -445,13 +452,34 @@ class AirportTicker {
 
     // Extract unique line IDs for interactive show/hide filtering
     const uniqueLines = Array.from(new Set(this.arrivals.map(a => String(a.line_id || '').trim()).filter(Boolean)));
-    const visibleArrivals = this.arrivals.filter(a => !this.hiddenLines.has(String(a.line_id || '').trim()));
+    
+    // Filter arrivals by line visibility
+    let visibleArrivals = this.arrivals.filter(a => !this.hiddenLines.has(String(a.line_id || '').trim()));
+    
+    // Filter arrivals by live vs scheduled mode
+    if (this.modeFilter === 'live') {
+      visibleArrivals = visibleArrivals.filter(a => a.is_live);
+    } else if (this.modeFilter === 'scheduled') {
+      visibleArrivals = visibleArrivals.filter(a => !a.is_live);
+    }
 
     let rowsHtml = '';
     if (this.arrivals.length === 0) {
       rowsHtml = `
         <div style="padding: 2.5rem 1rem; text-align: center; color: #64748b; font-size: 0.9rem;">
           Δεν βρέθηκαν προγραμματισμένες αφίξεις για αυτή τη στάση.
+        </div>
+      `;
+    } else if (this.modeFilter === 'live' && visibleArrivals.length === 0) {
+      rowsHtml = `
+        <div style="padding: 2.5rem 1rem; text-align: center; color: #64748b; font-size: 0.9rem;">
+          ⚡ Δεν υπάρχουν ζωντανές αφίξεις με ενεργό GPS αυτή τη στιγμή.
+        </div>
+      `;
+    } else if (this.modeFilter === 'scheduled' && visibleArrivals.length === 0) {
+      rowsHtml = `
+        <div style="padding: 2.5rem 1rem; text-align: center; color: #64748b; font-size: 0.9rem;">
+          🕒 Δεν υπάρχουν προγραμματισμένες αφίξεις για την επιλεγμένη ημέρα.
         </div>
       `;
     } else if (visibleArrivals.length === 0) {
@@ -466,7 +494,7 @@ class AirportTicker {
         </div>
       `;
     } else {
-      // Clean, ungrouped chronological arrival rows
+      // Clean, ungrouped chronological arrival rows as modern cards
       rowsHtml = visibleArrivals.map((arr, arrIdx) => this.renderArrivalRow(arr, arrIdx, walk)).join('');
     }
 
@@ -509,25 +537,10 @@ class AirportTicker {
               <span class="m3-pulse-dot" style="background: var(--md-sys-color-primary);"></span>
               ${stopName.toUpperCase()} • ΑΦΙΞΕΙΣ
             </div>
-            ${walk ? `
-              <span class="m3-badge" style="background: #e0f2fe; color: #005ac1; font-weight: 800; font-size: 0.72rem; padding: 2px 8px; border: 1px solid #bae6fd;">
-                🚶 ${walk.minutes}λ περπάτημα (${walk.meters}μ)
-              </span>
-            ` : ''}
           </div>
-          <div class="ticker-clock" id="ticker-live-clock">--:--:--</div>
         </div>
 
         ${filterBarHtml}
-
-        <div class="ticker-col-headers">
-          <div>ΓΡΑΜΜΗ</div>
-          <div>ΠΡΟΟΡΙΣΜΟΣ &amp; ΚΑΤΕΥΘΥΝΣΗ</div>
-          <div title="Χρόνος άφιξης λεωφορείου στη στάση">ΑΦΙΞΗ</div>
-          <div title="Χρονικό περιθώριο αναχώρησης">ΔΙΑΦΟΡΑ</div>
-          <div style="text-align: center;" title="Ειδοποίηση / Ξυπνητήρι">ΕΙΔ/ΣΗ</div>
-          <div style="text-align: center;" title="Καρφίτσωμα άφιξης">📌</div>
-        </div>
 
         <div class="ticker-rows">
           ${rowsHtml}

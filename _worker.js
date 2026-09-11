@@ -88,28 +88,36 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
   const athensNow = getAthensCurrentTime();
   const currentMinutes = athensNow.totalMinutes;
   const isTomorrow = targetDay === 'tomorrow';
-  const [liveArrivalsRaw, stopRoutesRaw] = await Promise.all([
+  const [liveArrivalsRaw, stopRoutesFetchRaw] = await Promise.all([
     isTomorrow ? Promise.resolve([]) : oasaRequest('getStopArrivals', { p1: stopCode }, 10).catch(() => []),
     oasaRequest('webRoutesForStop', { p1: stopCode }, 1800).catch(() => [])
   ]);
   const liveArrivals = Array.isArray(liveArrivalsRaw) ? liveArrivalsRaw : [];
-  const stopRoutes = Array.isArray(stopRoutesRaw) ? stopRoutesRaw : [];
+  const stopRoutesRaw = Array.isArray(stopRoutesFetchRaw) ? stopRoutesFetchRaw : [];
+  const routeCodeMap = new Map();
+  for (const r of stopRoutesRaw) {
+    if (!routeCodeMap.has(String(r.RouteCode))) routeCodeMap.set(String(r.RouteCode), r);
+  }
+  const stopRoutes = Array.from(routeCodeMap.values());
   const routesByCode = new Map();
   for (const r of stopRoutes) routesByCode.set(String(r.RouteCode), r);
   const results = [];
   const routesWithLive = new Set();
+  const linesWithLive = new Set();
   if (!isTomorrow) {
     for (const arr of liveArrivals) {
       const rc = String(arr.route_code);
       routesWithLive.add(rc);
       const route = routesByCode.get(rc) || {};
+      const lid = route.LineID || arr.line_id || 'BUS';
+      if (lid) linesWithLive.add(String(lid).trim());
       const btime2 = parseInt(arr.btime2, 10);
       const arrMin = currentMinutes + btime2;
       const estTime = String(Math.floor(arrMin / 60) % 24).padStart(2, '0') + ':' + String(Math.round(arrMin % 60)).padStart(2, '0');
       results.push({
         route_code: rc,
         line_code: route.LineCode || null,
-        line_id: route.LineID || arr.line_id || 'BUS',
+        line_id: lid,
         line_descr: route.LineDescr || route.RouteDescr || 'Λεωφορείο ΟΑΣΑ',
         route_descr: route.RouteDescr || '',
         destination: cleanRouteDestination(route),
@@ -123,10 +131,24 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
       });
     }
   }
-  const candidateRoutes = stopRoutes.filter(r => !routesWithLive.has(String(r.RouteCode))).slice(0, 15);
+
+  // Group candidate routes by line_id so every line is represented
+  const lineRoutesMap = new Map();
+  for (const r of stopRoutes) {
+    const lid = String(r.LineID || 'BUS').trim();
+    if (!lineRoutesMap.has(lid)) lineRoutesMap.set(lid, []);
+    lineRoutesMap.get(lid).push(r);
+  }
+  const candidateRoutes = [];
+  for (const [lid, routes] of lineRoutesMap.entries()) {
+    const primary = routes.find(r => !((r.RouteDescr || '').startsWith('***')));
+    candidateRoutes.push(primary || routes[0]);
+  }
+
   await Promise.all(candidateRoutes.map(async (route) => {
     const lineCode = route.LineCode;
     const rc = String(route.RouteCode);
+    const lineId = route.LineID || 'BUS';
     if (!lineCode) return;
     try {
       const sched = await oasaRequest('getDailySchedule', { line_code: lineCode }, 600);
@@ -150,31 +172,46 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
         const arrMin = depM + transit;
         const rem = isTomorrow ? Math.round((1440 - currentMinutes) + arrMin) : Math.round(arrMin - currentMinutes);
         if (isTomorrow || (rem >= 1 && rem <= 1440)) {
-          const depFormatted = String(Math.floor(depM / 60) % 24).padStart(2, '0') + ':' + String(depM % 60).padStart(2, '0');
-          const estFormatted = String(Math.floor(arrMin / 60) % 24).padStart(2, '0') + ':' + String(Math.round(arrMin % 60)).padStart(2, '0');
-          results.push({
-            route_code: rc,
-            line_code: lineCode,
-            line_id: route.LineID || 'BUS',
-            line_descr: route.LineDescr || route.RouteDescr || 'Λεωφορείο ΟΑΣΑ',
-            route_descr: route.RouteDescr || '',
-            direction: /κυκλικη|circular/i.test(route.LineDescr || '') ? 'Κυκλική' : (route.RouteType === '2' ? 'Επιστροφή' : 'Μετάβαση'),
-            veh_code: null,
-            btime2: rem,
-            estimated_arrival_time: estFormatted,
-            is_live: false,
-            departure_time: depFormatted,
-            destination: cleanRouteDestination(route),
-            departure_terminal: cleanRouteDestination(route),
-            status_label: 'Προγραμματισμένη (' + depFormatted + ')',
-            source: 'timetable_estimate'
-          });
+          const alreadyHasLive = !isTomorrow && results.some(
+            r => r.line_id === lineId && r.is_live && Math.abs(r.btime2 - rem) <= 7
+          );
+          if (!alreadyHasLive) {
+            const depFormatted = String(Math.floor(depM / 60) % 24).padStart(2, '0') + ':' + String(depM % 60).padStart(2, '0');
+            const estFormatted = String(Math.floor(arrMin / 60) % 24).padStart(2, '0') + ':' + String(Math.round(arrMin % 60)).padStart(2, '0');
+            results.push({
+              route_code: rc,
+              line_code: lineCode,
+              line_id: lineId,
+              line_descr: route.LineDescr || route.RouteDescr || 'Λεωφορείο ΟΑΣΑ',
+              route_descr: route.RouteDescr || '',
+              direction: /κυκλικη|circular/i.test(route.LineDescr || '') ? 'Κυκλική' : (route.RouteType === '2' ? 'Επιστροφή' : 'Μετάβαση'),
+              veh_code: null,
+              btime2: rem,
+              estimated_arrival_time: estFormatted,
+              is_live: false,
+              departure_time: depFormatted,
+              destination: cleanRouteDestination(route),
+              departure_terminal: cleanRouteDestination(route),
+              status_label: 'Προγραμματισμένη (' + depFormatted + ')',
+              source: 'timetable_estimate'
+            });
+          }
         }
       }
     } catch(e) {}
   }));
-  results.sort((a, b) => a.btime2 - b.btime2);
-  return { stop_code: stopCode, athens_time: athensNow.formatted, target_day: targetDay, total_arrivals: results.length, arrivals: results };
+
+  // Deduplicate exact line departures
+  const deduplicatedMap = new Map();
+  for (const a of results) {
+    const key = a.is_live
+      ? `${a.line_id}_live_${a.veh_code || a.route_code}_${a.btime2}`
+      : `${a.line_id}_sched_${a.departure_time}`;
+    if (!deduplicatedMap.has(key)) deduplicatedMap.set(key, a);
+  }
+  const finalResults = Array.from(deduplicatedMap.values());
+  finalResults.sort((a, b) => a.btime2 - b.btime2);
+  return { stop_code: stopCode, athens_time: athensNow.formatted, target_day: targetDay, total_arrivals: finalResults.length, arrivals: finalResults };
 }
 
 const jsonRes = (data, status = 200) => new Response(JSON.stringify(data), {

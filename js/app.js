@@ -402,7 +402,7 @@ class AppController {
         }
         if (walkInfo && typeof walkInfo.minutes === 'number') {
           walkPill.style.display = 'inline-flex';
-          walkPill.innerText = `🚶 ${walkInfo.minutes}λ περπάτημα (${walkInfo.meters}μ)`;
+          walkPill.innerText = `🚶 ${walkInfo.minutes}λ (${walkInfo.meters}μ)`;
         } else {
           walkPill.style.display = 'none';
         }
