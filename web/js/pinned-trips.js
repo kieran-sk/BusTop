@@ -365,67 +365,40 @@ class PinnedTripsManager {
         walkMins = Math.ceil(walkDistanceM / 75) + 2;
       }
 
-      if (matchingArr) {
-        const isLive = matchingArr.is_live;
-        const mins = matchingArr.btime2;
-        let dueText = '';
-        if (isLive) {
-          dueText = mins >= 60 ? this.formatMinutesHuman(mins) : `${String(mins).padStart(2, '0')}λ`;
-        } else if (matchingArr.estimated_arrival_time) {
-          dueText = matchingArr.estimated_arrival_time;
-        } else if (typeof mins === 'number') {
-          dueText = this.formatMinutesHuman(mins);
-        } else {
-          dueText = '--:--';
-        }
-
-        dueBadgeHtml = `
-          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
-            ${this.renderSplitFlapDigits(`pin_due_${item.id}`, dueText)}
-            <span style="font-size: 0.72rem; font-weight: 700; color: ${isLive ? '#008744' : '#64748b'};">
-              ${isLive ? 'Ζωντανό GPS' : 'Προγραμματισμένο'}
-            </span>
-          </div>
-        `;
-      } else {
-        dueBadgeHtml = `
-          <div style="font-size: 0.82rem; font-weight: 700; color: #64748b;">
-            Αναμονή...
-          </div>
-        `;
-      }
+      const isLive = matchingArr && matchingArr.is_live;
+      const isUrgent = (matchingArr && typeof matchingArr.btime2 === 'number' && matchingArr.btime2 <= 5);
+      const cleanStopName = (item.stopName || '').replace(/'/g, "\\'");
+      const cleanLineDescr = (item.lineDescr || '').replace(/'/g, "\\'");
+      const displayMinutes = (matchingArr && typeof matchingArr.btime2 === 'number') ? matchingArr.btime2 : null;
+      const formattedTime = displayMinutes !== null ? this.formatMinutesHuman(displayMinutes) : (matchingArr && matchingArr.estimated_arrival_time ? matchingArr.estimated_arrival_time : '--');
 
       return `
-        <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.75rem; padding: 1.1rem; background: var(--md-sys-color-surface-container); margin-bottom: 0.75rem; border: 1px solid var(--md-sys-color-outline-variant); border-left: 4px solid var(--md-sys-color-primary);">
-          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
-            <div style="display: flex; align-items: center; gap: 0.6rem;">
-              <span class="m3-badge" style="background: #0f172a; color: #ffffff; font-weight: 800; font-size: 0.72rem;">
-                Σκέλος ${idx + 1}
-              </span>
-              <span class="ticker-line-badge" style="font-size: 1rem;">
+        <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem; margin-bottom: 0.65rem; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-left: 4px solid ${isUrgent ? '#ea580c' : 'var(--md-sys-color-primary)'}; cursor: pointer;" onclick="window.App.switchTab('ticker'); window.App.selectStop('${item.stopCode}', '${cleanStopName}', ${item.stopLat || 'null'}, ${item.stopLng || 'null'});">
+          <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
+              <span class="ticker-line-badge" style="font-size: 1rem; min-width: 48px; flex-shrink: 0;">
                 ${item.lineId}
               </span>
-              <div style="font-weight: 800; font-size: 1.05rem; color: var(--md-sys-color-on-surface);">
-                ${item.stopName}
+              <div style="min-width: 0; flex: 1;">
+                <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: break-word;">${item.stopName}</div>
+                <div style="font-size: 0.76rem; color: var(--md-sys-color-outline); margin-top: 2px;">
+                  ${item.direction ? `<strong style="color: var(--md-sys-color-primary); margin-right: 4px;">${item.direction}</strong> • ` : ''}Στάση #${item.stopCode} • <span style="color: var(--md-sys-color-primary); text-decoration: underline;">Προβολή στάσης ➜</span>
+                </div>
               </div>
             </div>
-            ${dueBadgeHtml}
-          </div>
-
-          <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: var(--md-sys-color-outline); flex-wrap: wrap; gap: 0.5rem;">
-            <div>
-              <span style="font-weight: 700; color: var(--md-sys-color-on-surface);">${item.direction || 'Μετάβαση'}</span>
-              ${item.lineDescr ? ` • ${item.lineDescr}` : ''}
-            </div>
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
-              <span style="font-weight: 700; color: var(--md-sys-color-primary);">
-                🚶 ${walkMins} λεπτά (${walkDistanceM}μ.)
+            <div style="text-align: right; flex-shrink: 0;">
+              <span class="m3-badge" style="background: ${isLive ? '#dcfce7' : '#e0f2fe'}; color: ${isLive ? '#15803d' : '#005ac1'}; font-size: 0.72rem; font-weight: 800; padding: 2px 7px;">
+                ${isLive ? `⚡ ~${formattedTime}` : (displayMinutes !== null ? `🕒 ~${formattedTime}` : '⏳ Αναμονή')}
               </span>
-              <button class="m3-btn m3-btn-tonal" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;" onclick="window.App.selectStop('${item.stopCode}', '${item.stopName.replace(/'/g, "\\'")}', ${item.stopLat || 'null'}, ${item.stopLng || 'null'})">
-                Προβολή Στάσης
-              </button>
-              <button class="m3-icon-btn" title="Αφαίρεση καρφιτσώματος" style="width: 28px; height: 28px; color: var(--md-sys-color-error);" onclick="window.PinnedTrips.removePin('${item.id}')">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px dashed var(--md-sys-color-outline-variant); padding-top: 0.5rem; font-size: 0.8rem; color: var(--md-sys-color-outline);">
+            <div>
+              🚶 <strong style="color: var(--md-sys-color-on-surface);">${walkMins}λ</strong> (${walkDistanceM}μ. περπάτημα)
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="m3-btn m3-btn-tonal" onclick="event.stopPropagation(); window.PinnedTrips.removePin('${item.id}')" style="padding: 0.3rem 0.75rem; font-size: 0.78rem; border-radius: 9999px; color: var(--md-sys-color-error);">
+                Ξεκαρφίτσωμα
               </button>
             </div>
           </div>
@@ -434,24 +407,19 @@ class PinnedTripsManager {
     }).join('');
 
     container.innerHTML = `
-      <div class="m3-card" style="margin-bottom: 1.25rem; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1px solid var(--md-sys-color-outline-variant); padding-bottom: 0.75rem;">
-          <div>
-            <h2 style="font-size: 1.25rem; font-weight: 900; color: var(--md-sys-color-on-surface); margin: 0;">
-              Καρφιτσωμένες Αφίξεις
-            </h2>
-            <div style="font-size: 0.8rem; color: var(--md-sys-color-outline); margin-top: 2px;">
-              ${this.pinnedItems.length} καρφιτσωμένες γραμμές
-            </div>
-          </div>
-          <button class="m3-btn m3-btn-tonal" style="color: var(--md-sys-color-error); font-size: 0.8rem; padding: 0.4rem 0.8rem;" onclick="window.PinnedTrips.clearAll()">
-            Καθαρισμός
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.5rem;">
+        <div>
+          <h2 style="font-size: 1.25rem; font-weight: 800; margin: 0; color: #0f172a;">📌 Καρφιτσωμένες Αφίξεις</h2>
+          <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">${this.pinnedItems.length} καρφιτσωμένες γραμμές για γρήγορη παρακολούθηση</div>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+          <button class="m3-btn m3-btn-outlined" style="font-size: 0.75rem; padding: 3px 10px; border-radius: 9999px; color: var(--md-sys-color-error); border-color: #ef4444;" onclick="window.PinnedTrips.clearAll()">
+            🗑️ Καθαρισμός
           </button>
         </div>
-
-        <div style="display: flex; flex-direction: column;">
-          ${itemsHtml}
-        </div>
+      </div>
+      <div style="display: grid; gap: 0.65rem;">
+        ${itemsHtml}
       </div>
     `;
   }

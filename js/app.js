@@ -380,6 +380,11 @@ class AppController {
     if (banner) banner.style.display = 'none';
     const optBar = document.getElementById('arrivals-options-bar');
     if (optBar) optBar.style.display = 'none';
+
+    // Show search bar when viewing all stops / lines
+    const searchBar = document.querySelector('.m3-search-container');
+    if (searchBar) searchBar.style.display = '';
+
     if (this.ticker) {
       this.ticker.currentStop = null;
       this.ticker.render();
@@ -424,13 +429,16 @@ class AppController {
       sec.style.display = sec.id === `section-${tabId}` ? 'block' : 'none';
     });
 
-    // When switching to Arrivals tab, show all stops if no stop is explicitly selected
+    const searchBar = document.querySelector('.m3-search-container');
+
+    // When switching to Arrivals / Stops & Lines tab
     if (tabId === 'ticker') {
       const banner = document.getElementById('selected-stop-banner');
       const optBar = document.getElementById('arrivals-options-bar');
       if (!this.currentStop) {
         if (banner) banner.style.display = 'none';
         if (optBar) optBar.style.display = 'none';
+        if (searchBar) searchBar.style.display = '';
         if (this.ticker) this.ticker.render();
         if (window.Search && (!window.Search.nearbyStops || window.Search.nearbyStops.length === 0)) {
           window.Search.findNearbyStops(true);
@@ -438,7 +446,11 @@ class AppController {
       } else {
         if (banner) banner.style.display = 'flex';
         if (optBar) optBar.style.display = 'flex';
+        if (searchBar) searchBar.style.display = 'none';
       }
+    } else {
+      // In all other tabs, show search bar
+      if (searchBar) searchBar.style.display = '';
     }
 
     // Invalidate Leaflet Map size if on search / map tab

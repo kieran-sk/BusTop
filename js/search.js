@@ -455,7 +455,7 @@ class SearchManager {
               <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
                 <div style="min-width: 0; flex: 1;">
                   <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                    ${isFav ? '<span class="m3-badge" style="background: #fef08a; color: #854d0e; font-size: 0.68rem; font-weight: 800;">⭐ Αγαπημένη</span>' : ''}
+                    ${isFav ? '<span class="m3-badge" style="background: #fef08a; color: #854d0e; font-size: 0.72rem; font-weight: 800; padding: 2px 6px;">⭐</span>' : ''}
                     <div style="font-weight: 800; font-size: 0.94rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: break-word;">${stopTitle}</div>
                   </div>
                   <div style="font-size: 0.75rem; color: var(--md-sys-color-outline); margin-top: 3px;">
