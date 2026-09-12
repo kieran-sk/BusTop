@@ -3,9 +3,11 @@ package com.oasa.athensbus.wear
 import android.content.Context
 import androidx.wear.protolayout.ActionBuilders
 import androidx.wear.protolayout.ColorBuilders.argb
+import androidx.wear.protolayout.DimensionBuilders
 import androidx.wear.protolayout.DimensionBuilders.dp
 import androidx.wear.protolayout.DimensionBuilders.sp
 import androidx.wear.protolayout.LayoutElementBuilders
+import androidx.wear.protolayout.LayoutElementBuilders.FONT_WEIGHT_BOLD
 import androidx.wear.protolayout.ModifiersBuilders
 import androidx.wear.protolayout.ResourceBuilders
 import androidx.wear.protolayout.TimelineBuilders
@@ -45,7 +47,7 @@ class BusTopTileService : TileService() {
 
             TileBuilders.Tile.Builder()
                 .setResourcesVersion("1")
-                .setTimeline(timeline)
+                .setTileTimeline(timeline)
                 .setFreshnessIntervalMillis(60_000L) // Refresh every 60s
                 .build()
         }
@@ -146,7 +148,7 @@ class BusTopTileService : TileService() {
                     .setFontStyle(
                         LayoutElementBuilders.FontStyle.Builder()
                             .setSize(sp(16f))
-                            .setBold(true)
+                            .setWeight(FONT_WEIGHT_BOLD)
                             .setColor(argb(0xFF0F172A.toInt()))
                             .build()
                     )
@@ -165,7 +167,7 @@ class BusTopTileService : TileService() {
                 .setFontStyle(
                     LayoutElementBuilders.FontStyle.Builder()
                         .setSize(sp(26f))
-                        .setBold(true)
+                        .setWeight(FONT_WEIGHT_BOLD)
                         .setColor(argb(0xFF10B981.toInt()))
                         .build()
                 )
@@ -235,7 +237,7 @@ class BusTopTileService : TileService() {
                     .setFontStyle(
                         LayoutElementBuilders.FontStyle.Builder()
                             .setSize(sp(11f))
-                            .setBold(true)
+                            .setWeight(FONT_WEIGHT_BOLD)
                             .setColor(argb(0xFFF8FAFC.toInt()))
                             .build()
                     )
