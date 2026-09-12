@@ -15,6 +15,7 @@ class MapManager {
     this.isLoaded = false;
     this.moveDebounceTimer = null;
     this.stopMarkersMap = new Map();
+    this.vehicleHistoryMap = new Map(); // vehNo -> { lat, lng, heading }
   }
 
   async init() {
@@ -469,7 +470,23 @@ class MapManager {
   }
 
   /**
-   * Redesigned Live Bus Vehicle Marker - Highly distinct glowing 3D capsule with pulse beacon
+   * Calculates bearing angle in degrees from lat1,lng1 to lat2,lng2
+   */
+  calculateBearing(lat1, lng1, lat2, lng2) {
+    const toRad = deg => (deg * Math.PI) / 180;
+    const toDeg = rad => (rad * 180) / Math.PI;
+    const phi1 = toRad(lat1);
+    const phi2 = toRad(lat2);
+    const deltaLambda = toRad(lng2 - lng1);
+
+    const y = Math.sin(deltaLambda) * Math.cos(phi2);
+    const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
+    const bearing = toDeg(Math.atan2(y, x));
+    return (bearing + 360) % 360;
+  }
+
+  /**
+   * Redesigned Live Bus Vehicle Marker - Glowing 3D capsule with real-time directional heading chevron
    */
   updateBuses(buses = [], defaultLineId = 'BUS') {
     if (!this.map || !this.busLayer) return;
@@ -483,6 +500,28 @@ class MapManager {
       const lineId = b.line_id || b.LINE_ID || defaultLineId;
       const vehNo = b.VEH_NO || '';
 
+      // Determine vehicle heading from movement history
+      let heading = null;
+      if (vehNo && this.vehicleHistoryMap.has(vehNo)) {
+        const prev = this.vehicleHistoryMap.get(vehNo);
+        const distMoved = Math.hypot(lat - prev.lat, lng - prev.lng);
+        // Only calculate heading if bus moved more than ~8 meters
+        if (distMoved > 0.00008) {
+          heading = Math.round(this.calculateBearing(prev.lat, prev.lng, lat, lng));
+        } else {
+          heading = prev.heading;
+        }
+      }
+      this.vehicleHistoryMap.set(vehNo, { lat, lng, heading });
+
+      const headingHtml = (heading !== null && heading !== undefined) ? `
+        <div style="width: 18px; height: 18px; border-radius: 50%; background: #0f172a; border: 1.5px solid #ffffff; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3); margin-top: -5px; transform: rotate(${heading}deg); transition: transform 0.4s ease;" title="Κατεύθυνση: ${heading}°">
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="#fbbf24">
+            <polygon points="12,2 22,21 12,17 2,21" />
+          </svg>
+        </div>
+      ` : '';
+
       const busIcon = L.divIcon({
         className: 'map-live-bus-icon',
         html: `
@@ -492,19 +531,21 @@ class MapManager {
               <svg width="12" height="12" viewBox="0 0 24 24" fill="#ffffff"><path d="M4 16c0 .88.39 1.67 1 2.22V20c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h8v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6H6V6h12v5z"/></svg>
               <span>${lineId}</span>
             </div>
+            ${headingHtml}
             ${vehNo ? `
-              <div style="margin-top: 2px; font-size: 0.62rem; font-weight: 800; color: #166534; background: rgba(240,253,244,0.96); padding: 0 4px; border-radius: 3px; border: 1px solid #bbf7d0; box-shadow: 0 1px 2px rgba(0,0,0,0.15);">
+              <div style="margin-top: 1px; font-size: 0.62rem; font-weight: 800; color: #166534; background: rgba(240,253,244,0.96); padding: 0 4px; border-radius: 3px; border: 1px solid #bbf7d0; box-shadow: 0 1px 2px rgba(0,0,0,0.15);">
                 #${vehNo}
               </div>
             ` : ''}
           </div>
         `,
-        iconSize: [56, 36],
-        iconAnchor: [28, 18]
+        iconSize: [60, 48],
+        iconAnchor: [30, 24]
       });
 
+      const headingTxt = (heading !== null && heading !== undefined) ? ` | Κατεύθυνση: ${heading}°` : '';
       L.marker([lat, lng], { icon: busIcon }).addTo(this.busLayer)
-        .bindTooltip(`🚍 Λεωφορείο ${lineId} (Όχημα #${vehNo})`, { direction: 'top' });
+        .bindTooltip(`🚍 Λεωφορείο ${lineId} (Όχημα #${vehNo})${headingTxt}`, { direction: 'top' });
     });
   }
 

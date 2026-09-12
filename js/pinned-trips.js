@@ -263,7 +263,15 @@ class PinnedTripsManager {
   startPolling() {
     if (this.timerInterval) clearInterval(this.timerInterval);
     this.fetchAllPinnedArrivals();
-    this.timerInterval = setInterval(() => this.fetchAllPinnedArrivals(), 15000);
+    const isBatterySaver = window.App && typeof window.App.isBatterySaverEnabled === 'function' 
+      ? window.App.isBatterySaverEnabled() 
+      : (localStorage.getItem('OASA_BATTERY_SAVER') === 'true');
+    const intervalMs = isBatterySaver ? 35000 : 15000;
+    this.timerInterval = setInterval(() => {
+      if (!document.hidden) {
+        this.fetchAllPinnedArrivals();
+      }
+    }, intervalMs);
   }
 
   stopPolling() {

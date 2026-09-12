@@ -75,15 +75,39 @@ class SearchManager {
       return id.includes(query) || descr.includes(query) || descrEng.includes(query);
     }).slice(0, 15);
 
-    // 2. Search Stops remotely via server master stops index
+    // 2. Search Stops remotely via server master stops index (with Zero Data Mode offline fallback)
     let matchingStops = [];
+    let isOfflineResults = false;
     try {
       const res = await fetch(`/api/stops/search?q=${encodeURIComponent(trimmed)}`);
       if (res.ok) {
         matchingStops = await res.json();
+        // Cache stop results locally
+        if (Array.isArray(matchingStops) && matchingStops.length > 0) {
+          const stopCache = JSON.parse(localStorage.getItem('OASA_KNOWN_STOPS') || '{}');
+          matchingStops.forEach(s => { stopCache[s.StopCode] = s; });
+          localStorage.setItem('OASA_KNOWN_STOPS', JSON.stringify(stopCache));
+        }
+      } else {
+        throw new Error('Search network response not ok');
       }
     } catch (e) {
-      console.warn('Stop search error:', e);
+      console.warn('Network stop search failed, switching to Zero Data Mode:', e);
+      isOfflineResults = true;
+      // Search in locally cached stops (from previous searches and favourites)
+      const knownStops = Object.values(JSON.parse(localStorage.getItem('OASA_KNOWN_STOPS') || '{}'));
+      const favStops = JSON.parse(localStorage.getItem('OASA_FAV_STOPS') || '[]');
+      const allLocal = [...favStops, ...knownStops];
+      const seen = new Set();
+
+      matchingStops = allLocal.filter(s => {
+        if (!s || !s.StopCode || seen.has(String(s.StopCode))) return false;
+        seen.add(String(s.StopCode));
+        const code = String(s.StopCode);
+        const name = this.normalize(s.StopDescr || s.stopName || '');
+        const street = this.normalize(s.StopStreet || s.stopStreet || '');
+        return code.includes(query) || name.includes(query) || street.includes(query);
+      }).slice(0, 15);
     }
 
     let html = '';
@@ -129,8 +153,15 @@ class SearchManager {
     // Render Stops
     if (matchingStops.length > 0) {
       html += `
-        <div style="font-size: 0.82rem; font-weight: 800; color: #10b981; margin: 0.5rem 0 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">
-          Στάσεις Λεωφορείων (${matchingStops.length})
+        <div style="display: flex; align-items: center; justify-content: space-between; margin: 0.5rem 0 0.5rem;">
+          <span style="font-size: 0.82rem; font-weight: 800; color: #10b981; text-transform: uppercase; letter-spacing: 0.05em;">
+            Στάσεις Λεωφορείων (${matchingStops.length})
+          </span>
+          ${isOfflineResults ? `
+            <span class="m3-badge" style="background: #fef3c7; color: #b45309; font-size: 0.7rem; font-weight: 800; padding: 2px 6px;">
+              💾 Zero Data (Offline Cache)
+            </span>
+          ` : ''}
         </div>
         <div style="display: grid; gap: 0.45rem;">
           ${matchingStops.map(s => {

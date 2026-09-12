@@ -411,6 +411,39 @@
           </div>
         </div>
 
+        <!-- Battery Saver Mode for Live Tracking -->
+        <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 12px; padding: 0.9rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="padding-right: 0.5rem;">
+              <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); display: flex; align-items: center; gap: 6px;">
+                <span>🔋 Εξοικονόμηση Μπαταρίας</span>
+                <span id="battery-saver-badge" class="m3-badge" style="display: none; background: #fef3c7; color: #b45309; font-size: 0.68rem;">ΕΝΕΡΓΗ</span>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--md-sys-color-outline); margin-top: 2px;">Αραιώνει την ανανέωση GPS (35λ) και αναστέλλει τις κλήσεις όταν η οθόνη είναι κλειστή</div>
+            </div>
+            <label style="position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; cursor: pointer;">
+              <input id="battery-saver-toggle" type="checkbox" onchange="window.App.toggleBatterySaver(this.checked)" style="opacity: 0; width: 0; height: 0;">
+              <span id="battery-saver-slider" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e1; transition: .3s; border-radius: 24px;"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Offline Stop Cache (Zero Data Mode) -->
+        <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 12px; padding: 0.9rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+            <div>
+              <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); display: flex; align-items: center; gap: 6px;">
+                <span>💾 Zero Data Mode (Offline)</span>
+              </div>
+              <div style="font-size: 0.75rem; color: var(--md-sys-color-outline); margin-top: 2px;">Αποθήκευση στάσεων και δρομολογίων για αναζήτηση χωρίς σήμα / ίντερνετ</div>
+            </div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem; font-size: 0.8rem;">
+            <span style="color: var(--md-sys-color-outline);">Αποθηκευμένες στάσεις:</span>
+            <strong id="offline-cache-count" style="color: #059669;">--</strong>
+          </div>
+        </div>
+
         <!-- App & Channel Version Card -->
         <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 12px; padding: 0.9rem;">
           <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); margin-bottom: 0.6rem;">Πληροφορίες Έκδοσης</div>

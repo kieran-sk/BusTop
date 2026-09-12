@@ -55,7 +55,58 @@ class AppController {
     const modal = document.getElementById('settings-modal');
     if (modal) {
       modal.classList.add('open');
+      this.syncBatterySaverUI();
+      this.updateOfflineCacheCount();
       this.updateBackButtonsVisibility();
+    }
+  }
+
+  updateOfflineCacheCount() {
+    const countEl = document.getElementById('offline-cache-count');
+    if (!countEl) return;
+    try {
+      const knownStops = Object.keys(JSON.parse(localStorage.getItem('OASA_KNOWN_STOPS') || '{}')).length;
+      const favStops = (JSON.parse(localStorage.getItem('OASA_FAV_STOPS') || '[]')).length;
+      const total = knownStops + favStops;
+      countEl.innerText = `${total} στάσεις αποθηκευμένες`;
+    } catch (e) {
+      countEl.innerText = `Ενεργό`;
+    }
+  }
+
+  isBatterySaverEnabled() {
+    return localStorage.getItem('OASA_BATTERY_SAVER') === 'true';
+  }
+
+  toggleBatterySaver(enabled) {
+    localStorage.setItem('OASA_BATTERY_SAVER', enabled ? 'true' : 'false');
+    this.syncBatterySaverUI();
+    this.applyBatterySaverPolicy(enabled);
+    this.triggerHaptic('light');
+  }
+
+  syncBatterySaverUI() {
+    const enabled = this.isBatterySaverEnabled();
+    const toggle = document.getElementById('battery-saver-toggle');
+    const badge = document.getElementById('battery-saver-badge');
+    const slider = document.getElementById('battery-saver-slider');
+    if (toggle) toggle.checked = enabled;
+    if (badge) badge.style.display = enabled ? 'inline-block' : 'none';
+    if (slider) {
+      slider.style.backgroundColor = enabled ? '#10b981' : '#cbd5e1';
+    }
+  }
+
+  applyBatterySaverPolicy(enabled) {
+    // If enabled, throttle live polling interval in pinned trips and ticker
+    if (window.PinnedTrips) {
+      window.PinnedTrips.stopPolling();
+      const intervalMs = enabled ? 35000 : 15000;
+      window.PinnedTrips.timerInterval = setInterval(() => {
+        if (!document.hidden) {
+          window.PinnedTrips.fetchAllPinnedArrivals();
+        }
+      }, intervalMs);
     }
   }
 
