@@ -663,7 +663,6 @@ class AirportTicker {
 
                   ${linesPills ? `
                     <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding-top: 4px; border-top: 1px dashed #e2e8f0;">
-                      <span style="font-size: 0.68rem; font-weight: 800; color: #64748b; text-transform: uppercase;">Γραμμές:</span>
                       ${linesPills}
                     </div>
                   ` : `
