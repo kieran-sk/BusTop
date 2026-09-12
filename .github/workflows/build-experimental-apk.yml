@@ -39,36 +39,46 @@ jobs:
           sed -i 's|https://bustop.pages.dev|https://experimental.bustop.pages.dev|g' android/app/src/main/java/com/oasa/athensbus/MainActivity.kt
           
           cat << 'EOF' > release_body.md
-          ### 👾 BusTop Experimental APK (Dot-Matrix Transit Edition)
+          ### 👾 BusTop Experimental (Phone & Wear OS Watch Edition)
           
-          This is the standalone **Experimental Dot-Matrix Transit Edition** APK!
-          - Installs alongside your stable BusTop app without overwriting it (Package: `com.oasa.athensbus.experimental`)
-          - Pre-configured to point directly to `https://experimental.bustop.pages.dev`
-          - Includes authentic Athens transit LED matrix typography, phosphor & amber status colors, and physical tactile buttons.
+          This release contains the standalone **Phone APK** and the **OnePlus Watch 3 / Wear OS APK**:
+          
+          1. 📱 **Phone**: `bustop-experimental.apk` (Package: `com.oasa.athensbus.experimental`)
+             - Installs alongside your stable BusTop app without overwriting it.
+             - Features Settings menu, theme selection, and full Dot-Matrix Transit UI.
+          2. ⌚ **Watch**: `bustop-wear.apk` (Package: `com.oasa.athensbus.wear`)
+             - Native **Wear OS Tile** for your watch face carousel showing your next bus countdown!
+             - Lightweight mini-app for circular AMOLED displays.
+             - Compatible with OnePlus Watch 2 / Watch 3 (Wear OS 4 & 5).
           
           ---
-          **Download**: Install `bustop-experimental.apk` below.
+          **Downloads**: Download the APKs below.
           EOF
 
-      - name: Build Android Debug APK
+      - name: Build Android Debug APKs (Phone + Wear OS)
         working-directory: ./android
         run: |
           gradle wrapper
           chmod +x gradlew
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew :app:assembleDebug :wear:assembleDebug --stacktrace
           
-          cd app/build/outputs/apk/debug
-          APK_FILE=$(ls *.apk | head -n 1)
-          cp "$APK_FILE" bustop-experimental.apk
-          echo "Built APK: bustop-experimental.apk"
+          # Prepare Phone APK
+          cp app/build/outputs/apk/debug/*.apk bustop-experimental.apk
+          echo "Prepared bustop-experimental.apk"
+          
+          # Prepare Wear OS APK
+          cp wear/build/outputs/apk/debug/*.apk bustop-wear.apk
+          echo "Prepared bustop-wear.apk"
 
-      - name: Release Experimental APK on GitHub
+      - name: Release Experimental APKs on GitHub
         uses: softprops/action-gh-release@v2
         with:
           tag_name: experimental-latest
-          name: BusTop Experimental (Dot-Matrix Edition)
+          name: BusTop Experimental (Phone & OnePlus Watch Edition)
           body_path: release_body.md
-          files: android/app/build/outputs/apk/debug/bustop-experimental.apk
+          files: |
+            android/bustop-experimental.apk
+            android/bustop-wear.apk
           prerelease: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

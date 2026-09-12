@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">BusTop Wear</string>
+    <string name="tile_name">BusTop ΟΑΣΑ</string>
+    <string name="tile_description">Ζωντανές αφίξεις λεωφορείων ΟΑΣΑ στον καρπό σας</string>
+</resources>
