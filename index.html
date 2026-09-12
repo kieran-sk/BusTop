@@ -44,9 +44,10 @@
     </button>
     <div id="top-bar-filler" style="flex: 1;"></div>
     <div style="display: flex; align-items: center; gap: 0.5rem;">
-      <span class="m3-badge m3-badge-live">
-        <span class="m3-pulse-dot"></span> Τηλεματική Ενεργή
+      <span title="Τηλεματική Ενεργή" style="display:inline-flex;align-items:center;">
+        <span class="m3-pulse-dot" style="width:10px;height:10px;background:#059669;"></span>
       </span>
+      <span style="font-size:0.6rem;font-weight:900;color:#7c3aed;background:#ede9fe;border:1px solid #c4b5fd;border-radius:4px;padding:1px 5px;letter-spacing:0.05em;">EXP</span>
       <button id="top-bar-settings-btn" class="m3-icon-btn" style="width: 36px; height: 36px; border-radius: 9999px; background: none; border: 1px solid var(--md-sys-color-outline-variant); color: var(--md-sys-color-on-surface); cursor: pointer;" onclick="window.App.openSettingsModal()" title="Ρυθμίσεις &amp; Πληροφορίες Έκδοσης" aria-label="Ρυθμίσεις">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"></circle>
@@ -92,28 +93,13 @@
       <!-- Selected Stop Header Card with Line Directions Overview -->
       <div id="selected-stop-banner" class="m3-card" style="display: none; flex-direction: column; gap: 0.75rem; padding: 1rem 1.15rem; margin-bottom: 0.85rem; border: 1px solid var(--md-sys-color-outline-variant); border-left: 4px solid var(--md-sys-color-primary); background: #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
         <!-- Top Navigation & Actions Bar -->
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap;">
-          <button class="m3-btn m3-btn-tonal" style="font-size: 0.78rem; padding: 4px 12px; border-radius: 9999px; display: inline-flex; align-items: center; gap: 6px; font-weight: 700;" onclick="window.App.showAllStopsInArrivals()">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
-            <span>Όλες οι Στάσεις</span>
+        <div style="display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem;">
+          <!-- Save / Favorite Stop Star Button -->
+          <button id="selected-stop-star" class="m3-icon-btn" style="width: 36px; height: 36px;" title="Αποθήκευση στάσης στα αγαπημένα" aria-label="Αποθήκευση στα αγαπημένα">
+            <svg id="star-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+            </svg>
           </button>
-          
-          <div style="display: flex; align-items: center; gap: 0.4rem;">
-            <!-- Save / Favorite Stop Star Button -->
-            <button id="selected-stop-star" class="m3-icon-btn" style="width: 36px; height: 36px;" title="Αποθήκευση στάσης στα αγαπημένα" aria-label="Αποθήκευση στα αγαπημένα">
-              <svg id="star-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-              </svg>
-            </button>
-            <!-- Refresh Arrivals Button -->
-            <button id="selected-stop-refresh" class="m3-icon-btn" style="width: 36px; height: 36px;" title="Ανανέωση ζωντανών αφίξεων" aria-label="Ανανέωση αφίξεων" onclick="window.App.refreshStopArrivals()">
-              <svg id="refresh-icon-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="23 4 23 10 17 10"></polyline>
-                <polyline points="1 20 1 14 7 14"></polyline>
-                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-              </svg>
-            </button>
-          </div>
         </div>
 
         <!-- Stop Name and Primary Info -->
@@ -138,32 +124,30 @@
       </div>
 
       <!-- Arrival Display Options, Clock & Live/Scheduled Filters -->
-      <div id="arrivals-options-bar" style="display: none; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; padding: 0 0.25rem;">
-        <div style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
-          <div style="display: flex; background: var(--md-sys-color-surface-container); padding: 3px; border-radius: 9999px; border: 1px solid var(--md-sys-color-outline-variant);">
-            <button id="day-today-btn" class="m3-btn m3-btn-primary" style="padding: 0.25rem 0.65rem; font-size: 0.78rem; border-radius: 9999px;" onclick="window.App.setArrivalsDay('today')">
-              Σήμερα
-            </button>
-            <button id="day-tomorrow-btn" class="m3-btn m3-btn-tonal" style="padding: 0.25rem 0.65rem; font-size: 0.78rem; border-radius: 9999px;" onclick="window.App.setArrivalsDay('tomorrow')">
-              Αύριο
-            </button>
-          </div>
-          <!-- Compact Live Clock next to day selector -->
-          <div class="ticker-clock ticker-clock-compact" id="ticker-live-clock" title="Τρέχουσα ώρα Αθήνας">
-            --:--:--
-          </div>
+      <div id="arrivals-options-bar" style="display: none; align-items: center; flex-wrap: wrap; gap: 0.45rem; margin-bottom: 0.75rem; padding: 0 0.25rem;">
+        <!-- Compact Live Clock - leftmost -->
+        <div class="ticker-clock ticker-clock-compact" id="ticker-live-clock" title="Τρέχουσα ώρα Αθήνας">
+          --:--
         </div>
-
-        <!-- Filter for All / Live / Scheduled Buses -->
+        <!-- Day selector -->
+        <div style="display: flex; background: var(--md-sys-color-surface-container); padding: 3px; border-radius: 9999px; border: 1px solid var(--md-sys-color-outline-variant);">
+          <button id="day-today-btn" class="m3-btn m3-btn-primary" style="padding: 0.25rem 0.65rem; font-size: 0.78rem; border-radius: 9999px;" onclick="window.App.setArrivalsDay('today')">
+            Σήμερα
+          </button>
+          <button id="day-tomorrow-btn" class="m3-btn m3-btn-tonal" style="padding: 0.25rem 0.65rem; font-size: 0.78rem; border-radius: 9999px;" onclick="window.App.setArrivalsDay('tomorrow')">
+            Αύριο
+          </button>
+        </div>
+        <!-- Live / All / Scheduled filter - no icons -->
         <div style="display: flex; background: var(--md-sys-color-surface-container); padding: 3px; border-radius: 9999px; border: 1px solid var(--md-sys-color-outline-variant);">
           <button id="filter-all-btn" class="m3-btn m3-btn-primary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 9999px;" onclick="window.Ticker.setModeFilter('all')">
             Όλα
           </button>
           <button id="filter-live-btn" class="m3-btn m3-btn-tonal" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 9999px;" onclick="window.Ticker.setModeFilter('live')">
-            ⚡ Ζωντανά
+            Ζωντανά
           </button>
           <button id="filter-sched-btn" class="m3-btn m3-btn-tonal" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; border-radius: 9999px;" onclick="window.Ticker.setModeFilter('scheduled')">
-            🕒 Προγρ.
+            Προγρ.
           </button>
         </div>
       </div>

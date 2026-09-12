@@ -343,7 +343,7 @@ class AirportTicker {
           <div class="ticker-dest-info">
             <div class="ticker-dest-title-row">
               <span class="ticker-dest-name">${arr.destination || lineDescr}</span>
-              <span class="m3-badge ticker-dir-badge">${directionText}</span>
+              <span style="font-size: 1rem; line-height: 1; flex-shrink: 0;">${directionText}</span>
             </div>
             <div class="ticker-dest-sub">
               ${isLive ? `
@@ -821,13 +821,15 @@ class AirportTicker {
         const now = new Date();
         const timeStr = now.toLocaleTimeString('el-GR', {
           timeZone: 'Europe/Athens',
-          hour12: false
+          hour12: false,
+          hour: '2-digit',
+          minute: '2-digit'
         });
-        el.innerHTML = this.renderSplitFlapDigits('global_clock', timeStr);
+        el.innerHTML = this.renderSplitFlapDigits('global_clock', timeStr, 'urgency-scheduled');
       }
     };
     updateTime();
-    this.timerInterval = setInterval(updateTime, 1000);
+    this.timerInterval = setInterval(updateTime, 30000);
   }
 }
 
