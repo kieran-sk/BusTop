@@ -19,17 +19,46 @@ class AirportTicker {
     this.activeView = 'stops'; // 'stops' or 'lines'
     this.allLines = [];
     this.linesFilterQuery = '';
+    this.allStops = [];
+    this.stopsFilterQuery = '';
+    this.isLoadingAllStops = false;
     window.Ticker = this;
   }
 
   setActiveView(view) {
     this.activeView = view;
+    if (view === 'stops' && (!this.allStops || this.allStops.length === 0)) {
+      this.loadAllStops();
+    }
     this.render();
   }
 
   setLinesFilterQuery(q) {
     this.linesFilterQuery = q;
     this.render();
+  }
+
+  setStopsFilterQuery(q) {
+    this.stopsFilterQuery = q;
+    this.render();
+  }
+
+  async loadAllStops() {
+    if (this.isLoadingAllStops) return;
+    this.isLoadingAllStops = true;
+    try {
+      const stops = await window.API.getAllStops();
+      if (Array.isArray(stops) && stops.length > 0) {
+        this.allStops = stops;
+        if (!this.currentStop) {
+          this.render();
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load all stops:', e);
+    } finally {
+      this.isLoadingAllStops = false;
+    }
   }
 
   setModeFilter(mode) {
@@ -507,12 +536,78 @@ class AirportTicker {
       }
 
       // STOPS VIEW
+      // If we have all stops loaded or search query, use master stops; otherwise combine with nearby stops
+      let allStopsSource = [];
+      if (Array.isArray(this.allStops) && this.allStops.length > 0) {
+        allStopsSource = this.allStops;
+      } else {
+        // Asynchronously load all stops in the background
+        this.loadAllStops();
+        allStopsSource = rawStops;
+      }
+
+      // Filter stops if query exists
+      let stopsToDisplay = allStopsSource;
+      if (this.stopsFilterQuery && this.stopsFilterQuery.trim().length > 0) {
+        const normQ = this.stopsFilterQuery.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+        stopsToDisplay = allStopsSource.filter(s => {
+          const sCode = String(s.StopCode || '');
+          const sName = (s.StopDescr || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+          const sStreet = (s.StopStreet || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+          return sCode.includes(normQ) || sName.includes(normQ) || sStreet.includes(normQ);
+        });
+      } else if (allStopsSource === rawStops) {
+        stopsToDisplay = rawStops;
+      }
+
+      // Prioritize favorites and active lines
+      const sortedStops = [...stopsToDisplay].sort((a, b) => {
+        const isFavA = window.Favorites && window.Favorites.isStopFav(a.StopCode);
+        const isFavB = window.Favorites && window.Favorites.isStopFav(b.StopCode);
+        if (isFavA && !isFavB) return -1;
+        if (!isFavA && isFavB) return 1;
+
+        const aHas = Array.isArray(a.serving_lines) && a.serving_lines.length > 0;
+        const bHas = Array.isArray(b.serving_lines) && b.serving_lines.length > 0;
+        if (aHas && !bHas) return -1;
+        if (!aHas && bHas) return 1;
+
+        return (a.distanceMeters || 0) - (b.distanceMeters || 0);
+      });
+
+      // Display up to 100 items at once for smooth rendering
+      const paginatedStops = sortedStops.slice(0, 100);
+
+      const stopsTabSwitcherHtml = `
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; padding: 0.25rem 0.1rem;">
+          <div style="display: inline-flex; background: var(--md-sys-color-surface-container-high); padding: 4px; border-radius: 9999px; border: 1px solid var(--md-sys-color-outline-variant);">
+            <button class="m3-btn ${this.activeView === 'stops' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="font-size: 0.82rem; padding: 0.35rem 1rem; border-radius: 9999px; border: none; font-weight: 800; cursor: pointer;" onclick="window.App.ticker.setActiveView('stops')">
+              🚏 Στάσεις ${sortedStops.length > 0 ? `(${sortedStops.length})` : ''}
+            </button>
+            <button class="m3-btn ${this.activeView === 'lines' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="font-size: 0.82rem; padding: 0.35rem 1rem; border-radius: 9999px; border: none; font-weight: 800; cursor: pointer;" onclick="window.App.ticker.setActiveView('lines')">
+              🚌 Όλες οι Γραμμές ${lines.length > 0 ? `(${lines.length})` : ''}
+            </button>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div style="position: relative; display: flex; align-items: center;">
+              <input type="text" placeholder="Αναζήτηση στάσης..." value="${this.stopsFilterQuery || ''}" oninput="window.App.ticker.setStopsFilterQuery(this.value)" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; border: 1px solid var(--md-sys-color-outline-variant); border-radius: 9999px; background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface); outline: none; width: 160px;" />
+            </div>
+            <button class="m3-btn m3-btn-tonal" style="font-size: 0.78rem; padding: 0.35rem 0.75rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;" onclick="window.App.ticker.loadAllStops()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
+              Όλες
+            </button>
+          </div>
+        </div>
+      `;
+
       let stopsContent = '';
-      if (displayStops.length > 0) {
+      if (paginatedStops.length > 0) {
         stopsContent = `
-          ${tabSwitcherHtml}
+          ${stopsTabSwitcherHtml}
+          ${sortedStops.length > 100 ? `<div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.5rem; text-align: right;">Εμφάνιση 100 από ${sortedStops.length} στάσεις</div>` : ''}
           <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem;">
-            ${displayStops.map(s => {
+            ${paginatedStops.map(s => {
               const sCode = s.StopCode;
               const isFav = window.Favorites && window.Favorites.isStopFav(sCode);
               const sTitle = s.StopDescr || ('Στάση #' + sCode);
@@ -584,23 +679,10 @@ class AirportTicker {
         `;
       } else {
         stopsContent = `
-          ${tabSwitcherHtml}
+          ${stopsTabSwitcherHtml}
           <div class="m3-card" style="padding: 2.5rem 1.5rem; text-align: center; background: #ffffff; border: 1px solid var(--md-sys-color-outline-variant);">
-            <div style="width: 48px; height: 48px; border-radius: 50%; background: #eff6ff; color: #005ac1; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
-            </div>
-            <div style="font-size: 1.15rem; font-weight: 900; color: #0f172a; margin-bottom: 0.4rem;">Όλες οι Στάσεις</div>
-            <div style="font-size: 0.85rem; color: #64748b; max-width: 380px; margin: 0 auto 1.25rem; line-height: 1.4;">
-              Εντοπίστε αυτόματα όλες τις στάσεις γύρω σας ή επιλέξτε την καρτέλα «Όλες οι Γραμμές».
-            </div>
-            <div style="display: flex; justify-content: center; gap: 0.5rem; flex-wrap: wrap;">
-              <button class="m3-btn m3-btn-primary" style="padding: 0.5rem 1.2rem; font-weight: 800; border-radius: 9999px;" onclick="window.Search.findNearbyStops()">
-                📍 Εντοπισμός Στάσεων Κοντά μου
-              </button>
-              <button class="m3-btn m3-btn-tonal" style="padding: 0.5rem 1.2rem; font-weight: 700; border-radius: 9999px; border: 1px solid #e2e8f0;" onclick="window.App.ticker.setActiveView('lines')">
-                🚌 Προβολή Όλων των Γραμμών
-              </button>
-            </div>
+            <div style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin-bottom: 0.4rem;">Δεν βρέθηκαν στάσεις</div>
+            <div style="font-size: 0.8rem; color: #64748b;">Δοκιμάστε διαφορετικό όνομα ή κωδικό στάσης.</div>
           </div>
         `;
       }

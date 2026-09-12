@@ -316,24 +316,21 @@ class PinnedTripsManager {
 
     if (this.pinnedItems.length === 0) {
       container.innerHTML = `
-        <div class="m3-card" style="text-align: center; padding: 3rem 1.5rem; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);">
-          <div style="width: 54px; height: 54px; border-radius: 50%; background: #eff6ff; color: var(--md-sys-color-primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem;">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="17" x2="12" y2="22"></line>
-              <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
-            </svg>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.5rem;">
+          <div>
+            <h2 style="font-size: 1.25rem; font-weight: 800; margin: 0; color: #0f172a;">📌 Καρφιτσωμένες Αφίξεις</h2>
+            <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">Ζωντανή παρακολούθηση επιλεγμένων αφίξεων σε συγκεντρωτικό πίνακα</div>
           </div>
-          <h3 style="font-size: 1.2rem; font-weight: 800; color: var(--md-sys-color-on-surface); margin-bottom: 0.5rem;">
-            Καρφιτσωμένες Αφίξεις
-          </h3>
-          <p style="font-size: 0.9rem; color: var(--md-sys-color-outline); max-width: 440px; margin: 0 auto 1.5rem; line-height: 1.5;">
-            Καρφιτσώστε λεωφορεία από οποιαδήποτε στάση για να παρακολουθείτε ζωντανά τις αφίξεις τους σε έναν συγκεντρωτικό πίνακα!
+        </div>
+        <div class="m3-card" style="text-align: center; padding: 2.5rem 1.25rem; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);">
+          <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">📌</div>
+          <div style="font-weight: 800; font-size: 1.1rem; color: var(--md-sys-color-on-surface); margin-bottom: 0.4rem;">Δεν υπάρχουν καρφιτσωμένες αφίξεις</div>
+          <p style="color: var(--md-sys-color-outline); font-size: 0.85rem; max-width: 380px; margin: 0 auto 1.25rem; line-height: 1.4;">
+            Πατήστε το εικονίδιο καρφίτσας δίπλα σε οποιαδήποτε άφιξη στον πίνακα για να παρακολουθείτε ζωντανά το λεωφορείο σας.
           </p>
-          <div style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.82rem; font-weight: 700; color: var(--md-sys-color-primary); background: var(--md-sys-color-surface-container-high); padding: 8px 16px; border-radius: 9999px;">
-            <span>Πατήστε το εικονίδιο</span>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 12V4H17V2H7V4H8V12L6 14V16H11V22H13V16H18V14L16 12Z"/></svg>
-            <span>σε οποιαδήποτε άφιξη</span>
-          </div>
+          <button class="m3-btn m3-btn-primary" style="border-radius: 9999px; padding: 0.5rem 1.2rem; font-weight: 800;" onclick="window.App.switchTab('ticker')">
+            Προβολή Αφίξεων ➜
+          </button>
         </div>
       `;
       return;
@@ -373,7 +370,7 @@ class PinnedTripsManager {
       const formattedTime = displayMinutes !== null ? this.formatMinutesHuman(displayMinutes) : (matchingArr && matchingArr.estimated_arrival_time ? matchingArr.estimated_arrival_time : '--');
 
       return `
-        <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem; margin-bottom: 0.65rem; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-left: 4px solid ${isUrgent ? '#ea580c' : 'var(--md-sys-color-primary)'}; cursor: pointer;" onclick="window.App.switchTab('ticker'); window.App.selectStop('${item.stopCode}', '${cleanStopName}', ${item.stopLat || 'null'}, ${item.stopLng || 'null'});">
+        <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem; margin-bottom: 0; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-left: 4px solid ${isUrgent ? '#ea580c' : 'var(--md-sys-color-primary)'}; cursor: pointer;" onclick="window.App.switchTab('ticker'); window.App.selectStop('${item.stopCode}', '${cleanStopName}', ${item.stopLat || 'null'}, ${item.stopLng || 'null'});">
           <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
             <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
               <span class="ticker-line-badge" style="font-size: 1rem; min-width: 48px; flex-shrink: 0;">
@@ -397,7 +394,7 @@ class PinnedTripsManager {
               🚶 <strong style="color: var(--md-sys-color-on-surface);">${walkMins}λ</strong> (${walkDistanceM}μ. περπάτημα)
             </div>
             <div style="display: flex; gap: 0.5rem;">
-              <button class="m3-btn m3-btn-tonal" onclick="event.stopPropagation(); window.PinnedTrips.removePin('${item.id}')" style="padding: 0.3rem 0.75rem; font-size: 0.78rem; border-radius: 9999px; color: var(--md-sys-color-error);">
+              <button class="m3-btn m3-btn-tonal" onclick="event.stopPropagation(); window.PinnedTrips.removePin('${item.id}')" style="padding: 0.3rem 0.75rem; font-size: 0.78rem; border-radius: 9999px;">
                 Ξεκαρφίτσωμα
               </button>
             </div>
@@ -414,7 +411,7 @@ class PinnedTripsManager {
         </div>
         <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
           <button class="m3-btn m3-btn-outlined" style="font-size: 0.75rem; padding: 3px 10px; border-radius: 9999px; color: var(--md-sys-color-error); border-color: #ef4444;" onclick="window.PinnedTrips.clearAll()">
-            🗑️ Καθαρισμός
+            🗑️ Διαγραφή Όλων
           </button>
         </div>
       </div>

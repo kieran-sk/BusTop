@@ -1,6 +1,11 @@
 package com.oasa.athensbus.wear
 
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationManager
+import androidx.core.content.ContextCompat
 import androidx.wear.protolayout.ActionBuilders
 import androidx.wear.protolayout.ColorBuilders.argb
 import androidx.wear.protolayout.DimensionBuilders
@@ -61,21 +66,127 @@ class BusTopTileService : TileService() {
         )
     }
 
+    private fun getLastKnownLocation(): Pair<Double, Double> {
+        val hasFine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val hasCoarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (hasFine || hasCoarse) {
+            val locManager = getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+            if (locManager != null) {
+                val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
+                for (p in providers) {
+                    try {
+                        val loc: Location? = locManager.getLastKnownLocation(p)
+                        if (loc != null) {
+                            return Pair(loc.latitude, loc.longitude)
+                        }
+                    } catch (e: Exception) {}
+                }
+            }
+        }
+        return Pair(37.9845, 23.7335)
+    }
+
+    data class FavStopCandidate(
+        val code: String,
+        val name: String,
+        val lat: Double?,
+        val lng: Double?,
+        var distanceMeters: Float = Float.MAX_VALUE
+    )
+
+    private fun loadFavoriteStops(userLat: Double, userLng: Double): List<FavStopCandidate> {
+        val candidates = mutableListOf<FavStopCandidate>()
+        val prefsList = listOf(
+            getSharedPreferences("OASA_PERSISTENT_DATA", Context.MODE_PRIVATE),
+            getSharedPreferences("BusTopWatch", Context.MODE_PRIVATE)
+        )
+
+        for (p in prefsList) {
+            val raw = p.getString("OASA_FAV_STOPS", null) ?: p.getString("fav_stops", null)
+            if (!raw.isNullOrBlank() && raw != "[]" && raw != "null") {
+                try {
+                    val arr = JSONArray(raw)
+                    for (i in 0 until arr.length()) {
+                        val obj = arr.getJSONObject(i)
+                        val code = obj.optString("code", obj.optString("StopCode", ""))
+                        val name = obj.optString("name", obj.optString("stopName", obj.optString("StopDescr", "Στάση $code")))
+                        val latVal = if (obj.has("lat") && !obj.isNull("lat")) obj.optDouble("lat") else if (obj.has("StopLat")) obj.optDouble("StopLat") else null
+                        val lngVal = if (obj.has("lng") && !obj.isNull("lng")) obj.optDouble("lng") else if (obj.has("StopLng")) obj.optDouble("StopLng") else null
+                        if (code.isNotEmpty() && candidates.none { it.code == code }) {
+                            candidates.add(FavStopCandidate(code, name, latVal, lngVal))
+                        }
+                    }
+                } catch (e: Exception) {}
+            }
+        }
+
+        // Calculate distance for each favorite stop
+        for (c in candidates) {
+            if (c.lat != null && c.lng != null && c.lat != 0.0 && c.lng != 0.0) {
+                val res = FloatArray(1)
+                Location.distanceBetween(userLat, userLng, c.lat, c.lng, res)
+                c.distanceMeters = res[0]
+            } else {
+                // If coordinates unknown, rank after stops with known distance
+                c.distanceMeters = 50000f
+            }
+        }
+
+        // Sort by distance ascending
+        return candidates.sortedBy { it.distanceMeters }
+    }
+
     private fun fetchTopArrival(): WatchArrival {
-        val prefs = getSharedPreferences("BusTopWatch", Context.MODE_PRIVATE)
-        val stopCode = prefs.getString("primary_stop_code", "10175") ?: "10175"
-        val stopName = prefs.getString("primary_stop_name", "Πλ. Κάνιγγος") ?: "Πλ. Κάνιγγος"
+        val (userLat, userLng) = getLastKnownLocation()
+        val favStops = loadFavoriteStops(userLat, userLng)
 
-        val stopsToTry = linkedSetOf(stopCode, "10175", "60010")
-
-        for (code in stopsToTry) {
-            val arrival = tryFetchForStop(code, if (code == stopCode) stopName else if (code == "10175") "Πλ. Κάνιγγος" else "Ναυαρίνου")
+        // 1. Try favorite stops in order of distance from user
+        for (fav in favStops) {
+            val arrival = tryFetchForStop(fav.code, fav.name)
             if (arrival != null) {
                 return arrival
             }
         }
 
-        return WatchArrival(stopName, "040", 4, "Σύνταγμα (Live)")
+        // 2. If no favorites or none have active arrivals, fetch closest stops via API
+        try {
+            val url = "https://telematics.oasa.gr/api/?act=getClosestStops&p1=$userLat&p2=$userLng"
+            val req = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Linux; Android Wear OS; BusTop)")
+                .build()
+            val resp = httpClient.newCall(req).execute()
+            val body = resp.body?.string() ?: ""
+            if (body.isNotEmpty() && body != "null") {
+                val arr = JSONArray(body)
+                for (i in 0 until minOf(arr.length(), 5)) {
+                    val obj = arr.getJSONObject(i)
+                    val sCode = obj.optString("StopCode")
+                    val sName = obj.optString("StopDescr", "Στάση $sCode")
+                    if (sCode.isNotEmpty()) {
+                        val arrLive = tryFetchForStop(sCode, sName)
+                        if (arrLive != null) {
+                            return arrLive
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {}
+
+        // 3. Fallbacks for major Athens hubs
+        val hubFallbacks = listOf(
+            Pair("10175", "Πλ. Κάνιγγος"),
+            Pair("60010", "Ναυαρίνου"),
+            Pair("10022", "Πλ. Συντάγματος")
+        )
+        for ((code, name) in hubFallbacks) {
+            val arrival = tryFetchForStop(code, name)
+            if (arrival != null) {
+                return arrival
+            }
+        }
+
+        return WatchArrival("Πλ. Συντάγματος", "040", 4, "Σύνταγμα (Live)")
     }
 
     private fun tryFetchForStop(code: String, sName: String): WatchArrival? {

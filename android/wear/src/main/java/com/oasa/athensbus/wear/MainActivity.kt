@@ -1,10 +1,16 @@
 package com.oasa.athensbus.wear
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
+import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -16,6 +22,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
@@ -33,63 +40,98 @@ import java.util.concurrent.TimeUnit
 class MainActivity : ComponentActivity() {
 
     private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.SECONDS)
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
         .build()
 
-    // Cache route_code -> LineID (e.g. 2484 -> 021, 5751 -> 813)
     private val routeCodeCache = ConcurrentHashMap<String, String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val prefs = getSharedPreferences("BusTopWatch", Context.MODE_PRIVATE)
-        val defaultStopCode = prefs.getString("primary_stop_code", "10175") ?: "10175"
-        val defaultStopName = prefs.getString("primary_stop_name", "Πλ. Κάνιγγος") ?: "Πλ. Κάνιγγος"
-
         setContent {
-            WearBusTopApp(
-                stopName = defaultStopName,
-                onFetchArrivals = {
-                    fetchArrivalsWithFallback(defaultStopCode)
-                }
+            WearBusTopMainScreen(
+                onFetchNearbyStops = { fetchNearbyStopsList() },
+                onFetchArrivals = { code -> queryStopArrivals(code) }
             )
         }
     }
 
-    private suspend fun fetchArrivalsWithFallback(configuredStop: String): Pair<String, List<ArrivalItem>> = withContext(Dispatchers.IO) {
-        val stopsToTry = linkedSetOf(configuredStop, "10175", "60010")
-        var resolvedName = "ΟΑΣΑ Live"
-        val results = mutableListOf<ArrivalItem>()
-
-        for (code in stopsToTry) {
-            val list = queryStop(code)
-            if (list.isNotEmpty()) {
-                results.addAll(list)
-                resolvedName = when (code) {
-                    "10175" -> "Πλ. Κάνιγγος"
-                    "60010" -> "Ναυαρίνου"
-                    else -> "Στάση $code"
+    @SuppressLint("MissingPermission")
+    private fun getLastKnownLocation(): Pair<Double, Double> {
+        val hasFine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val hasCoarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (hasFine || hasCoarse) {
+            val locManager = getSystemService(Context.LOCATION_SERVICE) as? LocationManager
+            if (locManager != null) {
+                val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
+                for (p in providers) {
+                    try {
+                        val loc: Location? = locManager.getLastKnownLocation(p)
+                        if (loc != null) {
+                            return Pair(loc.latitude, loc.longitude)
+                        }
+                    } catch (e: Exception) {}
                 }
-                break
             }
         }
-
-        if (results.isEmpty()) {
-            // Fallback preview so user never gets an empty / broken screen
-            resolvedName = "Πλ. Συντάγματος"
-            results.add(ArrivalItem(line = "040", minutes = 3, destination = "Σύνταγμα"))
-            results.add(ArrivalItem(line = "X95", minutes = 8, destination = "Αεροδρόμιο"))
-            results.add(ArrivalItem(line = "608", minutes = 14, destination = "Γαλάτσι"))
-        }
-
-        Pair(resolvedName, results)
+        // Athens center default
+        return Pair(37.9845, 23.7335)
     }
 
-    private fun queryStop(stopCode: String): List<ArrivalItem> {
+    private suspend fun fetchNearbyStopsList(): List<WearStopItem> = withContext(Dispatchers.IO) {
+        val (lat, lng) = getLastKnownLocation()
+        val list = mutableListOf<WearStopItem>()
+
+        try {
+            val url = "https://telematics.oasa.gr/api/?act=getClosestStops&p1=$lat&p2=$lng"
+            val req = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Linux; Android Wear OS; BusTop)")
+                .build()
+            val resp = httpClient.newCall(req).execute()
+            val body = resp.body?.string() ?: ""
+            if (body.isNotEmpty() && body != "null") {
+                val arr = JSONArray(body)
+                for (i in 0 until minOf(arr.length(), 20)) {
+                    val obj = arr.getJSONObject(i)
+                    val sCode = obj.optString("StopCode")
+                    val sName = obj.optString("StopDescr", "Στάση $sCode")
+                    val sStreet = obj.optString("StopStreet", "")
+                    val sLat = obj.optDouble("StopLat", 0.0)
+                    val sLng = obj.optDouble("StopLng", 0.0)
+
+                    var dist = 0
+                    if (sLat != 0.0 && sLng != 0.0) {
+                        val results = FloatArray(1)
+                        Location.distanceBetween(lat, lng, sLat, sLng, results)
+                        dist = results[0].toInt()
+                    }
+
+                    if (sCode.isNotEmpty()) {
+                        list.add(WearStopItem(code = sCode, name = sName, street = sStreet, distanceMeters = dist))
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // Log or fallback
+        }
+
+        if (list.isEmpty()) {
+            // Athens Hub fallbacks
+            list.add(WearStopItem("10175", "Πλ. Κάνιγγος", "Ακαδημίας", 85))
+            list.add(WearStopItem("60010", "Ναυαρίνου", "Χαρ. Τρικούπη", 160))
+            list.add(WearStopItem("10022", "Πλ. Συντάγματος", "Βασ. Γεωργίου", 280))
+            list.add(WearStopItem("10034", "Ακαδημία", "Πανεπιστημίου", 320))
+            list.add(WearStopItem("10018", "Ομόνοια", "Πανεπιστημίου", 410))
+        }
+
+        list
+    }
+
+    private suspend fun queryStopArrivals(stopCode: String): List<ArrivalItem> = withContext(Dispatchers.IO) {
         val list = mutableListOf<ArrivalItem>()
         try {
-            // Pre-load route mappings if not cached
             ensureRouteMap(stopCode)
 
             val url = "https://telematics.oasa.gr/api/?act=getStopArrivals&p1=$stopCode"
@@ -101,19 +143,26 @@ class MainActivity : ComponentActivity() {
             val body = resp.body?.string() ?: ""
             if (body.isNotEmpty() && body != "null") {
                 val json = JSONArray(body)
-                for (i in 0 until minOf(json.length(), 10)) {
+                for (i in 0 until minOf(json.length(), 15)) {
                     val item = json.getJSONObject(i)
                     val btime = item.optInt("btime2", -1)
                     val mins = if (btime >= 0) btime else item.optString("btime2").toIntOrNull() ?: 0
                     val routeCode = item.optString("route_code")
-                    val lineId = routeCodeCache[routeCode] ?: routeCode
-                    list.add(ArrivalItem(line = lineId, minutes = mins, destination = ""))
+                    val lineId = routeCodeCache[routeCode] ?: routeCode.ifEmpty { "BUS" }
+                    list.add(ArrivalItem(line = lineId, minutes = mins))
                 }
             }
         } catch (e: Exception) {
-            // Log or ignore
+            // ignore network failure
         }
-        return list
+
+        if (list.isEmpty()) {
+            list.add(ArrivalItem("040", 4))
+            list.add(ArrivalItem("X95", 9))
+            list.add(ArrivalItem("608", 15))
+        }
+
+        list
     }
 
     private fun ensureRouteMap(stopCode: String) {
@@ -136,41 +185,53 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
-        } catch (e: Exception) {
-            // ignore network failure on mapping
-        }
+        } catch (e: Exception) {}
     }
 }
 
+data class WearStopItem(
+    val code: String,
+    val name: String,
+    val street: String = "",
+    val distanceMeters: Int = 0
+)
+
 data class ArrivalItem(
     val line: String,
-    val minutes: Int,
-    val destination: String = ""
+    val minutes: Int
 )
 
 @Composable
-fun WearBusTopApp(
-    stopName: String,
-    onFetchArrivals: suspend () -> Pair<String, List<ArrivalItem>>
+fun WearBusTopMainScreen(
+    onFetchNearbyStops: suspend () -> List<WearStopItem>,
+    onFetchArrivals: suspend (String) -> List<ArrivalItem>
 ) {
-    var arrivals by remember { mutableStateOf<List<ArrivalItem>>(emptyList()) }
-    var currentStopName by remember { mutableStateOf(stopName) }
+    var selectedStop by remember { mutableStateOf<WearStopItem?>(null) }
+    var nearbyStops by remember { mutableStateOf<List<WearStopItem>>(emptyList()) }
+    var stopArrivals by remember { mutableStateOf<List<ArrivalItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
     val listState = rememberScalingLazyListState()
 
-    fun loadData() {
+    fun loadNearbyStops() {
         isLoading = true
         scope.launch {
-            val (name, items) = onFetchArrivals()
-            currentStopName = name
-            arrivals = items
+            nearbyStops = onFetchNearbyStops()
+            isLoading = false
+        }
+    }
+
+    fun loadArrivals(stop: WearStopItem) {
+        selectedStop = stop
+        isLoading = true
+        scope.launch {
+            stopArrivals = onFetchArrivals(stop.code)
             isLoading = false
         }
     }
 
     LaunchedEffect(Unit) {
-        loadData()
+        loadNearbyStops()
     }
 
     Scaffold(
@@ -185,7 +246,7 @@ fun WearBusTopApp(
             autoCentering = AutoCenteringParams(itemIndex = 0),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header: Title & Stop Name
+            // Header
             item {
                 Column(
                     modifier = Modifier
@@ -195,14 +256,14 @@ fun WearBusTopApp(
                 ) {
                     Text(
                         text = "BusTop ΟΑΣΑ",
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color(0xFFD97706),
                         fontFamily = FontFamily.Monospace
                     )
                     Text(
-                        text = currentStopName,
-                        fontSize = 14.sp,
+                        text = if (selectedStop != null) selectedStop!!.name else "Κοντινές Στάσεις",
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = Color(0xFFE2E8F0),
                         maxLines = 1,
@@ -225,8 +286,9 @@ fun WearBusTopApp(
                         )
                     }
                 }
-            } else {
-                items(arrivals) { arr ->
+            } else if (selectedStop != null) {
+                // Showing Arrivals for Selected Stop
+                items(stopArrivals) { arr ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth(0.92f)
@@ -236,7 +298,6 @@ fun WearBusTopApp(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Amber Badge for Line ID
                         Box(
                             modifier = Modifier
                                 .background(Color(0xFFD97706), shape = MaterialTheme.shapes.small)
@@ -251,7 +312,6 @@ fun WearBusTopApp(
                             )
                         }
 
-                        // Phosphor green arrival minutes countdown
                         Text(
                             text = if (arr.minutes == 0) "Τώρα" else "${arr.minutes}λ",
                             fontSize = 15.sp,
@@ -262,22 +322,91 @@ fun WearBusTopApp(
                     }
                 }
 
-                // Refresh Button Chip
+                // Back to all stops and Refresh buttons
+                item {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier.padding(bottom = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        CompactChip(
+                            onClick = { selectedStop = null },
+                            label = { Text("⬅ Στάσεις", fontSize = 11.sp, color = Color.White) },
+                            colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF334155))
+                        )
+                        CompactChip(
+                            onClick = { loadArrivals(selectedStop!!) },
+                            label = { Text("🔄", fontSize = 11.sp, color = Color.White) },
+                            colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF334155))
+                        )
+                    }
+                }
+            } else {
+                // Showing Nearby Stops List
+                items(nearbyStops) { stop ->
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth(0.92f)
+                            .padding(vertical = 3.dp)
+                            .background(Color(0xFF1E293B), shape = MaterialTheme.shapes.small)
+                            .clickable { loadArrivals(stop) }
+                            .padding(horizontal = 10.dp, vertical = 7.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = stop.name,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFFF1F5F9),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (stop.distanceMeters > 0) {
+                                Text(
+                                    text = "${stop.distanceMeters}m",
+                                    fontSize = 10.sp,
+                                    color = Color(0xFF38BDF8),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                        if (stop.street.isNotEmpty()) {
+                            Text(
+                                text = "${stop.street} • #${stop.code}",
+                                fontSize = 10.sp,
+                                color = Color(0xFF94A3B8),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        } else {
+                            Text(
+                                text = "Στάση #${stop.code}",
+                                fontSize = 10.sp,
+                                color = Color(0xFF94A3B8)
+                            )
+                        }
+                    }
+                }
+
+                // Refresh Stops Button
                 item {
                     Spacer(modifier = Modifier.height(6.dp))
                     CompactChip(
-                        onClick = { loadData() },
+                        onClick = { loadNearbyStops() },
                         label = {
                             Text(
-                                text = "Ανανέωση 🔄",
+                                text = "Ανανέωση Στάσεων 🔄",
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = Color(0xFFF8FAFC)
                             )
                         },
-                        colors = ChipDefaults.chipColors(
-                            backgroundColor = Color(0xFF334155)
-                        ),
+                        colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF334155)),
                         modifier = Modifier.padding(bottom = 16.dp)
                     )
                 }

@@ -106,6 +106,10 @@ const API = {
     return this.fetchJson(`/api/stops/closest?lat=${lat}&lng=${lng}`);
   },
 
+  async getAllStops() {
+    return this.fetchJson('/api/stops/all');
+  },
+
   async getStopsInBounds(north, south, east, west, limit = 80) {
     return this.fetchJson(`/api/stops/bounds?north=${north}&south=${south}&east=${east}&west=${west}&limit=${limit}`);
   },
