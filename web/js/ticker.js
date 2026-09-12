@@ -365,16 +365,9 @@ class AirportTicker {
           </div>
         </div>
 
-        <!-- Bottom Section: Walking Time with Emoji, Commute Difference / Buffer, Alarm and Pin -->
+        <!-- Bottom Section: Commute Difference / Buffer, Alarm and Pin -->
         <div class="ticker-row-bottom">
           <div class="ticker-commute-group">
-            <!-- Walking time with walking emoji -->
-            <div class="ticker-walk-pill" title="${walk ? `Χρόνος περπατήματος μέχρι τη στάση: ${walk.minutes}λ • Απόσταση: ${walk.meters}μ` : 'Άγνωστη απόσταση περπατήματος'}">
-              <span class="ticker-walk-emoji">🚶</span>
-              <span class="ticker-walk-val">${walkMins !== null ? `${walkMins}λ` : '—'}</span>
-              <span class="ticker-walk-label">περπάτημα</span>
-            </div>
-
             <!-- Commute Buffer / Departure Timing Advice Badge -->
             <div class="ticker-commute-badge ${advice.className}" title="${advice.tooltip || 'Χρονικό περιθώριο αναχώρησης'}">
               ${advice.displayLabel || advice.label}
@@ -823,13 +816,14 @@ class AirportTicker {
           timeZone: 'Europe/Athens',
           hour12: false,
           hour: '2-digit',
-          minute: '2-digit'
+          minute: '2-digit',
+          second: '2-digit'
         });
-        el.innerHTML = this.renderSplitFlapDigits('global_clock', timeStr, 'urgency-scheduled');
+        el.innerHTML = this.renderSplitFlapDigits('global_clock', timeStr, 'urgency-normal');
       }
     };
     updateTime();
-    this.timerInterval = setInterval(updateTime, 30000);
+    this.timerInterval = setInterval(updateTime, 1000);
   }
 }
 

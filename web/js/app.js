@@ -1103,4 +1103,7 @@ class AppController {
 document.addEventListener('DOMContentLoaded', () => {
   window.App = new AppController();
   window.App.init();
+  // Start the global clock bar immediately on page load
+  if (window.Ticker) window.Ticker.startClock();
+  else setTimeout(() => { if (window.Ticker) window.Ticker.startClock(); }, 500);
 });
