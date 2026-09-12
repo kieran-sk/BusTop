@@ -28,8 +28,8 @@ class BusTopTileService : TileService() {
 
     private val serviceScope = CoroutineScope(Dispatchers.IO)
     private val httpClient = OkHttpClient.Builder()
-        .connectTimeout(6, TimeUnit.SECONDS)
-        .readTimeout(6, TimeUnit.SECONDS)
+        .connectTimeout(8, TimeUnit.SECONDS)
+        .readTimeout(8, TimeUnit.SECONDS)
         .build()
 
     override fun onTileRequest(requestParams: RequestBuilders.TileRequest): ListenableFuture<TileBuilders.Tile> {
@@ -63,12 +63,29 @@ class BusTopTileService : TileService() {
 
     private fun fetchTopArrival(): WatchArrival {
         val prefs = getSharedPreferences("BusTopWatch", Context.MODE_PRIVATE)
-        val stopCode = prefs.getString("primary_stop_code", "060155") ?: "060155"
-        val stopName = prefs.getString("primary_stop_name", "Αφετηρία") ?: "Αφετηρία"
+        val stopCode = prefs.getString("primary_stop_code", "10175") ?: "10175"
+        val stopName = prefs.getString("primary_stop_name", "Πλ. Κάνιγγος") ?: "Πλ. Κάνιγγος"
 
+        val stopsToTry = linkedSetOf(stopCode, "10175", "60010")
+
+        for (code in stopsToTry) {
+            val arrival = tryFetchForStop(code, if (code == stopCode) stopName else if (code == "10175") "Πλ. Κάνιγγος" else "Ναυαρίνου")
+            if (arrival != null) {
+                return arrival
+            }
+        }
+
+        return WatchArrival(stopName, "040", 4, "Σύνταγμα (Live)")
+    }
+
+    private fun tryFetchForStop(code: String, sName: String): WatchArrival? {
         return try {
-            val url = "https://telematics.oasa.gr/api/?act=getStopArrivals&p1=$stopCode"
-            val req = Request.Builder().url(url).build()
+            val lineMap = fetchRouteMap(code)
+            val url = "https://telematics.oasa.gr/api/?act=getStopArrivals&p1=$code"
+            val req = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Linux; Android Wear OS; BusTop)")
+                .build()
             val response = httpClient.newCall(req).execute()
             val body = response.body?.string() ?: ""
             if (body.isNotEmpty() && body != "null") {
@@ -77,22 +94,55 @@ class BusTopTileService : TileService() {
                     val first = json.getJSONObject(0)
                     val routeCode = first.optString("route_code")
                     val btime = first.optInt("btime2", -1)
-                    val mins = if (btime >= 0) btime else first.optString("btime2").toIntOrNull() ?: 5
+                    val mins = if (btime >= 0) btime else first.optString("btime2").toIntOrNull() ?: 3
+                    val lineId = lineMap[routeCode] ?: routeCode.ifEmpty { "BUS" }
+                    val descr = if (json.length() > 1) {
+                        val second = json.getJSONObject(1)
+                        val r2 = second.optString("route_code")
+                        val m2 = second.optInt("btime2", 0)
+                        val l2 = lineMap[r2] ?: r2
+                        "Επόμενο: $l2 (${m2}λ)"
+                    } else {
+                        "ΟΑΣΑ Live"
+                    }
                     WatchArrival(
-                        stopName = stopName,
-                        routeId = routeCode.ifEmpty { "BUS" },
+                        stopName = sName,
+                        routeId = lineId,
                         minsRemaining = mins,
-                        destination = "ΟΑΣΑ Live"
+                        destination = descr
                     )
-                } else {
-                    WatchArrival(stopName, "--", -1, "Δεν βρέθηκαν αφίξεις")
+                } else null
+            } else null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun fetchRouteMap(code: String): Map<String, String> {
+        val map = mutableMapOf<String, String>()
+        try {
+            val url = "https://telematics.oasa.gr/api/?act=webRoutesForStop&p1=$code"
+            val req = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Linux; Android Wear OS; BusTop)")
+                .build()
+            val response = httpClient.newCall(req).execute()
+            val body = response.body?.string() ?: ""
+            if (body.isNotEmpty() && body != "null") {
+                val json = JSONArray(body)
+                for (i in 0 until json.length()) {
+                    val obj = json.getJSONObject(i)
+                    val rCode = obj.optString("RouteCode")
+                    val lId = obj.optString("LineID")
+                    if (rCode.isNotEmpty() && lId.isNotEmpty()) {
+                        map[rCode] = lId
+                    }
                 }
-            } else {
-                WatchArrival(stopName, "--", -1, "Δεν βρέθηκαν αφίξεις")
             }
         } catch (e: Exception) {
-            WatchArrival(stopName, "BUS", 4, "Σύνταγμα (Live)")
+            // ignore
         }
+        return map
     }
 
     private fun buildTileLayout(arrival: WatchArrival): LayoutElementBuilders.Layout {
