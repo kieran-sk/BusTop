@@ -4,16 +4,17 @@
  */
 
 .ticker-board {
-  background: #ffffff;
-  border-radius: var(--md-sys-shape-corner-extra-large);
-  border: 1.5px solid #e2e8f0;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
-  padding: 1.25rem;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
   color: #0f172a;
   font-family: 'Inter', 'Noto Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  overflow: hidden;
-  margin-bottom: 1.5rem;
+  overflow: visible;
+  margin-bottom: 1rem;
   position: relative;
+  width: 100%;
 }
 
 /* Board Header bar */
@@ -22,19 +23,64 @@
   align-items: center;
   justify-content: space-between;
   border-bottom: 1.5px solid #e2e8f0;
-  padding-bottom: 0.75rem;
-  margin-bottom: 0.75rem;
+  padding: 0.25rem 0 0.65rem 0;
+  margin-bottom: 0.65rem;
   text-transform: uppercase;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.ticker-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.ticker-back-btn {
+  font-size: 0.75rem;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-weight: 700;
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  white-space: nowrap;
 }
 
 .ticker-board-title {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.6rem;
-  font-size: 1rem;
+  gap: 0.4rem;
+  font-size: 0.95rem;
   font-weight: 900;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.03em;
   color: var(--md-sys-color-primary, #005ac1);
+  flex-wrap: wrap;
+}
+
+.ticker-title-sub {
+  color: #64748b;
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+
+.ticker-header-walk-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  background: #eff6ff;
+  color: #005ac1;
+  border: 1px solid #bfdbfe;
+  border-radius: 9999px;
+  padding: 2px 8px;
+  text-transform: none;
+  letter-spacing: normal;
+  white-space: nowrap;
 }
 
 /* Individual Digit Split-Flap Container */
@@ -324,8 +370,13 @@
 .ticker-row-top {
   display: flex;
   align-items: flex-start;
+  justify-content: space-between;
   gap: 0.65rem;
   width: 100%;
+}
+
+.ticker-cell-line {
+  flex-shrink: 0;
 }
 
 .ticker-dest-info {
@@ -364,6 +415,24 @@
   flex-wrap: wrap;
 }
 
+.ticker-cell-due {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.ticker-due-sublabel {
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #64748b;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+  line-height: 1;
+}
+
 .ticker-row-bottom {
   display: flex;
   align-items: center;
@@ -373,18 +442,47 @@
   margin-top: 0.5rem;
   padding-top: 0.5rem;
   border-top: 1px dashed #e2e8f0;
+  flex-wrap: wrap;
 }
 
-.ticker-cell-due {
+.ticker-commute-group {
   display: flex;
   align-items: center;
-  flex-shrink: 0;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
-.ticker-cell-commute {
-  display: flex;
+/* Walking time to stop pill with emoji */
+.ticker-walk-pill {
+  display: inline-flex;
   align-items: center;
-  flex-shrink: 0;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #334155;
+  font-size: 0.82rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.ticker-walk-emoji {
+  font-size: 0.92rem;
+  line-height: 1;
+}
+
+.ticker-walk-val {
+  font-weight: 900;
+  color: #0f172a;
+}
+
+.ticker-walk-label {
+  font-size: 0.68rem;
+  color: #64748b;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .ticker-cell-actions {
@@ -406,18 +504,18 @@
     border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
-    padding: 0.5rem 0.15rem !important;
+    padding: 0 !important;
     margin-bottom: 0.5rem !important;
     background: transparent !important;
   }
 
   .ticker-board-header {
-    padding: 0.25rem 0.35rem 0.6rem;
-    margin-bottom: 0.5rem;
+    padding: 0.25rem 0.15rem 0.5rem;
+    margin-bottom: 0.45rem;
   }
 
   .ticker-board-title {
-    font-size: 0.92rem;
+    font-size: 0.9rem;
   }
 
   .ticker-filter-bar {
@@ -434,6 +532,10 @@
   .ticker-row-bottom {
     margin-top: 0.45rem;
     padding-top: 0.45rem;
+  }
+
+  .ticker-walk-label {
+    display: none; /* Keep super clean and compact on small phones: 🚶 6λ */
   }
 }
 

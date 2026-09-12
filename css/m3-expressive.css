@@ -491,29 +491,28 @@ body {
 .m3-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 1rem;
-  padding-bottom: 6rem;
+  padding: 0.6rem 0.5rem 6rem;
 }
 
 @media (max-width: 640px) {
   .m3-container {
-    padding: 0.35rem 0.25rem 5.5rem;
+    padding: 0.25rem 0.35rem 5.5rem;
   }
 
   .m3-search-container {
-    padding: 0.5rem 0.4rem;
+    padding: 0.4rem 0.35rem;
   }
 
   .m3-card {
     border-radius: 12px;
-    padding: 0.85rem 0.65rem;
-    margin-bottom: 0.6rem;
+    padding: 0.75rem 0.65rem;
+    margin-bottom: 0.5rem;
     border-color: rgba(203, 213, 225, 0.7);
   }
 
   #selected-stop-banner {
     border-radius: 12px !important;
-    padding: 0.85rem 0.75rem !important;
+    padding: 0.75rem 0.65rem !important;
     margin-bottom: 0.5rem !important;
   }
 }

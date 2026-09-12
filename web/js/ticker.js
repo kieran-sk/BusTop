@@ -179,7 +179,7 @@ class AirportTicker {
    * Explains whether user has plenty of time (+), should leave immediately (0λ / 1-4λ), or if bus will arrive before user reaches the stop (-).
    */
   getCommuteAdvice(busMinutes, walkMinutes) {
-    if (walkMinutes === null) {
+    if (walkMinutes === null || typeof busMinutes !== 'number') {
       return {
         label: '--',
         displayLabel: '--',
@@ -197,7 +197,8 @@ class AirportTicker {
     if (buffer >= 5) {
       return {
         label: sign,
-        displayLabel: `⏱️ ${sign}`,
+        displayLabel: `⏱️ ${sign} περιθώριο`,
+        shortLabel: `⏱️ ${sign}`,
         tooltip: `Περιθώριο αναχώρησης: Έχετε ${formattedBuf} διαθέσιμα πριν ξεκινήσετε για να προλάβετε το λεωφορείο!`,
         className: 'commute-relax',
         buffer
@@ -205,7 +206,8 @@ class AirportTicker {
     } else if (buffer >= 0) {
       return {
         label: sign,
-        displayLabel: `⚡ ${sign}`,
+        displayLabel: `⚡ ${sign} άμεσα!`,
+        shortLabel: `⚡ ${sign}`,
         tooltip: `Ξεκινήστε τώρα! Το λεωφορείο φτάνει σχεδόν ταυτόχρονα με εσάς (${sign}).`,
         className: 'commute-leave-now',
         buffer
@@ -213,7 +215,8 @@ class AirportTicker {
     } else {
       return {
         label: sign,
-        displayLabel: `⚠️ ${sign}`,
+        displayLabel: `⚠️ ${sign} χάνεται`,
+        shortLabel: `⚠️ ${sign}`,
         tooltip: `Το λεωφορείο αναμένεται ${formattedBuf} πριν φτάσετε στη στάση (χρειάζεστε ${walkMinutes}λ περπάτημα).`,
         className: 'commute-hurry',
         buffer
@@ -284,9 +287,11 @@ class AirportTicker {
     // Live location report latency string
     const reportAgo = arr.last_contact_ago_gr || arr.last_contact_ago;
 
+    const walkMins = (walk && typeof walk.minutes === 'number') ? walk.minutes : null;
+
     return `
       <div class="ticker-row" onclick="window.App.openLineTimetableBothDirections('${arr.line_code}', '${arr.line_id}', '${safeDescr}')" title="Κλικ για προβολή πλήρους δρομολογίου και στάσεων">
-        <!-- Top Section: Line Badge, Destination, Direction & Live/Scheduled Status (No colored chip) -->
+        <!-- Top Section: Line Badge, Destination, Direction, GPS Status & Labeled Arrival Countdown -->
         <div class="ticker-row-top">
           <div class="ticker-cell-line">
             <span class="ticker-line-badge">
@@ -312,18 +317,26 @@ class AirportTicker {
               ${lineDescr && arr.destination && lineDescr !== arr.destination ? `<span style="font-size: 0.7rem; color: #94a3b8;">• ${lineDescr}</span>` : ''}
             </div>
           </div>
-        </div>
-
-        <!-- Bottom Section: Arrival Time, Commute Difference, Alarm and Pin -->
-        <div class="ticker-row-bottom">
           <div class="ticker-cell-due" title="Εκτιμώμενος χρόνος άφιξης στη στάση">
+            <span class="ticker-due-sublabel">Άφιξη</span>
             ${dueDisplay}
           </div>
+        </div>
 
-          <div class="ticker-cell-commute" title="${advice.tooltip || 'Χρονικό περιθώριο αναχώρησης'}">
-            <span class="ticker-commute-badge ${advice.className}">
+        <!-- Bottom Section: Walking Time with Emoji, Commute Difference / Buffer, Alarm and Pin -->
+        <div class="ticker-row-bottom">
+          <div class="ticker-commute-group">
+            <!-- Walking time with walking emoji -->
+            <div class="ticker-walk-pill" title="${walk ? `Χρόνος περπατήματος μέχρι τη στάση: ${walk.minutes}λ • Απόσταση: ${walk.meters}μ` : 'Άγνωστη απόσταση περπατήματος'}">
+              <span class="ticker-walk-emoji">🚶</span>
+              <span class="ticker-walk-val">${walkMins !== null ? `${walkMins}λ` : '—'}</span>
+              <span class="ticker-walk-label">περπάτημα</span>
+            </div>
+
+            <!-- Commute Buffer / Departure Timing Advice Badge -->
+            <div class="ticker-commute-badge ${advice.className}" title="${advice.tooltip || 'Χρονικό περιθώριο αναχώρησης'}">
               ${advice.displayLabel || advice.label}
-            </span>
+            </div>
           </div>
 
           <div class="ticker-cell-actions">
@@ -583,18 +596,27 @@ class AirportTicker {
       `;
     }
 
+    const walkHeaderPill = (walk && typeof walk.minutes === 'number') ? `
+      <span class="ticker-header-walk-pill" title="Χρόνος περπατήματος από την τοποθεσία σας: ${walk.minutes}λ (${walk.meters}μ)">
+        🚶 ${walk.minutes}λ (${walk.meters}μ)
+      </span>
+    ` : '';
+
     container.innerHTML = `
       <div class="ticker-board">
         <div class="ticker-board-header">
-          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-            <button class="m3-btn m3-btn-tonal" style="font-size: 0.75rem; padding: 3px 10px; border-radius: 9999px; font-weight: 700; background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface); border: 1px solid var(--md-sys-color-outline-variant);" onclick="event.stopPropagation(); window.App.showAllStopsInArrivals();" title="Επιστροφή σε όλες τις στάσεις">
+          <div class="ticker-header-left">
+            <button class="m3-btn m3-btn-tonal ticker-back-btn" onclick="event.stopPropagation(); window.App.showAllStopsInArrivals();" title="Επιστροφή σε όλες τις στάσεις">
               ⬅ Όλες οι Στάσεις
             </button>
             <div class="ticker-board-title">
               <span class="m3-pulse-dot" style="background: var(--md-sys-color-primary);"></span>
-              ${stopName.toUpperCase()} • ΑΦΙΞΕΙΣ
+              <span>${stopName.toUpperCase()}</span>
+              <span class="ticker-title-sub">• ΑΦΙΞΕΙΣ</span>
+              ${walkHeaderPill}
             </div>
           </div>
+          <div class="ticker-clock ticker-clock-compact" id="ticker-live-clock" title="Τρέχουσα ώρα Αθήνας">--:--:--</div>
         </div>
 
         ${filterBarHtml}

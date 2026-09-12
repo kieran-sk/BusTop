@@ -245,11 +245,23 @@ h1, h2, h3, h4, .m3-title {
 }
 
 /* Badges & Commute Advice */
-.m3-badge, .ticker-commute-badge {
+.m3-badge, .ticker-commute-badge, .ticker-walk-pill {
   border-radius: 3px !important;
   border: 1px solid currentColor !important;
   font-family: var(--font-matrix-mono), monospace !important;
   font-weight: 700 !important;
+}
+
+.ticker-walk-pill {
+  border-color: var(--matrix-border) !important;
+  background: var(--matrix-surface-sunken) !important;
+}
+
+.ticker-board {
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
 }
 
 /* Modals & Dialogs: Physical Hardware Terminal */
