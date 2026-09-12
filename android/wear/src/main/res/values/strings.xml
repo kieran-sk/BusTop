@@ -1,6 +1,5 @@
-<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">BusTop Wear</string>
-    <string name="tile_name">BusTop ΟΑΣΑ</string>
-    <string name="tile_description">Ζωντανές αφίξεις λεωφορείων ΟΑΣΑ στον καρπό σας</string>
+    <string name="app_name">BusTop</string>
+    <!-- Replace with your Google Maps API Key or inject via BuildConfig -->
+    <string name="google_maps_key">YOUR_GOOGLE_MAPS_API_KEY</string>
 </resources>
