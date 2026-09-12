@@ -536,28 +536,44 @@ class AirportTicker {
       }
 
       // STOPS VIEW
-      // If we have all stops loaded or search query, use master stops; otherwise combine with nearby stops
-      let allStopsSource = [];
-      if (Array.isArray(this.allStops) && this.allStops.length > 0) {
-        allStopsSource = this.allStops;
-      } else {
-        // Asynchronously load all stops in the background
-        this.loadAllStops();
-        allStopsSource = rawStops;
-      }
+      // rawStops contains all enriched nearby stops (with serving_lines).
+      // allStops (from /api/stops/all) has no serving_lines so we don't use it
+      // as the base. Instead we always start from rawStops and, when the user
+      // is searching, we augment with a city-wide /api/stops/search call.
+      let stopsToDisplay = rawStops;
 
-      // Filter stops if query exists
-      let stopsToDisplay = allStopsSource;
       if (this.stopsFilterQuery && this.stopsFilterQuery.trim().length > 0) {
         const normQ = this.stopsFilterQuery.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-        stopsToDisplay = allStopsSource.filter(s => {
+        // Filter nearby (enriched) stops first
+        const nearbyMatches = rawStops.filter(s => {
           const sCode = String(s.StopCode || '');
           const sName = (s.StopDescr || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
           const sStreet = (s.StopStreet || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
           return sCode.includes(normQ) || sName.includes(normQ) || sStreet.includes(normQ);
         });
-      } else if (allStopsSource === rawStops) {
-        stopsToDisplay = rawStops;
+        // Also search city-wide asynchronously and merge results
+        const nearbyCodes = new Set(nearbyMatches.map(s => String(s.StopCode)));
+        if (!this._lastSearchQ || this._lastSearchQ !== normQ) {
+          this._lastSearchQ = normQ;
+          window.API.fetchJson(`/api/stops/search?q=${encodeURIComponent(normQ)}`).then(remote => {
+            if (!Array.isArray(remote)) return;
+            const merged = [...nearbyMatches];
+            for (const rs of remote) {
+              if (!nearbyCodes.has(String(rs.StopCode))) merged.push(rs);
+            }
+            this._citySearchResults = merged;
+            if (this.stopsFilterQuery && this.stopsFilterQuery.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim() === normQ) {
+              this.render();
+            }
+          }).catch(() => {});
+        }
+        stopsToDisplay = this._citySearchResults && this._lastSearchQ === normQ
+          ? this._citySearchResults
+          : nearbyMatches;
+      } else {
+        // Reset city-search state when query is cleared
+        this._lastSearchQ = null;
+        this._citySearchResults = null;
       }
 
       // Prioritize favorites and active lines
@@ -610,16 +626,15 @@ class AirportTicker {
               const hasRoutes = Array.isArray(s.serving_lines) && s.serving_lines.length > 0;
               let linesPills = '';
               if (hasRoutes) {
-                linesPills = s.serving_lines.slice(0, 6).map(l => `
-                  <span class="m3-badge" style="background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface); font-size: 0.75rem; padding: 2px 7px; border: 1px solid var(--md-sys-color-outline-variant); margin-bottom: 2px;">
+                linesPills = s.serving_lines.slice(0, 3).map(l => `
+                  <span class="m3-badge" style="background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface); font-size: 0.75rem; padding: 2px 7px; border: 1px solid var(--md-sys-color-outline-variant); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;">
                     <strong style="color: var(--md-sys-color-primary);">${l.line_id}</strong>
                     <span style="color: var(--md-sys-color-outline); margin: 0 3px;">προς</span>
                     <span>${l.last_stop}</span>
-                    ${l.direction ? `<span style="font-size: 0.68rem; color: #64748b; margin-left: 2px;">(${l.direction})</span>` : ''}
                   </span>
                 `).join('');
-                if (s.serving_lines.length > 6) {
-                  linesPills += `<span style="font-size: 0.7rem; color: #64748b; font-weight: 700; align-self: center;">+${s.serving_lines.length - 6} ακόμη</span>`;
+                if (s.serving_lines.length > 3) {
+                  linesPills += `<span class="m3-badge" style="background: var(--md-sys-color-surface-container-high); color: #64748b; font-size: 0.75rem; padding: 2px 7px; border: 1px solid var(--md-sys-color-outline-variant); margin-bottom: 2px; font-weight: 700; letter-spacing: 0.05em;">…</span>`;
                 }
               }
 
