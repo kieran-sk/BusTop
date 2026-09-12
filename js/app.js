@@ -396,10 +396,8 @@ class AppController {
   }
 
   updateBackButtonsVisibility() {
-    const canGoBack = this.navHistory.length > 0 || 
-                      this.activeTab === 'timetable' || 
+    const canGoBack = this.activeTab === 'timetable' || 
                       (this.activeTab === 'ticker' && !!this.currentStop) || 
-                      (this.activeTab !== 'search') ||
                       !!document.querySelector('.m3-dialog-backdrop.open');
 
     const globalBackBtn = document.getElementById('global-back-btn');

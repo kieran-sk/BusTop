@@ -588,16 +588,6 @@ class AirportTicker {
               🚌 Όλες οι Γραμμές ${lines.length > 0 ? `(${lines.length})` : ''}
             </button>
           </div>
-
-          <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <div style="position: relative; display: flex; align-items: center;">
-              <input type="text" placeholder="Αναζήτηση στάσης..." value="${this.stopsFilterQuery || ''}" oninput="window.App.ticker.setStopsFilterQuery(this.value)" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; border: 1px solid var(--md-sys-color-outline-variant); border-radius: 9999px; background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface); outline: none; width: 160px;" />
-            </div>
-            <button class="m3-btn m3-btn-tonal" style="font-size: 0.78rem; padding: 0.35rem 0.75rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;" onclick="window.App.ticker.loadAllStops()">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
-              Όλες
-            </button>
-          </div>
         </div>
       `;
 

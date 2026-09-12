@@ -138,6 +138,20 @@ class PinnedTripsManager {
     }
   }
 
+  removePinByStopAndLine(stopCode, lineId) {
+    const normStop = String(stopCode || '').trim();
+    const normLine = String(lineId || '').trim().toUpperCase();
+    const initialCount = this.pinnedItems.length;
+    this.pinnedItems = this.pinnedItems.filter(p => !(String(p.stopCode).trim() === normStop && String(p.lineId).trim().toUpperCase() === normLine));
+    if (this.pinnedItems.length !== initialCount) {
+      this.save();
+      this.updateLiveAndroidNotification();
+      if (window.App && window.App.ticker) {
+        window.App.ticker.render();
+      }
+    }
+  }
+
   clearAll() {
     if (this.pinnedItems.length === 0) return;
     if (confirm('Θέλετε να αφαιρέσετε όλες τις καρφιτσωμένες αφίξεις;')) {
@@ -187,6 +201,26 @@ class PinnedTripsManager {
         console.warn(`Could not refresh pinned stop ${code}:`, e);
       }
     }));
+
+    // Auto-dismiss pinned trips when the bus arrives/departs (btime2 <= 0)
+    let autoDismissed = false;
+    for (const item of [...this.pinnedItems]) {
+      const arrs = this.liveArrivals.get(item.stopCode) || [];
+      const match = arrs.find(a => 
+        String(a.line_id || a.LineID).trim().toUpperCase() === String(item.lineId).trim().toUpperCase() &&
+        (!item.routeCode || String(a.route_code) === String(item.routeCode))
+      );
+      if (match && typeof match.btime2 === 'number' && match.btime2 <= 0) {
+        this.pinnedItems = this.pinnedItems.filter(p => p.id !== item.id);
+        autoDismissed = true;
+      }
+    }
+    if (autoDismissed) {
+      this.save();
+      if (window.App && window.App.ticker) {
+        window.App.ticker.render();
+      }
+    }
 
     this.renderUI();
     this.updateLiveAndroidNotification();

@@ -269,6 +269,44 @@ export default {
         }
         const mArr = path.match(/^\/api\/stops\/([^\/]+)\/arrivals$/);
         if (mArr) return jsonRes(await getCombinedArrivals(mArr[1], url.searchParams.get('day') || 'today'));
+        if (path === '/api/stops/all') {
+          const cached = getCache('all_master_stops');
+          if (cached) return jsonRes(cached);
+          try {
+            const buf = await oasaRequest('getStops', {}, 86400);
+            return jsonRes(Array.isArray(buf) ? buf : []);
+          } catch(e) {
+            return jsonRes([]);
+          }
+        }
+        if (path === '/api/stops/search') {
+          const q = (url.searchParams.get('q') || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+          if (!q) return jsonRes([]);
+          // Search closest stops around Athens central hubs
+          const hubs = [
+            { lat: 37.9845, lng: 23.7335 }, // Center / Omonia / Syntagma
+            { lat: 37.9429, lng: 23.6469 }, // Piraeus
+            { lat: 38.0483, lng: 23.8055 }, // Marousi / Kifisia
+            { lat: 37.9056, lng: 23.7547 }  // Glyfada / South
+          ];
+          const results = await Promise.all(hubs.map(h => oasaRequest('getClosestStops', { p1: h.lat, p2: h.lng }, 120).catch(() => [])));
+          const merged = new Map();
+          for (const list of results) {
+            if (Array.isArray(list)) {
+              for (const s of list) {
+                const sCode = String(s.StopCode);
+                if (!merged.has(sCode)) {
+                  const sName = (s.StopDescr || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+                  const sStreet = (s.StopStreet || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+                  if (sCode.includes(q) || sName.includes(q) || sStreet.includes(q)) {
+                    merged.set(sCode, s);
+                  }
+                }
+              }
+            }
+          }
+          return jsonRes(Array.from(merged.values()).slice(0, 30));
+        }
         if (path === '/api/stops/closest') {
           const lat = parseFloat(url.searchParams.get('lat')), lng = parseFloat(url.searchParams.get('lng'));
           if (isNaN(lat) || isNaN(lng)) return jsonRes([]);

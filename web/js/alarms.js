@@ -116,6 +116,12 @@ class AlarmManager {
     this.stopAlarmRinging();
     this.isRinging = true;
 
+    // If running inside Android APK (AndroidBridge present), only ring the native alarm!
+    // Do not ring Web Audio oscillator siren or browser vibration to prevent dual/overlapping alarms.
+    if (window.AndroidBridge) {
+      return;
+    }
+
     // 1. Aggressive repeating vibration pattern (800ms vibrate, 200ms pause)
     if ('vibrate' in navigator) {
       navigator.vibrate([800, 200, 800, 200, 800, 200, 1200]);
@@ -188,6 +194,20 @@ class AlarmManager {
       try {
         window.AndroidBridge.dismissAlarm();
       } catch (e) {}
+    }
+
+    // Dismiss triggered alarms and clean up corresponding pinned trips
+    const triggeredAlarms = this.alarms.filter(a => a.triggered);
+    if (triggeredAlarms.length > 0) {
+      triggeredAlarms.forEach(a => {
+        this.clearLiveNotification(a.id);
+        if (window.PinnedTrips && typeof window.PinnedTrips.removePinByStopAndLine === 'function') {
+          window.PinnedTrips.removePinByStopAndLine(a.stopCode, a.lineId);
+        }
+      });
+      this.alarms = this.alarms.filter(a => !a.triggered);
+      this.save();
+      this.renderUI();
     }
   }
 

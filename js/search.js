@@ -343,11 +343,6 @@ class SearchManager {
       // Sort by walking distance
       return (a.distanceMeters || 0) - (b.distanceMeters || 0);
     });
-
-    // Strictly limit to 20 nearest stops
-    if (this.nearbyStops.length > 20) {
-      this.nearbyStops = this.nearbyStops.slice(0, 20);
-    }
   }
 
   toggleShowAllNearby() {
