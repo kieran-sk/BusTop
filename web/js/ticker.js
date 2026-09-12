@@ -197,7 +197,7 @@ class AirportTicker {
     if (buffer >= 5) {
       return {
         label: sign,
-        displayLabel: `⏱️ ${sign} περιθώριο`,
+        displayLabel: `⏱️ ${sign}`,
         shortLabel: `⏱️ ${sign}`,
         tooltip: `Περιθώριο αναχώρησης: Έχετε ${formattedBuf} διαθέσιμα πριν ξεκινήσετε για να προλάβετε το λεωφορείο!`,
         className: 'commute-relax',
@@ -206,7 +206,7 @@ class AirportTicker {
     } else if (buffer >= 0) {
       return {
         label: sign,
-        displayLabel: `⚡ ${sign} άμεσα!`,
+        displayLabel: `⚡ ${sign}`,
         shortLabel: `⚡ ${sign}`,
         tooltip: `Ξεκινήστε τώρα! Το λεωφορείο φτάνει σχεδόν ταυτόχρονα με εσάς (${sign}).`,
         className: 'commute-leave-now',
@@ -215,7 +215,7 @@ class AirportTicker {
     } else {
       return {
         label: sign,
-        displayLabel: `⚠️ ${sign} χάνεται`,
+        displayLabel: `⚠️ ${sign}`,
         shortLabel: `⚠️ ${sign}`,
         tooltip: `Το λεωφορείο αναμένεται ${formattedBuf} πριν φτάσετε στη στάση (χρειάζεστε ${walkMinutes}λ περπάτημα).`,
         className: 'commute-hurry',
@@ -596,29 +596,8 @@ class AirportTicker {
       `;
     }
 
-    const walkHeaderPill = (walk && typeof walk.minutes === 'number') ? `
-      <span class="ticker-header-walk-pill" title="Χρόνος περπατήματος από την τοποθεσία σας: ${walk.minutes}λ (${walk.meters}μ)">
-        🚶 ${walk.minutes}λ (${walk.meters}μ)
-      </span>
-    ` : '';
-
     container.innerHTML = `
       <div class="ticker-board">
-        <div class="ticker-board-header">
-          <div class="ticker-header-left">
-            <button class="m3-btn m3-btn-tonal ticker-back-btn" onclick="event.stopPropagation(); window.App.showAllStopsInArrivals();" title="Επιστροφή σε όλες τις στάσεις">
-              ⬅ Όλες οι Στάσεις
-            </button>
-            <div class="ticker-board-title">
-              <span class="m3-pulse-dot" style="background: var(--md-sys-color-primary);"></span>
-              <span>${stopName.toUpperCase()}</span>
-              <span class="ticker-title-sub">• ΑΦΙΞΕΙΣ</span>
-              ${walkHeaderPill}
-            </div>
-          </div>
-          <div class="ticker-clock ticker-clock-compact" id="ticker-live-clock" title="Τρέχουσα ώρα Αθήνας">--:--:--</div>
-        </div>
-
         ${filterBarHtml}
 
         <div class="ticker-rows">

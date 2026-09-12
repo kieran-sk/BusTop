@@ -324,7 +324,7 @@ class PinnedTripsManager {
             </svg>
           </div>
           <h3 style="font-size: 1.2rem; font-weight: 800; color: var(--md-sys-color-on-surface); margin-bottom: 0.5rem;">
-            Καρφίτσες • Καρφιτσωμένες Αφίξεις
+            Καρφιτσωμένες Αφίξεις
           </h3>
           <p style="font-size: 0.9rem; color: var(--md-sys-color-outline); max-width: 440px; margin: 0 auto 1.5rem; line-height: 1.5;">
             Καρφιτσώστε λεωφορεία από οποιαδήποτε στάση για να παρακολουθείτε ζωντανά τις αφίξεις τους σε έναν συγκεντρωτικό πίνακα!
@@ -438,7 +438,7 @@ class PinnedTripsManager {
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1px solid var(--md-sys-color-outline-variant); padding-bottom: 0.75rem;">
           <div>
             <h2 style="font-size: 1.25rem; font-weight: 900; color: var(--md-sys-color-on-surface); margin: 0;">
-              Καρφίτσες • Καρφιτσωμένες Αφίξεις
+              Καρφιτσωμένες Αφίξεις
             </h2>
             <div style="font-size: 0.8rem; color: var(--md-sys-color-outline); margin-top: 2px;">
               ${this.pinnedItems.length} καρφιτσωμένες γραμμές

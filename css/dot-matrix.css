@@ -5,7 +5,7 @@
  * tactile hardware buttons, and crisp monospace Greek typography.
  */
 
-@import url('https://fonts.googleapis.com/css2?family=DotGothic16&family=VT323&family=Silkscreen:wght@400;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;0,700;1,400&family=Silkscreen:wght@400;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap&subset=greek,greek-ext,latin');
 
 :root {
   /* Dot-Matrix Light Mode Palette */
@@ -26,10 +26,10 @@
   --led-blue: #0284c7;
   --led-red: #dc2626;
 
-  /* Typography */
-  --font-matrix-display: 'Silkscreen', 'VT323', monospace;
-  --font-matrix-greek: 'DotGothic16', 'Space Mono', monospace;
-  --font-matrix-mono: 'Space Mono', monospace;
+  /* Typography: Greek-compatible monospace fonts with proper diacritics */
+  --font-matrix-display: 'IBM Plex Mono', 'Space Mono', monospace;
+  --font-matrix-greek: 'IBM Plex Mono', 'Space Mono', 'Noto Sans Mono', monospace;
+  --font-matrix-mono: 'IBM Plex Mono', 'Space Mono', monospace;
 }
 
 /* Background subtle LED grid */
@@ -129,18 +129,28 @@ h1, h2, h3, h4, .m3-title {
   color: var(--matrix-text-main) !important;
 }
 
-/* Filter Chips */
-.m3-filter-chip {
+/* Filter Chips & Selection Pills */
+.m3-filter-chip, .ticker-filter-pill {
   border-radius: 4px !important;
   border: 1.5px solid var(--matrix-border) !important;
   font-family: var(--font-matrix-mono), monospace !important;
   font-weight: 700 !important;
   box-shadow: 1px 1px 0 var(--matrix-border) !important;
+  transition: all 0.08s ease !important;
 }
 
-.m3-filter-chip.active {
+.m3-filter-chip.active, .ticker-filter-pill.is-active {
   background: var(--matrix-border) !important;
   color: #fbbf24 !important;
+  border-color: var(--matrix-border) !important;
+}
+
+#day-today-btn, #day-tomorrow-btn,
+#filter-all-btn, #filter-live-btn, #filter-sched-btn {
+  border-radius: 4px !important;
+  font-family: var(--font-matrix-mono), monospace !important;
+  font-weight: 700 !important;
+  font-size: 0.76rem !important;
 }
 
 /* Line Badges: Physical Amber / Dark LED plates */
@@ -160,34 +170,58 @@ h1, h2, h3, h4, .m3-title {
 /* Dot-Matrix Split Flap Digit Tiles */
 .flap-digit-box {
   border-radius: 2px !important;
-  border: 1.5px solid #334155 !important;
-  background: #090d16 !important;
-  color: #38bdf8 !important;
-  font-family: var(--font-matrix-display) !important;
-  font-weight: 700 !important;
-  text-shadow: 0 0 4px rgba(56, 189, 248, 0.5) !important;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.2) !important;
+  border: 1px solid #1e293b !important;
+  background: #0f172a !important;
+  color: #ffffff !important;
+  font-family: var(--font-matrix-mono), monospace !important;
+  font-weight: 800 !important;
+  text-shadow: none !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.15) !important;
 }
 
 .split-flap-board.urgency-soon .flap-digit-box {
-  color: #fbbf24 !important;
-  text-shadow: 0 0 5px rgba(251, 191, 36, 0.6) !important;
+  color: #f59e0b !important;
+  border-color: #78350f !important;
+  text-shadow: none !important;
 }
 
 .split-flap-board.urgency-now .flap-digit-box {
   color: #ef4444 !important;
-  text-shadow: 0 0 6px rgba(239, 68, 68, 0.7) !important;
+  border-color: #7f1d1d !important;
+  text-shadow: none !important;
 }
 
 /* Ticker Clock */
 .ticker-clock {
-  font-family: var(--font-matrix-display) !important;
-  border: 2px solid var(--matrix-border) !important;
+  font-family: var(--font-matrix-mono), monospace !important;
+  border: 1.5px solid var(--matrix-border) !important;
   border-radius: 4px !important;
   background: #0f172a !important;
   color: #38bdf8 !important;
-  text-shadow: 0 0 4px rgba(56, 189, 248, 0.4) !important;
-  box-shadow: 2px 2px 0 var(--matrix-border) !important;
+  box-shadow: 1px 1px 0 var(--matrix-border) !important;
+}
+
+.ticker-clock-compact {
+  border-radius: 9999px !important;
+  background: #0f172a !important;
+  border: 1px solid #334155 !important;
+  padding: 2px 8px !important;
+}
+
+.ticker-clock-compact .flap-digit-box {
+  background: #1e293b !important;
+  color: #38bdf8 !important;
+  font-size: 0.82rem !important;
+  min-width: 14px !important;
+  height: 20px !important;
+  line-height: 20px !important;
+  border-color: #334155 !important;
+  margin: 0 1px !important;
+}
+
+.ticker-clock-compact .flap-separator {
+  color: #94a3b8 !important;
+  font-family: var(--font-matrix-mono), monospace !important;
 }
 
 /* Ticker Rows (Hardware Departures Board) */

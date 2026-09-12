@@ -54,6 +54,18 @@ class FavoritesManager {
       } catch (e) {}
     }
     this.render();
+    // Quickly refresh other UI components so stars and favorite lists update immediately
+    if (window.Search && typeof window.Search.sortStopsWithFavorites === 'function') {
+      window.Search.sortStopsWithFavorites();
+      const uLat = window.App && window.App.userLocation ? window.App.userLocation.lat : null;
+      const uLng = window.App && window.App.userLocation ? window.App.userLocation.lng : null;
+      if (typeof window.Search.renderNearbyStops === 'function' && document.getElementById('nearby-stops-container')) {
+        window.Search.renderNearbyStops(uLat, uLng);
+      }
+    }
+    if (window.App && window.App.ticker && !window.App.currentStop) {
+      window.App.ticker.render();
+    }
   }
 
   exportBackup() {

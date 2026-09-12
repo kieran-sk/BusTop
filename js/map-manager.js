@@ -40,7 +40,7 @@ class MapManager {
 
     this.map = L.map(this.containerId, {
       center: initialCenter,
-      zoom: 15,
+      zoom: 16,
       zoomControl: false
     });
 
@@ -552,6 +552,41 @@ class MapManager {
   clearAll() {
     if (this.routeLayer) this.routeLayer.clearLayers();
     if (this.busLayer) this.busLayer.clearLayers();
+  }
+
+  toggleFullscreen() {
+    const card = document.getElementById('map-card-wrapper');
+    const btn = document.getElementById('map-fullscreen-btn');
+    if (!card) return;
+
+    const isFull = card.classList.toggle('map-card-fullscreen');
+    if (btn) {
+      btn.innerHTML = isFull ? `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="4 14 10 14 10 20"></polyline>
+          <polyline points="20 10 14 10 14 4"></polyline>
+          <line x1="14" y1="10" x2="21" y2="3"></line>
+          <line x1="3" y1="21" x2="10" y2="14"></line>
+        </svg>
+      ` : `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 3 21 3 21 9"></polyline>
+          <polyline points="9 21 3 21 3 15"></polyline>
+          <line x1="21" y1="3" x2="14" y2="10"></line>
+          <line x1="3" y1="21" x2="10" y2="14"></line>
+        </svg>
+      `;
+      btn.title = isFull ? 'Κλείσιμο πλήρους οθόνης' : 'Πλήρης οθόνη χάρτη';
+    }
+
+    if (this.map) {
+      setTimeout(() => {
+        this.map.invalidateSize();
+      }, 100);
+      setTimeout(() => {
+        this.map.invalidateSize();
+      }, 300);
+    }
   }
 }
 

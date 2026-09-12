@@ -784,5 +784,16 @@ body {
   background-color: var(--md-sys-color-surface-container-high) !important;
 }
 
-
-
+/* Fullscreen Map Mode */
+#map-card-wrapper.map-card-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  z-index: 9999 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
