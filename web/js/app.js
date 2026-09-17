@@ -591,7 +591,7 @@ class AppController {
     if (banner) {
       banner.style.display = 'flex';
       banner.querySelector('#selected-stop-title').innerText = stopName;
-      banner.querySelector('#selected-stop-code').innerText = `Στάση #${stopCodeStr}`;
+      banner.querySelector('#selected-stop-code').innerText = `#${stopCodeStr}`;
 
       // Populate walking time pill if user location is available
       const walkPill = banner.querySelector('#selected-stop-walk-pill');
@@ -624,10 +624,23 @@ class AppController {
             starSvg.setAttribute('fill', '#eab308');
             starSvg.setAttribute('stroke', '#ca8a04');
             starBtn.title = 'Αποθηκευμένο στα αγαπημένα (κλικ για αφαίρεση)';
+            banner.classList.add('is-favourite');
           } else {
             starSvg.setAttribute('fill', 'none');
             starSvg.setAttribute('stroke', 'currentColor');
             starBtn.title = 'Αποθήκευση στάσης στα αγαπημένα';
+            banner.classList.remove('is-favourite');
+          }
+        }
+      };
+      updateStarIcon();
+      if (starBtn) {
+        starBtn.onclick = () => {
+          window.Favorites.toggleStop(stopCode, stopName, lat, lng);
+          updateStarIcon();
+        };
+      }
+    }
           }
         }
       };

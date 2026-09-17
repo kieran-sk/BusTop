@@ -44,8 +44,7 @@ class MapManager {
       zoomControl: false
     });
 
-    // Add zoom control in bottom right
-    L.control.zoom({ position: 'bottomright' }).addTo(this.map);
+    // Zoom control intentionally hidden — pinch/scroll to zoom
 
     // OpenStreetMap Tile Layer (Crisp, light mode)
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {

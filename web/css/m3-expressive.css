@@ -797,3 +797,9 @@ body {
   border: none !important;
   box-shadow: none !important;
 }
+
+/* Favourite stop banner — gold left border */
+#selected-stop-banner.is-favourite {
+  border-left-color: #eab308 !important;
+  border-left-width: 5px !important;
+}

@@ -279,7 +279,7 @@ class AirportTicker {
     const busMins = arr.btime2;
     const advice = this.getCommuteAdvice(busMins, walk ? walk.minutes : null);
     const isLive = arr.is_live;
-    const directionText = arr.direction || 'Μετάβαση';
+    const directionText = arr.direction || '→';
     const lineDescr = arr.route_descr || arr.line_descr || 'Διαδρομή Λεωφορείου';
     const safeDescr = lineDescr.replace(/'/g, "\\'");
 
@@ -353,7 +353,7 @@ class AirportTicker {
                 </span>
               ` : `
                 <span style="color: #64748b; font-weight: 600; font-size: 0.74rem;">
-                  🕒 Προγραμματισμένο${arr.departure_time ? ` (Αναχώρηση ${arr.departure_time})` : ''}
+                  ${arr.departure_time ? `🕒 ${arr.departure_time}` : '🕒 —'}
                 </span>
               `}
               ${lineDescr && arr.destination && lineDescr !== arr.destination ? `<span style="font-size: 0.7rem; color: #94a3b8;">• ${lineDescr}</span>` : ''}
