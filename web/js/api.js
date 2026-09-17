@@ -107,7 +107,15 @@ const API = {
   },
 
   async getAllStops() {
-    return this.fetchJson('/api/stops/all');
+    try {
+      const res = await this.fetchJson('/api/stops/all');
+      if (Array.isArray(res) && res.length > 0) return res;
+    } catch (e) {}
+    try {
+      const res2 = await this.fetchJson('/data/all_stops.json');
+      if (Array.isArray(res2) && res2.length > 0) return res2;
+    } catch (e2) {}
+    return [];
   },
 
   async getStopsInBounds(north, south, east, west, limit = 80) {

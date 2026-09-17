@@ -273,8 +273,51 @@ export default {
           const cached = getCache('all_master_stops');
           if (cached) return jsonRes(cached);
           try {
-            const buf = await oasaRequest('getStops', {}, 86400);
-            return jsonRes(Array.isArray(buf) ? buf : []);
+            // First attempt to load bundled static all_stops.json from assets
+            const assetRes = await env.ASSETS.fetch(new Request(new URL('/data/all_stops.json', request.url)));
+            if (assetRes.ok) {
+              const stops = await assetRes.json();
+              if (Array.isArray(stops) && stops.length > 0) {
+                setCache('all_master_stops', stops, 86400);
+                return jsonRes(stops);
+              }
+            }
+          } catch(assetErr) {}
+
+          try {
+            const res = await fetch('https://telematics.oasa.gr/api/?act=getStops', {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept': '*/*'
+              }
+            });
+            if (!res.ok) throw new Error('OASA API error');
+            const rawText = await res.text();
+            // Parse OASA SQL/tuple format: (-order, "StopCode", "StopDescr", "StopDescrEng", "StopStreet", "StopStreetEng", Heading, StopLng, StopLat, ...)
+            const stops = [];
+            const regex = /\(-?\d+,\s*"([^"]+)",\s*"([^"]*)",\s*"([^"]*)",\s*"([^"]*)",\s*"([^"]*)",\s*[^,]+,\s*([0-9.]+),\s*([0-9.]+)/g;
+            let match;
+            while ((match = regex.exec(rawText)) !== null) {
+              const stopCode = match[1];
+              const descr = match[2];
+              const descrEng = match[3];
+              const street = match[4] === 'null' ? '' : match[4];
+              const lng = parseFloat(match[6]);
+              const lat = parseFloat(match[7]);
+              stops.push({
+                StopCode: stopCode,
+                StopDescr: descr,
+                StopDescrEng: descrEng,
+                StopStreet: street,
+                StopLat: lat,
+                StopLng: lng
+              });
+            }
+            if (stops.length > 0) {
+              setCache('all_master_stops', stops, 86400);
+              return jsonRes(stops);
+            }
+            return jsonRes([]);
           } catch(e) {
             return jsonRes([]);
           }

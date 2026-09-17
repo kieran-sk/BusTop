@@ -21,9 +21,17 @@ class AirportTicker {
     this.linesFilterQuery = '';
     this.allStops = [];
     this.stopsFilterQuery = '';
+    this.stopsPageSize = 80;
+    this.stopsVisibleCount = 80;
     this.isLoadingAllStops = false;
     window.Ticker = this;
     this.startClock();
+    this.loadAllStops();
+  }
+
+  loadMoreStops() {
+    this.stopsVisibleCount += this.stopsPageSize;
+    this.render();
   }
 
   setActiveView(view) {
@@ -41,6 +49,7 @@ class AirportTicker {
 
   setStopsFilterQuery(q) {
     this.stopsFilterQuery = q;
+    this.stopsVisibleCount = this.stopsPageSize;
     this.render();
   }
 
@@ -459,12 +468,15 @@ class AirportTicker {
         });
       }
 
+      // Total stops count (either master allStops or nearbyStops)
+      const totalStopsCount = (this.allStops && this.allStops.length > 0) ? this.allStops.length : rawStops.length;
+
       // Header with view switcher (Στάσεις vs Γραμμές)
       const tabSwitcherHtml = `
         <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; padding: 0.25rem 0.1rem;">
           <div style="display: inline-flex; background: var(--md-sys-color-surface-container-high); padding: 4px; border-radius: 9999px; border: 1px solid var(--md-sys-color-outline-variant);">
             <button class="m3-btn ${this.activeView === 'stops' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="font-size: 0.82rem; padding: 0.35rem 1rem; border-radius: 9999px; border: none; font-weight: 800; cursor: pointer;" onclick="window.App.ticker.setActiveView('stops')">
-              🚏 Στάσεις ${displayStops.length > 0 ? `(${displayStops.length})` : ''}
+              🚏 Στάσεις ${totalStopsCount > 0 ? `(${totalStopsCount})` : (this.isLoadingAllStops ? '(φόρτωση...)' : '')}
             </button>
             <button class="m3-btn ${this.activeView === 'lines' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="font-size: 0.82rem; padding: 0.35rem 1rem; border-radius: 9999px; border: none; font-weight: 800; cursor: pointer;" onclick="window.App.ticker.setActiveView('lines')">
               🚌 Όλες οι Γραμμές ${lines.length > 0 ? `(${lines.length})` : ''}
@@ -530,72 +542,80 @@ class AirportTicker {
       }
 
       // STOPS VIEW
-      // rawStops contains all enriched nearby stops (with serving_lines).
-      // allStops (from /api/stops/all) has no serving_lines so we don't use it
-      // as the base. Instead we always start from rawStops and, when the user
-      // is searching, we augment with a city-wide /api/stops/search call.
-      let stopsToDisplay = rawStops;
+      // Merge all master stops (~9,425) with enriched nearby stops so nearby stops retain
+      // their walking distances and serving lines while allowing the user to browse every stop in Athens.
+      const nearbyMap = new Map(rawStops.map(s => [String(s.StopCode), s]));
+      
+      let masterStopsList = [];
+      if (this.allStops && this.allStops.length > 0) {
+        masterStopsList = this.allStops.map(s => nearbyMap.get(String(s.StopCode)) || s);
+        // Include any rawStops that might not be in allStops
+        for (const ns of rawStops) {
+          if (!this.allStops.some(s => String(s.StopCode) === String(ns.StopCode))) {
+            masterStopsList.unshift(ns);
+          }
+        }
+      } else {
+        masterStopsList = rawStops;
+      }
+
+      let stopsToDisplay = masterStopsList;
 
       if (this.stopsFilterQuery && this.stopsFilterQuery.trim().length > 0) {
         const normQ = this.stopsFilterQuery.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-        // Filter nearby (enriched) stops first
-        const nearbyMatches = rawStops.filter(s => {
+        stopsToDisplay = masterStopsList.filter(s => {
           const sCode = String(s.StopCode || '');
           const sName = (s.StopDescr || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
           const sStreet = (s.StopStreet || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-          return sCode.includes(normQ) || sName.includes(normQ) || sStreet.includes(normQ);
+          const sEng = (s.StopDescrEng || '').toLowerCase();
+          return sCode.includes(normQ) || sName.includes(normQ) || sStreet.includes(normQ) || sEng.includes(normQ);
         });
-        // Also search city-wide asynchronously and merge results
-        const nearbyCodes = new Set(nearbyMatches.map(s => String(s.StopCode)));
-        if (!this._lastSearchQ || this._lastSearchQ !== normQ) {
-          this._lastSearchQ = normQ;
-          window.API.fetchJson(`/api/stops/search?q=${encodeURIComponent(normQ)}`).then(remote => {
-            if (!Array.isArray(remote)) return;
-            const merged = [...nearbyMatches];
-            for (const rs of remote) {
-              if (!nearbyCodes.has(String(rs.StopCode))) merged.push(rs);
-            }
-            this._citySearchResults = merged;
-            if (this.stopsFilterQuery && this.stopsFilterQuery.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim() === normQ) {
-              this.render();
-            }
-          }).catch(() => {});
-        }
-        stopsToDisplay = this._citySearchResults && this._lastSearchQ === normQ
-          ? this._citySearchResults
-          : nearbyMatches;
-      } else {
-        // Reset city-search state when query is cleared
-        this._lastSearchQ = null;
-        this._citySearchResults = null;
       }
 
-      // Prioritize favorites and active lines
+      // Prioritize favorites first, then nearby stops with active routes/distance, then citywide stops
       const sortedStops = [...stopsToDisplay].sort((a, b) => {
         const isFavA = window.Favorites && window.Favorites.isStopFav(a.StopCode);
         const isFavB = window.Favorites && window.Favorites.isStopFav(b.StopCode);
         if (isFavA && !isFavB) return -1;
         if (!isFavA && isFavB) return 1;
 
-        const aHas = Array.isArray(a.serving_lines) && a.serving_lines.length > 0;
-        const bHas = Array.isArray(b.serving_lines) && b.serving_lines.length > 0;
-        if (aHas && !bHas) return -1;
-        if (!aHas && bHas) return 1;
+        const aHasRoutes = Array.isArray(a.serving_lines) && a.serving_lines.length > 0;
+        const bHasRoutes = Array.isArray(b.serving_lines) && b.serving_lines.length > 0;
+        if (aHasRoutes && !bHasRoutes) return -1;
+        if (!aHasRoutes && bHasRoutes) return 1;
 
-        return (a.distanceMeters || 0) - (b.distanceMeters || 0);
+        const aDist = typeof a.distanceMeters === 'number' ? a.distanceMeters : 999999;
+        const bDist = typeof b.distanceMeters === 'number' ? b.distanceMeters : 999999;
+        if (aDist !== bDist) return aDist - bDist;
+
+        return (a.StopDescr || '').localeCompare(b.StopDescr || '', 'el');
       });
 
-      // Display up to 100 items at once for smooth rendering
-      const paginatedStops = sortedStops.slice(0, 100);
+      // Display paginated slice for smooth 60fps rendering
+      const visibleLimit = this.stopsVisibleCount || 80;
+      const paginatedStops = sortedStops.slice(0, visibleLimit);
 
       const stopsTabSwitcherHtml = `
         <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; padding: 0.25rem 0.1rem;">
           <div style="display: inline-flex; background: var(--md-sys-color-surface-container-high); padding: 4px; border-radius: 9999px; border: 1px solid var(--md-sys-color-outline-variant);">
             <button class="m3-btn ${this.activeView === 'stops' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="font-size: 0.82rem; padding: 0.35rem 1rem; border-radius: 9999px; border: none; font-weight: 800; cursor: pointer;" onclick="window.App.ticker.setActiveView('stops')">
-              🚏 Στάσεις ${sortedStops.length > 0 ? `(${sortedStops.length})` : ''}
+              🚏 Στάσεις ${sortedStops.length > 0 ? `(${sortedStops.length})` : (this.isLoadingAllStops ? '(φόρτωση...)' : '')}
             </button>
             <button class="m3-btn ${this.activeView === 'lines' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="font-size: 0.82rem; padding: 0.35rem 1rem; border-radius: 9999px; border: none; font-weight: 800; cursor: pointer;" onclick="window.App.ticker.setActiveView('lines')">
               🚌 Όλες οι Γραμμές ${lines.length > 0 ? `(${lines.length})` : ''}
+            </button>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div style="position: relative; display: flex; align-items: center;">
+              <input type="text" placeholder="Αναζήτηση στάσης..." value="${this.stopsFilterQuery || ''}" oninput="window.App.ticker.setStopsFilterQuery(this.value)" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; border: 1px solid var(--md-sys-color-outline-variant); border-radius: 9999px; background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface); outline: none; width: 170px;" />
+              ${this.stopsFilterQuery ? `
+                <button onclick="window.App.ticker.setStopsFilterQuery('');" style="position: absolute; right: 8px; background: none; border: none; font-size: 0.8rem; color: #94a3b8; cursor: pointer; padding: 0;">✕</button>
+              ` : ''}
+            </div>
+            <button class="m3-btn m3-btn-tonal" style="font-size: 0.78rem; padding: 0.35rem 0.75rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;" onclick="window.Search.findNearbyStops()">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
+              Ανανέωση
             </button>
           </div>
         </div>
@@ -605,7 +625,10 @@ class AirportTicker {
       if (paginatedStops.length > 0) {
         stopsContent = `
           ${stopsTabSwitcherHtml}
-          ${sortedStops.length > 100 ? `<div style="font-size: 0.75rem; color: #64748b; margin-bottom: 0.5rem; text-align: right;">Εμφάνιση 100 από ${sortedStops.length} στάσεις</div>` : ''}
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #64748b; margin-bottom: 0.5rem; padding: 0 0.2rem;">
+            <span>${this.stopsFilterQuery ? `Αποτελέσματα: ${sortedStops.length}` : `Σύνολο: ${sortedStops.length} στάσεις`}</span>
+            <span>Εμφάνιση ${paginatedStops.length} από ${sortedStops.length}</span>
+          </div>
           <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem;">
             ${paginatedStops.map(s => {
               const sCode = s.StopCode;
@@ -614,7 +637,7 @@ class AirportTicker {
               const safeTitle = sTitle.replace(/'/g, "\\'");
               const sStreet = s.StopStreet || '';
               const walk = this.getWalkMinutes(s.StopLat, s.StopLng);
-              const distText = s.Distance ? `${Math.round(s.Distance)}m` : (walk ? `${walk.meters}m` : '');
+              const distText = s.distanceMeters ? `${Math.round(s.distanceMeters)}m` : (s.Distance ? `${Math.round(s.Distance)}m` : (walk ? `${walk.meters}m` : ''));
               const walkText = walk ? `~${walk.minutes}λ` : '';
               
               const hasRoutes = Array.isArray(s.serving_lines) && s.serving_lines.length > 0;
@@ -633,7 +656,7 @@ class AirportTicker {
               }
 
               return `
-                <div class="m3-card stop-interactive-card" data-stop-code="${sCode}" data-stop-title="${safeTitle}" data-stop-lat="${s.StopLat}" data-stop-lng="${s.StopLng}" style="padding: 0.9rem; display: flex; flex-direction: column; justify-content: space-between; gap: 0.65rem; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; border: ${isFav ? '2px solid #eab308; background: #fffdf5;' : (hasRoutes ? '1px solid var(--md-sys-color-outline-variant); background: #ffffff;' : '1px dashed #cbd5e1; background: #f8fafc; opacity: 0.85;')}" onclick="window.App.selectStop('${sCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})" onmouseover="this.style.borderColor='var(--md-sys-color-primary)'" onmouseout="this.style.borderColor='${isFav ? '#eab308' : (hasRoutes ? 'var(--md-sys-color-outline-variant)' : '#cbd5e1')}'">
+                <div class="m3-card stop-interactive-card" data-stop-code="${sCode}" data-stop-title="${safeTitle}" data-stop-lat="${s.StopLat}" data-stop-lng="${s.StopLng}" style="padding: 0.9rem; display: flex; flex-direction: column; justify-content: space-between; gap: 0.65rem; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; border: ${isFav ? '2px solid #eab308; background: #fffdf5;' : (hasRoutes ? '1px solid var(--md-sys-color-outline-variant); background: #ffffff;' : '1px solid var(--md-sys-color-outline-variant); background: #ffffff;')}" onclick="window.App.selectStop('${sCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})" onmouseover="this.style.borderColor='var(--md-sys-color-primary)'" onmouseout="this.style.borderColor='${isFav ? '#eab308' : 'var(--md-sys-color-outline-variant)'}'">
                   <div>
                     <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem;">
                       <div style="font-weight: 800; font-size: 0.98rem; color: #0f172a; line-height: 1.25;">
@@ -659,11 +682,7 @@ class AirportTicker {
                     <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding-top: 4px; border-top: 1px dashed #e2e8f0;">
                       ${linesPills}
                     </div>
-                  ` : `
-                    <div style="padding-top: 4px; border-top: 1px dashed #e2e8f0; font-size: 0.72rem; color: #64748b; font-style: italic;">
-                      ⚠️ Δεν διέρχονται ενεργές γραμμές
-                    </div>
-                  `}
+                  ` : ''}
 
                   <div style="display: flex; justify-content: flex-end; padding-top: 2px;">
                     <button class="m3-btn m3-btn-primary" style="font-size: 0.78rem; padding: 0.3rem 0.8rem; border-radius: 9999px; width: 100%; justify-content: center;" onclick="event.stopPropagation(); window.App.selectStop('${sCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})">
@@ -674,6 +693,13 @@ class AirportTicker {
               `;
             }).join('')}
           </div>
+          ${sortedStops.length > paginatedStops.length ? `
+            <div style="text-align: center; margin: 1.5rem 0 0.5rem;">
+              <button class="m3-btn m3-btn-tonal" style="padding: 0.6rem 1.75rem; font-size: 0.85rem; font-weight: 800; border-radius: 9999px; cursor: pointer;" onclick="window.App.ticker.loadMoreStops()">
+                Φόρτωση περισσότερων στάσεων (${sortedStops.length - paginatedStops.length} απομένουν) ⇩
+              </button>
+            </div>
+          ` : ''}
         `;
       } else {
         stopsContent = `
