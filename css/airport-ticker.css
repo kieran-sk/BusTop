@@ -242,11 +242,10 @@
 .ticker-clock {
   display: inline-flex;
   align-items: center;
-  background: #ffffff;
-  padding: 0.2rem 0.5rem;
-  border-radius: 6px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  background: transparent;
+  padding: 0;
+  border: none;
+  box-shadow: none;
 }
 
 .ticker-clock.ticker-clock-compact {

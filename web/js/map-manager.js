@@ -24,7 +24,15 @@ class MapManager {
 
     if (typeof L === 'undefined') {
       console.warn('Leaflet not loaded yet, waiting...');
-      return;
+      let retries = 0;
+      while (typeof L === 'undefined' && retries < 20) {
+        await new Promise(r => setTimeout(r, 100));
+        retries++;
+      }
+      if (typeof L === 'undefined') {
+        console.error('Leaflet failed to load');
+        return;
+      }
     }
 
     if (this.map) {
@@ -67,6 +75,11 @@ class MapManager {
     });
 
     this.isLoaded = true;
+
+    // Ensure Leaflet recalculates viewport bounds
+    setTimeout(() => {
+      if (this.map) this.map.invalidateSize();
+    }, 150);
 
     // If nearby stops already exist in Search, render them now
     if (window.Search && window.Search.nearbyStops && window.Search.nearbyStops.length > 0) {

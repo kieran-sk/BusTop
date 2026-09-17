@@ -23,6 +23,7 @@ class AirportTicker {
     this.stopsFilterQuery = '';
     this.isLoadingAllStops = false;
     window.Ticker = this;
+    this.startClock();
   }
 
   setActiveView(view) {
