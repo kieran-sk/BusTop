@@ -641,17 +641,6 @@ class AppController {
         };
       }
     }
-          }
-        }
-      };
-      updateStarIcon();
-      if (starBtn) {
-        starBtn.onclick = () => {
-          window.Favorites.toggleStop(stopCode, stopName, lat, lng);
-          updateStarIcon();
-        };
-      }
-    }
 
     // Populate deduplicated line directions overview (with offline cache first)
     const routesListEl = document.getElementById('selected-stop-routes-list');
