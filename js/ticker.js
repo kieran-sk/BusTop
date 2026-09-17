@@ -23,10 +23,17 @@ class AirportTicker {
     this.stopsFilterQuery = '';
     this.stopsPageSize = 80;
     this.stopsVisibleCount = 80;
+    this.stopsSortBy = 'distance'; // 'distance', 'alpha', 'numeric'
     this.isLoadingAllStops = false;
     window.Ticker = this;
     this.startClock();
     this.loadAllStops();
+  }
+
+  setStopsSortBy(mode) {
+    this.stopsSortBy = mode;
+    this.stopsVisibleCount = this.stopsPageSize;
+    this.render();
   }
 
   loadMoreStops() {
@@ -479,21 +486,8 @@ class AirportTicker {
               🚏 Στάσεις ${totalStopsCount > 0 ? `(${totalStopsCount})` : (this.isLoadingAllStops ? '(φόρτωση...)' : '')}
             </button>
             <button class="m3-btn ${this.activeView === 'lines' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="font-size: 0.82rem; padding: 0.35rem 1rem; border-radius: 9999px; border: none; font-weight: 800; cursor: pointer;" onclick="window.App.ticker.setActiveView('lines')">
-              🚌 Όλες οι Γραμμές ${lines.length > 0 ? `(${lines.length})` : ''}
+              🚌 Γραμμές ${lines.length > 0 ? `(${lines.length})` : ''}
             </button>
-          </div>
-
-          <div style="display: flex; align-items: center; gap: 0.5rem;">
-            ${this.activeView === 'stops' ? `
-              <button class="m3-btn m3-btn-tonal" style="font-size: 0.78rem; padding: 0.35rem 0.75rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;" onclick="window.Search.findNearbyStops()">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
-                Ανανέωση
-              </button>
-            ` : `
-              <div style="position: relative; display: flex; align-items: center;">
-                <input type="text" placeholder="Φιλτράρισμα γραμμής..." value="${this.linesFilterQuery || ''}" oninput="window.App.ticker.setLinesFilterQuery(this.value)" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; border: 1px solid var(--md-sys-color-outline-variant); border-radius: 9999px; background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface); outline: none; width: 160px;" />
-              </div>
-            `}
           </div>
         </div>
       `;
@@ -572,23 +566,27 @@ class AirportTicker {
         });
       }
 
-      // Prioritize favorites first, then nearby stops with active routes/distance, then citywide stops
+      // Prioritize favorites first, then sort according to stopsSortBy
+      const sortBy = this.stopsSortBy || 'distance';
       const sortedStops = [...stopsToDisplay].sort((a, b) => {
         const isFavA = window.Favorites && window.Favorites.isStopFav(a.StopCode);
         const isFavB = window.Favorites && window.Favorites.isStopFav(b.StopCode);
         if (isFavA && !isFavB) return -1;
         if (!isFavA && isFavB) return 1;
 
-        const aHasRoutes = Array.isArray(a.serving_lines) && a.serving_lines.length > 0;
-        const bHasRoutes = Array.isArray(b.serving_lines) && b.serving_lines.length > 0;
-        if (aHasRoutes && !bHasRoutes) return -1;
-        if (!aHasRoutes && bHasRoutes) return 1;
-
-        const aDist = typeof a.distanceMeters === 'number' ? a.distanceMeters : 999999;
-        const bDist = typeof b.distanceMeters === 'number' ? b.distanceMeters : 999999;
-        if (aDist !== bDist) return aDist - bDist;
-
-        return (a.StopDescr || '').localeCompare(b.StopDescr || '', 'el');
+        if (sortBy === 'alpha') {
+          return (a.StopDescr || '').localeCompare(b.StopDescr || '', 'el');
+        } else if (sortBy === 'numeric') {
+          const numA = parseInt(a.StopCode || 0, 10) || 0;
+          const numB = parseInt(b.StopCode || 0, 10) || 0;
+          return numA - numB;
+        } else {
+          // Default: distance
+          const aDist = typeof a.distanceMeters === 'number' ? a.distanceMeters : (typeof a.Distance === 'number' ? a.Distance : 999999);
+          const bDist = typeof b.distanceMeters === 'number' ? b.distanceMeters : (typeof b.Distance === 'number' ? b.Distance : 999999);
+          if (aDist !== bDist) return aDist - bDist;
+          return (a.StopDescr || '').localeCompare(b.StopDescr || '', 'el');
+        }
       });
 
       // Display paginated slice for smooth 60fps rendering
@@ -602,21 +600,17 @@ class AirportTicker {
               🚏 Στάσεις ${sortedStops.length > 0 ? `(${sortedStops.length})` : (this.isLoadingAllStops ? '(φόρτωση...)' : '')}
             </button>
             <button class="m3-btn ${this.activeView === 'lines' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="font-size: 0.82rem; padding: 0.35rem 1rem; border-radius: 9999px; border: none; font-weight: 800; cursor: pointer;" onclick="window.App.ticker.setActiveView('lines')">
-              🚌 Όλες οι Γραμμές ${lines.length > 0 ? `(${lines.length})` : ''}
+              🚌 Γραμμές ${lines.length > 0 ? `(${lines.length})` : ''}
             </button>
           </div>
 
-          <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <div style="position: relative; display: flex; align-items: center;">
-              <input type="text" placeholder="Αναζήτηση στάσης..." value="${this.stopsFilterQuery || ''}" oninput="window.App.ticker.setStopsFilterQuery(this.value)" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; border: 1px solid var(--md-sys-color-outline-variant); border-radius: 9999px; background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface); outline: none; width: 170px;" />
-              ${this.stopsFilterQuery ? `
-                <button onclick="window.App.ticker.setStopsFilterQuery('');" style="position: absolute; right: 8px; background: none; border: none; font-size: 0.8rem; color: #94a3b8; cursor: pointer; padding: 0;">✕</button>
-              ` : ''}
-            </div>
-            <button class="m3-btn m3-btn-tonal" style="font-size: 0.78rem; padding: 0.35rem 0.75rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 5px; cursor: pointer;" onclick="window.Search.findNearbyStops()">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>
-              Ανανέωση
-            </button>
+          <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <label for="stops-sort-select" style="font-size: 0.75rem; color: #64748b; font-weight: 700;">Ταξινόμηση:</label>
+            <select id="stops-sort-select" onchange="window.App.ticker.setStopsSortBy(this.value)" style="padding: 0.25rem 0.6rem; font-size: 0.78rem; font-weight: 700; border-radius: 9999px; border: 1px solid var(--md-sys-color-outline-variant); background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface); outline: none; cursor: pointer;">
+              <option value="distance" ${sortBy === 'distance' ? 'selected' : ''}>Απόσταση</option>
+              <option value="alpha" ${sortBy === 'alpha' ? 'selected' : ''}>Αλφαβητικά</option>
+              <option value="numeric" ${sortBy === 'numeric' ? 'selected' : ''}>Κωδικός</option>
+            </select>
           </div>
         </div>
       `;

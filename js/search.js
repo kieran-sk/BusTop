@@ -18,6 +18,39 @@ class SearchManager {
     } catch (err) {
       console.warn('Failed to prefetch lines for search:', err);
     }
+    // Add click listener outside dropdown to close it
+    document.addEventListener('click', (e) => {
+      const searchContainer = document.querySelector('.m3-search-container');
+      if (searchContainer && !searchContainer.contains(e.target)) {
+        this.hideDropdown();
+      }
+    });
+  }
+
+  hideDropdown() {
+    const dropdown = document.getElementById('global-search-dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+  }
+
+  showDropdown() {
+    const dropdown = document.getElementById('global-search-dropdown');
+    if (dropdown) dropdown.style.display = 'block';
+  }
+
+  onSearchKeyDown(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      const input = document.getElementById('global-search-input');
+      const q = input ? input.value.trim() : '';
+      this.hideDropdown();
+      if (window.App && window.App.ticker) {
+        window.App.switchTab('ticker');
+        window.App.ticker.setActiveView('stops');
+        window.App.ticker.setStopsFilterQuery(q);
+      }
+    } else if (event.key === 'Escape') {
+      this.hideDropdown();
+    }
   }
 
   normalize(str) {
@@ -42,30 +75,34 @@ class SearchManager {
     const query = this.normalize(rawQuery);
     const resultsContainer = document.getElementById('search-results');
     const nearbyContainer = document.getElementById('nearby-stops-container');
-    if (!resultsContainer) return;
+    const dropdown = document.getElementById('global-search-dropdown');
 
     const trimmed = (rawQuery || '').trim();
 
     if (!trimmed) {
-      resultsContainer.innerHTML = '';
-      if (nearbyContainer) {
-        nearbyContainer.style.display = 'block';
-      }
+      if (resultsContainer) resultsContainer.innerHTML = '';
+      if (nearbyContainer) nearbyContainer.style.display = 'block';
+      this.hideDropdown();
       return;
     }
 
-    if (window.App && window.App.activeTab !== 'search') {
-      window.App.switchTab('search');
-    }
-    if (nearbyContainer) {
+    if (nearbyContainer && window.App && window.App.activeTab === 'search') {
       nearbyContainer.style.display = 'none';
     }
 
-    resultsContainer.innerHTML = `
-      <div style="padding: 1.5rem; text-align: center; color: #64748b; font-size: 0.85rem;">
+    const searchingHtml = `
+      <div style="padding: 1rem; text-align: center; color: #64748b; font-size: 0.85rem;">
         Αναζήτηση γραμμών και στάσεων για "${trimmed}"...
       </div>
     `;
+
+    if (dropdown) {
+      dropdown.innerHTML = searchingHtml;
+      this.showDropdown();
+    }
+    if (resultsContainer && window.App && window.App.activeTab === 'search') {
+      resultsContainer.innerHTML = searchingHtml;
+    }
 
     // 1. Search Lines locally
     const matchingLines = (this.allLines || []).filter(l => {
@@ -115,31 +152,31 @@ class SearchManager {
     // Render Lines
     if (matchingLines.length > 0) {
       html += `
-        <div style="font-size: 0.82rem; font-weight: 800; color: var(--md-sys-color-primary); margin: 0.5rem 0 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">
+        <div style="font-size: 0.82rem; font-weight: 800; color: var(--md-sys-color-primary); margin: 0.35rem 0 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">
           Γραμμές Λεωφορείων (${matchingLines.length})
         </div>
-        <div style="display: grid; gap: 0.55rem; margin-bottom: 1.25rem;">
+        <div style="display: grid; gap: 0.55rem; margin-bottom: 1rem;">
           ${matchingLines.map(l => {
             const safeDescr = (l.LineDescr || '').replace(/'/g, "\\'");
             const isLineFav = window.Favorites && window.Favorites.isLineFav(l.LineCode);
             return `
-              <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.65rem; padding: 0.85rem 1rem; margin-bottom: 0; cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);" onclick="window.App.openLineTimetableBothDirections('${l.LineCode}', '${l.LineID}', '${safeDescr}')">
+              <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem 0.9rem; margin-bottom: 0; cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);" onclick="window.Search.hideDropdown(); window.App.openLineTimetableBothDirections('${l.LineCode}', '${l.LineID}', '${safeDescr}')">
                 <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.65rem;">
                   <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
                     <span class="ticker-line-badge" style="font-size: 0.95rem; min-width: 46px; flex-shrink: 0;">
                       ${l.LineID}
                     </span>
                     <div style="min-width: 0; flex: 1;">
-                      <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: break-word;">${l.LineDescr}</div>
-                      <div style="font-size: 0.76rem; color: var(--md-sys-color-outline); margin-top: 2px;">Γραμμή #${l.LineCode}</div>
+                      <div style="font-weight: 800; font-size: 0.92rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: break-word;">${l.LineDescr}</div>
+                      <div style="font-size: 0.74rem; color: var(--md-sys-color-outline); margin-top: 2px;">Γραμμή #${l.LineCode}</div>
                     </div>
                   </div>
-                  <button class="m3-icon-btn" style="width: 36px; height: 36px; border: none; cursor: pointer; background: none; flex-shrink: 0;" title="Αποθήκευση γραμμής" onclick="event.stopPropagation(); const isFav = window.Favorites.toggleLine('${l.LineCode}', '${l.LineID}', '${safeDescr}'); this.querySelector('svg').setAttribute('fill', isFav ? '#eab308' : 'none'); this.querySelector('svg').setAttribute('stroke', isFav ? '#ca8a04' : '#64748b');">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="${isLineFav ? '#eab308' : 'none'}" stroke="${isLineFav ? '#ca8a04' : '#64748b'}" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                  <button class="m3-icon-btn" style="width: 32px; height: 32px; border: none; cursor: pointer; background: none; flex-shrink: 0;" title="Αποθήκευση γραμμής" onclick="event.stopPropagation(); const isFav = window.Favorites.toggleLine('${l.LineCode}', '${l.LineID}', '${safeDescr}'); this.querySelector('svg').setAttribute('fill', isFav ? '#eab308' : 'none'); this.querySelector('svg').setAttribute('stroke', isFav ? '#ca8a04' : '#64748b');">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="${isLineFav ? '#eab308' : 'none'}" stroke="${isLineFav ? '#ca8a04' : '#64748b'}" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
                   </button>
                 </div>
-                <div style="display: flex; align-items: center; justify-content: flex-end; border-top: 1px dashed var(--md-sys-color-outline-variant); padding-top: 0.45rem;">
-                  <button class="m3-btn m3-btn-primary" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px;" onclick="event.stopPropagation(); window.App.openLineTimetableBothDirections('${l.LineCode}', '${l.LineID}', '${safeDescr}')">
+                <div style="display: flex; align-items: center; justify-content: flex-end; border-top: 1px dashed var(--md-sys-color-outline-variant); padding-top: 0.35rem;">
+                  <button class="m3-btn m3-btn-primary" style="padding: 0.25rem 0.75rem; font-size: 0.78rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px;" onclick="event.stopPropagation(); window.Search.hideDropdown(); window.App.openLineTimetableBothDirections('${l.LineCode}', '${l.LineID}', '${safeDescr}')">
                     🗺️ Δρομολόγιο &amp; Στάσεις ➜
                   </button>
                 </div>
@@ -153,7 +190,7 @@ class SearchManager {
     // Render Stops
     if (matchingStops.length > 0) {
       html += `
-        <div style="display: flex; align-items: center; justify-content: space-between; margin: 0.5rem 0 0.5rem;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin: 0.35rem 0 0.5rem;">
           <span style="font-size: 0.82rem; font-weight: 800; color: #10b981; text-transform: uppercase; letter-spacing: 0.05em;">
             Στάσεις Λεωφορείων (${matchingStops.length})
           </span>
@@ -167,23 +204,29 @@ class SearchManager {
           ${matchingStops.map(s => {
             const stopTitle = s.StopDescr || `Στάση #${s.StopCode}`;
             const safeTitle = stopTitle.replace(/'/g, "\\'");
+            const isFav = window.Favorites && window.Favorites.isStopFav(s.StopCode);
             return `
-              <div class="m3-card stop-interactive-card" data-stop-code="${s.StopCode}" data-stop-title="${safeTitle}" data-stop-lat="${s.StopLat}" data-stop-lng="${s.StopLng}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1rem; margin-bottom: 0; cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})">
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                  <div class="m3-icon-btn" style="width: 38px; height: 38px; background: #ecfdf5; color: #047857; border: 1.5px solid #a7f3d0;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"></path>
-                      <circle cx="12" cy="9" r="2.5"></circle>
-                    </svg>
+              <div class="m3-card stop-interactive-card" data-stop-code="${s.StopCode}" data-stop-title="${safeTitle}" data-stop-lat="${s.StopLat}" data-stop-lng="${s.StopLng}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0.9rem; margin-bottom: 0; cursor: pointer; background: ${isFav ? '#fffdf5' : 'var(--md-sys-color-surface-container)'}; border: ${isFav ? '2px solid #eab308' : '1px solid var(--md-sys-color-outline-variant)'};" onclick="window.Search.hideDropdown(); window.App.selectStop('${s.StopCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})">
+                <div style="display: flex; align-items: center; gap: 0.65rem;">
+                  <div class="m3-icon-btn" style="width: 36px; height: 36px; background: ${isFav ? '#fef9c3' : '#ecfdf5'}; color: ${isFav ? '#ca8a04' : '#047857'}; border: 1.5px solid ${isFav ? '#fde047' : '#a7f3d0'}; flex-shrink: 0;">
+                    ${isFav ? `⭐` : `
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"></path>
+                        <circle cx="12" cy="9" r="2.5"></circle>
+                      </svg>
+                    `}
                   </div>
                   <div>
-                    <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface);">${stopTitle}</div>
-                    <div style="font-size: 0.78rem; color: var(--md-sys-color-outline); margin-top: 2px;">
-                      ${s.StopStreet ? s.StopStreet + ' • ' : ''}Στάση #${s.StopCode}
+                    <div style="font-weight: 800; font-size: 0.92rem; color: var(--md-sys-color-on-surface); display: flex; align-items: center; gap: 4px;">
+                      ${stopTitle}
+                      ${isFav ? `<span style="font-size: 0.7rem; color: #ca8a04; font-weight: 900;">⭐ Αγαπημένη</span>` : ''}
+                    </div>
+                    <div style="font-size: 0.76rem; color: var(--md-sys-color-outline); margin-top: 2px;">
+                      ${s.StopStreet ? s.StopStreet + ' • ' : ''}#${s.StopCode}
                     </div>
                   </div>
                 </div>
-                <button class="m3-btn m3-btn-tonal" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; border-radius: 9999px;">
+                <button class="m3-btn m3-btn-tonal" style="padding: 0.3rem 0.7rem; font-size: 0.78rem; border-radius: 9999px;">
                   Αφίξεις
                 </button>
               </div>
@@ -195,19 +238,24 @@ class SearchManager {
 
     if (matchingLines.length === 0 && matchingStops.length === 0) {
       html = `
-        <div style="padding: 2.5rem; text-align: center; color: #64748b;">
-          <div style="font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem;">Δεν βρέθηκαν αποτελέσματα</div>
-          <div style="font-size: 0.85rem;">Δοκιμάστε με αριθμό γραμμής (π.χ. 040, 306, X95) ή όνομα στάσης στα ελληνικά.</div>
+        <div style="padding: 1.5rem; text-align: center; color: #64748b;">
+          <div style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.25rem;">Δεν βρέθηκαν αποτελέσματα</div>
+          <div style="font-size: 0.8rem;">Δοκιμάστε με αριθμό γραμμής (π.χ. 040, 306, X95) ή όνομα στάσης στα ελληνικά.</div>
         </div>
       `;
     }
 
-    resultsContainer.innerHTML = html;
+    // Populate dropdown
+    if (dropdown) {
+      dropdown.innerHTML = html;
+      this.showDropdown();
+    }
+    // Also populate search tab results if search tab is active
+    if (resultsContainer && window.App && window.App.activeTab === 'search') {
+      resultsContainer.innerHTML = html;
+    }
   }
 
-  /**
-   * "Near Me" GPS Radar
-   */
   /**
    * "Near Me" GPS Radar
    */
