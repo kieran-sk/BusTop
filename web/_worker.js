@@ -325,7 +325,33 @@ export default {
         if (path === '/api/stops/search') {
           const q = (url.searchParams.get('q') || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
           if (!q) return jsonRes([]);
-          // Search closest stops around Athens central hubs
+
+          // 1. First try searching in master stops list
+          let allStops = getCache('all_master_stops');
+          if (!allStops || allStops.length === 0) {
+            try {
+              const assetRes = await env.ASSETS.fetch(new Request(new URL('/data/all_stops.json', request.url)));
+              if (assetRes.ok) {
+                allStops = await assetRes.json();
+                if (Array.isArray(allStops) && allStops.length > 0) {
+                  setCache('all_master_stops', allStops, 86400);
+                }
+              }
+            } catch(e) {}
+          }
+
+          if (Array.isArray(allStops) && allStops.length > 0) {
+            const matches = allStops.filter(s => {
+              const sCode = String(s.StopCode || '');
+              const sName = (s.StopDescr || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+              const sStreet = (s.StopStreet || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+              const sEng = (s.StopDescrEng || '').toLowerCase();
+              return sCode.includes(q) || sName.includes(q) || sStreet.includes(q) || sEng.includes(q);
+            }).slice(0, 30);
+            return jsonRes(matches);
+          }
+
+          // Fallback: search central hubs
           const hubs = [
             { lat: 37.9845, lng: 23.7335 }, // Center / Omonia / Syntagma
             { lat: 37.9429, lng: 23.6469 }, // Piraeus

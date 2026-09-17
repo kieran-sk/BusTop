@@ -6,6 +6,7 @@
 class SearchManager {
   constructor() {
     this.allLines = [];
+    this.allStops = [];
     this.nearbyStops = [];
     this.showAllNearby = false;
     this.debounceTimer = null;
@@ -17,6 +18,11 @@ class SearchManager {
       this.allLines = await window.API.getLines();
     } catch (err) {
       console.warn('Failed to prefetch lines for search:', err);
+    }
+    try {
+      this.allStops = await window.API.getAllStops();
+    } catch (err) {
+      console.warn('Failed to prefetch all stops for search:', err);
     }
     // Add click listener outside dropdown to close it
     document.addEventListener('click', (e) => {
@@ -112,39 +118,56 @@ class SearchManager {
       return id.includes(query) || descr.includes(query) || descrEng.includes(query);
     }).slice(0, 15);
 
-    // 2. Search Stops remotely via server master stops index (with Zero Data Mode offline fallback)
+    // 2. Search Stops across full 9,425 citywide stops
     let matchingStops = [];
     let isOfflineResults = false;
-    try {
-      const res = await fetch(`/api/stops/search?q=${encodeURIComponent(trimmed)}`);
-      if (res.ok) {
-        matchingStops = await res.json();
-        // Cache stop results locally
-        if (Array.isArray(matchingStops) && matchingStops.length > 0) {
-          const stopCache = JSON.parse(localStorage.getItem('OASA_KNOWN_STOPS') || '{}');
-          matchingStops.forEach(s => { stopCache[s.StopCode] = s; });
-          localStorage.setItem('OASA_KNOWN_STOPS', JSON.stringify(stopCache));
-        }
-      } else {
-        throw new Error('Search network response not ok');
-      }
-    } catch (e) {
-      console.warn('Network stop search failed, switching to Zero Data Mode:', e);
-      isOfflineResults = true;
-      // Search in locally cached stops (from previous searches and favourites)
-      const knownStops = Object.values(JSON.parse(localStorage.getItem('OASA_KNOWN_STOPS') || '{}'));
-      const favStops = JSON.parse(localStorage.getItem('OASA_FAV_STOPS') || '[]');
-      const allLocal = [...favStops, ...knownStops];
-      const seen = new Set();
 
-      matchingStops = allLocal.filter(s => {
-        if (!s || !s.StopCode || seen.has(String(s.StopCode))) return false;
-        seen.add(String(s.StopCode));
-        const code = String(s.StopCode);
+    // A. Check if allStops is available in search manager or ticker
+    const stopsSource = (Array.isArray(this.allStops) && this.allStops.length > 0)
+      ? this.allStops
+      : (window.Ticker && Array.isArray(window.Ticker.allStops) && window.Ticker.allStops.length > 0 ? window.Ticker.allStops : null);
+
+    if (stopsSource && stopsSource.length > 0) {
+      matchingStops = stopsSource.filter(s => {
+        const code = String(s.StopCode || '');
         const name = this.normalize(s.StopDescr || s.stopName || '');
         const street = this.normalize(s.StopStreet || s.stopStreet || '');
-        return code.includes(query) || name.includes(query) || street.includes(query);
-      }).slice(0, 15);
+        const eng = (s.StopDescrEng || '').toLowerCase();
+        return code.includes(query) || name.includes(query) || street.includes(query) || eng.includes(query);
+      }).slice(0, 25);
+    } else {
+      // B. If not yet loaded in client memory, fetch from /api/stops/search
+      try {
+        const res = await fetch(`/api/stops/search?q=${encodeURIComponent(trimmed)}`);
+        if (res.ok) {
+          matchingStops = await res.json();
+          // Cache stop results locally
+          if (Array.isArray(matchingStops) && matchingStops.length > 0) {
+            const stopCache = JSON.parse(localStorage.getItem('OASA_KNOWN_STOPS') || '{}');
+            matchingStops.forEach(s => { stopCache[s.StopCode] = s; });
+            localStorage.setItem('OASA_KNOWN_STOPS', JSON.stringify(stopCache));
+          }
+        } else {
+          throw new Error('Search network response not ok');
+        }
+      } catch (e) {
+        console.warn('Network stop search failed, switching to Zero Data Mode:', e);
+        isOfflineResults = true;
+        // Search in locally cached stops (from previous searches and favourites)
+        const knownStops = Object.values(JSON.parse(localStorage.getItem('OASA_KNOWN_STOPS') || '{}'));
+        const favStops = JSON.parse(localStorage.getItem('OASA_FAV_STOPS') || '[]');
+        const allLocal = [...favStops, ...knownStops];
+        const seen = new Set();
+
+        matchingStops = allLocal.filter(s => {
+          if (!s || !s.StopCode || seen.has(String(s.StopCode))) return false;
+          seen.add(String(s.StopCode));
+          const code = String(s.StopCode);
+          const name = this.normalize(s.StopDescr || s.stopName || '');
+          const street = this.normalize(s.StopStreet || s.stopStreet || '');
+          return code.includes(query) || name.includes(query) || street.includes(query);
+        }).slice(0, 15);
+      }
     }
 
     let html = '';
