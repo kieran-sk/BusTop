@@ -71,20 +71,16 @@ class PinnedTripsManager {
       if (window.App && typeof window.App.triggerHaptic === 'function') {
         window.App.triggerHaptic('success');
       }
-      if (window.Alarms) {
-        window.Alarms.playTone(659.25, 0.12);
-        setTimeout(() => window.Alarms.playTone(880, 0.15), 100);
-      }
 
-      // Check if an active alarm exists for this stop and line to preserve threshold & ringing!
-      const activeAlarm = (window.Alarms && Array.isArray(window.Alarms.alarms))
+      // Check if the user has explicitly created an alarm for this stop and line
+      const explicitAlarm = (window.Alarms && Array.isArray(window.Alarms.alarms))
         ? window.Alarms.alarms.find(a => !a.triggered && String(a.stopCode).trim() === stopCode && String(a.lineId).trim().toUpperCase() === lineId.toUpperCase())
         : null;
 
-      const threshold = activeAlarm ? (activeAlarm.thresholdMinutes || 5) : 0;
-      const ringUntilDismissed = activeAlarm ? (activeAlarm.ringUntilDismissed !== false) : false;
+      const threshold = explicitAlarm ? (explicitAlarm.thresholdMinutes || 5) : 0;
+      const ringUntilDismissed = explicitAlarm ? (explicitAlarm.ringUntilDismissed !== false) : false;
 
-      // Start Android Live Tracking Notification immediately for this pinned bus
+      // Start Android Live Tracking Notification immediately for this pinned bus (silent live tracker, no alarm ringing unless explicitAlarm)
       if (window.AndroidBridge && typeof window.AndroidBridge.startLiveTracking === 'function') {
         try {
           const busMins = (arrival && typeof arrival.btime2 === 'number') ? arrival.btime2 : 10;

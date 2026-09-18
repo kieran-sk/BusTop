@@ -33,10 +33,10 @@ class LiveTrackingService : Service() {
     private var stopName: String = ""
     private var destination: String = ""
     private var walkMinutes: Int = 0
-    private var thresholdMinutes: Int = 5
+    private var thresholdMinutes: Int = 0
     private var initialMinutes: Int = 10
     private var startedAtMs: Long = 0L
-    private var ringUntilDismissed: Boolean = true
+    private var ringUntilDismissed: Boolean = false
     private var isAlarmTriggered = false
     private var wakeLock: PowerManager.WakeLock? = null
 
@@ -63,7 +63,7 @@ class LiveTrackingService : Service() {
             destination: String,
             walkMinutes: Int,
             threshold: Int,
-            ringUntilDismissed: Boolean = true,
+            ringUntilDismissed: Boolean = false,
             initialMinutes: Int = 10
         ) {
             val intent = Intent(context, LiveTrackingService::class.java).apply {
@@ -111,15 +111,10 @@ class LiveTrackingService : Service() {
         stopName = intent?.getStringExtra(EXTRA_STOP_NAME) ?: "Στάση ΟΑΣΑ"
         destination = intent?.getStringExtra(EXTRA_DESTINATION) ?: ""
         walkMinutes = intent?.getIntExtra(EXTRA_WALK_MINUTES, 0) ?: 0
-        val newThreshold = intent?.getIntExtra(EXTRA_THRESHOLD, 5) ?: 5
-        // If an alarm is already actively set (> 0), don't allow a quiet pin (0) to disarm it
-        if (newThreshold > 0 || thresholdMinutes == 0) {
-            thresholdMinutes = newThreshold
-        }
-        val newRing = intent?.getBooleanExtra(EXTRA_RING_UNTIL_DISMISSED, true) ?: true
-        if (newThreshold > 0) {
-            ringUntilDismissed = newRing
-        }
+        val newThreshold = intent?.getIntExtra(EXTRA_THRESHOLD, 0) ?: 0
+        thresholdMinutes = newThreshold
+        val newRing = intent?.getBooleanExtra(EXTRA_RING_UNTIL_DISMISSED, false) ?: false
+        ringUntilDismissed = newRing
         initialMinutes = intent?.getIntExtra(EXTRA_INITIAL_MINS, 10) ?: 10
         startedAtMs = System.currentTimeMillis()
         isAlarmTriggered = false

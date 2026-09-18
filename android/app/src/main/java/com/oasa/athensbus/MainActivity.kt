@@ -325,7 +325,7 @@ class MainActivity : ComponentActivity() {
             destination: String,
             walkMinutes: Double,
             thresholdMinutes: Double,
-            ringUntilDismissed: Boolean = true,
+            ringUntilDismissed: Boolean = false,
             initialMinutes: Double = 10.0
         ) {
             try {
