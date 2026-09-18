@@ -132,9 +132,15 @@ class AlarmManager {
       }, 3500);
     }
 
+    this.ringingStartedAt = Date.now();
+
     // 2. Loud alternating two-tone alarm siren
     const playSirenBurst = () => {
       if (!this.isRinging) return;
+      if (Date.now() - this.ringingStartedAt > 35000) {
+        this.stopAlarmRinging();
+        return;
+      }
       try {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         if (!this.audioCtx && AudioCtx) this.audioCtx = new AudioCtx();
@@ -503,7 +509,7 @@ class AlarmManager {
           // Sort by proximity to expected remaining time so we don't pick a scheduled bus 5 hours away!
           matchingArrivals.sort((a, b) => Math.abs(a.btime2 - expectedMins) - Math.abs(b.btime2 - expectedMins));
           const best = matchingArrivals[0];
-          if (Math.abs(best.btime2 - expectedMins) <= 20 || best.btime2 <= expectedMins + 15) {
+          if (Math.abs(best.btime2 - expectedMins) <= 45 || best.btime2 <= expectedMins + 30) {
             currentMins = best.btime2;
           }
         }

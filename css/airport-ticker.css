@@ -503,7 +503,7 @@
     border: none !important;
     border-radius: 0 !important;
     box-shadow: none !important;
-    padding: 0 !important;
+    padding: 0 0.25rem !important;
     margin-bottom: 0.5rem !important;
     background: transparent !important;
   }

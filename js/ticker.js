@@ -146,7 +146,8 @@ class AirportTicker {
     const prev = this.previousDigitsMap.get(key) || '';
     const prevChars = prev.split('');
     if (this.previousDigitsMap.size > 200) {
-      this.previousDigitsMap.clear();
+      const oldestKey = this.previousDigitsMap.keys().next().value;
+      if (oldestKey) this.previousDigitsMap.delete(oldestKey);
     }
     this.previousDigitsMap.set(key, String(text));
 
@@ -566,28 +567,35 @@ class AirportTicker {
         });
       }
 
-      // Prioritize favorites first, then sort according to stopsSortBy
+      // Prioritize favorites first, then sort according to stopsSortBy (cached for high fps)
       const sortBy = this.stopsSortBy || 'distance';
-      const sortedStops = [...stopsToDisplay].sort((a, b) => {
-        const isFavA = window.Favorites && window.Favorites.isStopFav(a.StopCode);
-        const isFavB = window.Favorites && window.Favorites.isStopFav(b.StopCode);
-        if (isFavA && !isFavB) return -1;
-        if (!isFavA && isFavB) return 1;
+      const favsCount = (window.Favorites && Array.isArray(window.Favorites.favStops)) ? window.Favorites.favStops.length : 0;
+      const cacheKey = `${this.stopsFilterQuery || ''}_${sortBy}_${stopsToDisplay.length}_${favsCount}`;
 
-        if (sortBy === 'alpha') {
-          return (a.StopDescr || '').localeCompare(b.StopDescr || '', 'el');
-        } else if (sortBy === 'numeric') {
-          const numA = parseInt(a.StopCode || 0, 10) || 0;
-          const numB = parseInt(b.StopCode || 0, 10) || 0;
-          return numA - numB;
-        } else {
-          // Default: distance
-          const aDist = typeof a.distanceMeters === 'number' ? a.distanceMeters : (typeof a.Distance === 'number' ? a.Distance : 999999);
-          const bDist = typeof b.distanceMeters === 'number' ? b.distanceMeters : (typeof b.Distance === 'number' ? b.Distance : 999999);
-          if (aDist !== bDist) return aDist - bDist;
-          return (a.StopDescr || '').localeCompare(b.StopDescr || '', 'el');
-        }
-      });
+      if (!this._sortedStopsCache || this._sortedStopsCacheKey !== cacheKey) {
+        this._sortedStopsCache = [...stopsToDisplay].sort((a, b) => {
+          const isFavA = window.Favorites && window.Favorites.isStopFav(a.StopCode);
+          const isFavB = window.Favorites && window.Favorites.isStopFav(b.StopCode);
+          if (isFavA && !isFavB) return -1;
+          if (!isFavA && isFavB) return 1;
+
+          if (sortBy === 'alpha') {
+            return (a.StopDescr || '').localeCompare(b.StopDescr || '', 'el');
+          } else if (sortBy === 'numeric') {
+            const numA = parseInt(a.StopCode || 0, 10) || 0;
+            const numB = parseInt(b.StopCode || 0, 10) || 0;
+            return numA - numB;
+          } else {
+            // Default: distance
+            const aDist = typeof a.distanceMeters === 'number' ? a.distanceMeters : (typeof a.Distance === 'number' ? a.Distance : 999999);
+            const bDist = typeof b.distanceMeters === 'number' ? b.distanceMeters : (typeof b.Distance === 'number' ? b.Distance : 999999);
+            if (aDist !== bDist) return aDist - bDist;
+            return (a.StopDescr || '').localeCompare(b.StopDescr || '', 'el');
+          }
+        });
+        this._sortedStopsCacheKey = cacheKey;
+      }
+      const sortedStops = this._sortedStopsCache;
 
       // Display paginated slice for smooth 60fps rendering
       const visibleLimit = this.stopsVisibleCount || 80;

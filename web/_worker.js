@@ -214,26 +214,72 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
   return { stop_code: stopCode, athens_time: athensNow.formatted, target_day: targetDay, total_arrivals: finalResults.length, arrivals: finalResults };
 }
 
-const jsonRes = (data, status = 200) => new Response(JSON.stringify(data), {
-  status,
-  headers: {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': '*'
+// Rate Limiting sliding window cache (CF-Connecting-IP)
+const IP_RATE_LIMIT = new Map();
+function isRateLimited(ip) {
+  if (!ip) return false;
+  const now = Date.now();
+  const windowMs = 60 * 1000;
+  const maxReqs = 150; // generous 150 reqs/min for normal client use
+  const record = IP_RATE_LIMIT.get(ip) || { count: 0, resetAt: now + windowMs };
+
+  if (now > record.resetAt) {
+    record.count = 1;
+    record.resetAt = now + windowMs;
+  } else {
+    record.count++;
   }
-});
+  IP_RATE_LIMIT.set(ip, record);
+
+  // Evict old entries if map gets large
+  if (IP_RATE_LIMIT.size > 2000) {
+    for (const [k, v] of IP_RATE_LIMIT.entries()) {
+      if (now > v.resetAt) IP_RATE_LIMIT.delete(k);
+    }
+  }
+
+  return record.count > maxReqs;
+}
+
+function getCorsHeaders(request) {
+  const origin = request.headers.get('Origin') || '';
+  const isAllowed = !origin ||
+    origin.includes('bustop.pages.dev') ||
+    origin.includes('localhost') ||
+    origin.includes('127.0.0.1') ||
+    origin.startsWith('android-app://') ||
+    origin === 'null';
+
+  return {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': isAllowed ? (origin || '*') : 'https://bustop.pages.dev',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+  };
+}
+
+const jsonRes = (data, status = 200, req = null) => {
+  const body = (data === null || data === undefined) ? { success: false, data: null } : data;
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: req ? getCorsHeaders(req) : {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*'
+    }
+  });
+};
 
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') {
       return new Response(null, {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': '*'
-        }
+        headers: getCorsHeaders(request)
       });
+    }
+
+    const clientIp = request.headers.get('CF-Connecting-IP') || request.headers.get('x-real-ip') || '';
+    if (clientIp && isRateLimited(clientIp)) {
+      return jsonRes({ error: 'Rate limit exceeded. Please wait a moment.', success: false }, 429, request);
     }
 
     const url = new URL(request.url);

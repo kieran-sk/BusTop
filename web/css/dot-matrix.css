@@ -323,11 +323,6 @@ button[aria-label="Εντοπισμός στάσεων κοντά μου"] {
   border-color: #1e3a5f !important;
 }
 
-.ticker-walk-pill {
-  border-color: var(--matrix-border) !important;
-  background: var(--matrix-surface-sunken) !important;
-}
-
 .ticker-board {
   border: none !important;
   box-shadow: none !important;

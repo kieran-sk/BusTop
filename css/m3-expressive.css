@@ -366,6 +366,27 @@ body {
   font-weight: 700;
 }
 
+@media (max-width: 360px) {
+  .m3-nav-bar {
+    padding: 0.25rem 0.15rem calc(0.25rem + env(safe-area-inset-bottom, 0px));
+  }
+  .m3-nav-item {
+    font-size: 0.62rem;
+    padding: 0.1rem 0;
+  }
+  .m3-nav-item span {
+    letter-spacing: -0.04em;
+  }
+  .m3-nav-pill {
+    width: 38px;
+    height: 24px;
+  }
+  .m3-nav-pill svg {
+    width: 17px;
+    height: 17px;
+  }
+}
+
 /* Modal / Bottom Sheet Dialog */
 .m3-dialog-backdrop {
   position: fixed;

@@ -243,9 +243,9 @@ class MapManager {
       }
     });
 
-    // Prune markers that are way outside the expanded viewport
-    if (this.stopMarkersMap.size > 80) {
-      const currentBounds = this.map.getBounds().pad(0.5);
+    // Prune markers that are far outside the expanded viewport
+    if (this.stopMarkersMap.size > 200) {
+      const currentBounds = this.map.getBounds().pad(1.2);
       for (const [code, marker] of this.stopMarkersMap.entries()) {
         const latLng = marker.getLatLng();
         if (!currentBounds.contains(latLng)) {
@@ -504,6 +504,7 @@ class MapManager {
     if (!this.map || !this.busLayer) return;
     this.busLayer.clearLayers();
 
+    const activeVehNos = new Set();
     buses.forEach(b => {
       const lat = parseFloat(b.CS_LAT);
       const lng = parseFloat(b.CS_LNG);
@@ -511,6 +512,7 @@ class MapManager {
 
       const lineId = b.line_id || b.LINE_ID || defaultLineId;
       const vehNo = b.VEH_NO || '';
+      if (vehNo) activeVehNos.add(vehNo);
 
       // Determine vehicle heading from movement history
       let heading = null;
@@ -559,6 +561,15 @@ class MapManager {
       L.marker([lat, lng], { icon: busIcon }).addTo(this.busLayer)
         .bindTooltip(`🚍 Λεωφορείο ${lineId} (Όχημα #${vehNo})${headingTxt}`, { direction: 'top' });
     });
+
+    // Prune offline vehicles from history cache
+    if (activeVehNos.size > 0) {
+      for (const vKey of this.vehicleHistoryMap.keys()) {
+        if (!activeVehNos.has(vKey)) {
+          this.vehicleHistoryMap.delete(vKey);
+        }
+      }
+    }
   }
 
   clearAll() {

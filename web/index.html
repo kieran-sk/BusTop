@@ -7,6 +7,14 @@
   <meta name="color-scheme" content="light">
   <title>Αστικές Συγκοινωνίες Αθηνών - ΟΑΣΑ Live Τηλεματική & Δρομολόγια</title>
   <meta name="description" content="Ζωντανή παρακολούθηση λεωφορείων, πίνακας αναχωρήσεων αεροδρομίου, εκτιμώμενες αφίξεις, δρομολόγια, στάσεις και ειδοποιήσεις για την Αθήνα.">
+  <link rel="canonical" href="https://bustop.pages.dev/">
+
+  <!-- Open Graph / Social Sharing Cards -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://bustop.pages.dev/">
+  <meta property="og:title" content="Αστικές Συγκοινωνίες Αθηνών - ΟΑΣΑ Live Τηλεματική">
+  <meta property="og:description" content="Ζωντανές αφίξεις λεωφορείων ΟΑΣΑ, δρομολόγια, χάρτες και ειδοποιήσεις για την Αθήνα.">
+  <meta property="og:image" content="https://bustop.pages.dev/assets/icon-512.png">
 
   <!-- Web App Manifest & Mobile App Icons -->
   <link rel="manifest" href="manifest.json">
@@ -65,11 +73,15 @@
     <span id="connection-status-text">⚡ Εκτός σύνδεσης: Λειτουργία με αποθηκευμένα δεδομένα &amp; δρομολόγια</span>
   </div>
 
+  <!-- Accessible semantic heading for screen readers -->
+  <h1 style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0;">Αστικές Συγκοινωνίες Αθηνών - ΟΑΣΑ Live Τηλεματική &amp; Δρομολόγια</h1>
+
   <!-- Global Instant Search Container -->
   <div class="m3-search-container">
     <div class="m3-search-bar">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--md-sys-color-outline)"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-      <input type="text" id="global-search-input" placeholder="Αναζήτηση γραμμής (π.χ. 040, 306, X95), στάσης ή κωδικού..." oninput="window.Search.onSearchInput(this.value)" onkeydown="window.Search.onSearchKeyDown(event)">
+      <label for="global-search-input" style="position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); border: 0;">Αναζήτηση στάσης ή γραμμής</label>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--md-sys-color-outline)" aria-hidden="true"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      <input type="text" id="global-search-input" placeholder="Αναζήτηση γραμμής (π.χ. 040, 306, X95), στάσης ή κωδικού..." aria-label="Αναζήτηση γραμμής ή στάσης" oninput="window.Search.onSearchInput(this.value)" onkeydown="window.Search.onSearchKeyDown(event)">
       <button id="search-clear-btn" class="m3-icon-btn" title="Καθαρισμός" aria-label="Καθαρισμός" onclick="document.getElementById('global-search-input').value=''; window.Search.onSearchInput(''); this.style.display='none'; window.Search.hideDropdown();" style="display: none; width: 32px; height: 32px; border: none; background: none; color: #64748b; flex-shrink: 0; cursor: pointer;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
       </button>
@@ -479,15 +491,15 @@
     </div>
   </nav>
 
-  <!-- Scripts (Cache-busted for live updates) -->
-  <script src="js/api.js?v=20260918_1455"></script>
-  <script src="js/map-manager.js?v=20260918_1455"></script>
-  <script src="js/ticker.js?v=20260918_1455"></script>
-  <script src="js/alarms.js?v=20260918_1455"></script>
-  <script src="js/pinned-trips.js?v=20260918_1455"></script>
-  <script src="js/timetable.js?v=20260918_1455"></script>
-  <script src="js/search.js?v=20260918_1455"></script>
-  <script src="js/favorites.js?v=20260918_1455"></script>
-  <script src="js/app.js?v=20260918_1455"></script>
+  <!-- Scripts (Cache-busted with defer for non-blocking execution) -->
+  <script defer src="js/api.js?v=20260918_1830"></script>
+  <script defer src="js/map-manager.js?v=20260918_1830"></script>
+  <script defer src="js/ticker.js?v=20260918_1830"></script>
+  <script defer src="js/alarms.js?v=20260918_1830"></script>
+  <script defer src="js/pinned-trips.js?v=20260918_1830"></script>
+  <script defer src="js/timetable.js?v=20260918_1830"></script>
+  <script defer src="js/search.js?v=20260918_1830"></script>
+  <script defer src="js/favorites.js?v=20260918_1830"></script>
+  <script defer src="js/app.js?v=20260918_1830"></script>
 </body>
 </html>

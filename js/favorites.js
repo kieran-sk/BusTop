@@ -21,18 +21,26 @@ class FavoritesManager {
           const stops = typeof parsed.stops === 'string' ? JSON.parse(parsed.stops) : parsed.stops;
           const lines = typeof parsed.lines === 'string' ? JSON.parse(parsed.lines) : parsed.lines;
           let changed = false;
-          if (this.favStops.length === 0 && Array.isArray(stops) && stops.length > 0) {
-            this.favStops = stops;
-            localStorage.setItem('OASA_FAV_STOPS', JSON.stringify(this.favStops));
-            changed = true;
+          if (Array.isArray(stops)) {
+            stops.forEach(s => {
+              if (s && s.code && !this.isStopFav(s.code)) {
+                this.favStops.push(s);
+                changed = true;
+              }
+            });
+            if (changed) localStorage.setItem('OASA_FAV_STOPS', JSON.stringify(this.favStops));
           }
-          if (this.favLines.length === 0 && Array.isArray(lines) && lines.length > 0) {
-            this.favLines = lines;
-            localStorage.setItem('OASA_FAV_LINES', JSON.stringify(this.favLines));
-            changed = true;
+          if (Array.isArray(lines)) {
+            lines.forEach(l => {
+              if (l && l.code && !this.isLineFav(l.code)) {
+                this.favLines.push(l);
+                changed = true;
+              }
+            });
+            if (changed) localStorage.setItem('OASA_FAV_LINES', JSON.stringify(this.favLines));
           }
           if (changed) {
-            console.log('[Favorites] Restored from Android SharedPreferences auto-backup!');
+            console.log('[Favorites] Merged & restored from Android SharedPreferences auto-backup!');
           }
         }
       } catch (e) {

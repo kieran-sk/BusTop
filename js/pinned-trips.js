@@ -325,6 +325,10 @@ class PinnedTripsManager {
   renderSplitFlapDigits(key, text) {
     const chars = String(text).split('');
     const prevChars = (this.previousDigitsMap.get(key) || '').split('');
+    if (this.previousDigitsMap.size > 100) {
+      const oldestKey = this.previousDigitsMap.keys().next().value;
+      if (oldestKey) this.previousDigitsMap.delete(oldestKey);
+    }
     this.previousDigitsMap.set(key, String(text));
 
     const html = chars.map((ch, idx) => {

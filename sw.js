@@ -3,7 +3,7 @@
  * Background alarm notification scheduler and offline caching
  */
 
-const CACHE_NAME = 'oasa-bus-v34';
+const CACHE_NAME = 'oasa-bus-v35';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -110,6 +110,19 @@ function tickServiceWorkerAlarms() {
     alarmTickerInterval = null;
   }
 }
+
+// Background Sync Wakeup (Chrome PWA background execution)
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'check-alarms' || activeAlarms.size > 0) {
+    tickServiceWorkerAlarms();
+  }
+});
+
+self.addEventListener('periodicsync', (event) => {
+  if (activeAlarms.size > 0) {
+    tickServiceWorkerAlarms();
+  }
+});
 
 // Background alarm listener & Android Live Updates
 self.addEventListener('message', (event) => {
@@ -252,7 +265,7 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => caches.match(event.request))
+        .catch(() => caches.match(event.request, { ignoreSearch: true }))
     );
     return;
   }
