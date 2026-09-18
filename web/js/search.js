@@ -21,6 +21,13 @@ class SearchManager {
     }
     try {
       this.allStops = await window.API.getAllStops();
+      // Pre-compute normalized search fields once for fast keystroke filtering
+      this.allStops.forEach(s => {
+        s._normName = this.normalize(s.StopDescr || s.stopName || '');
+        s._normStreet = this.normalize(s.StopStreet || s.stopStreet || '');
+        s._normEng = (s.StopDescrEng || '').toLowerCase();
+        s._code = String(s.StopCode || '');
+      });
     } catch (err) {
       console.warn('Failed to prefetch all stops for search:', err);
     }
@@ -129,10 +136,10 @@ class SearchManager {
 
     if (stopsSource && stopsSource.length > 0) {
       matchingStops = stopsSource.filter(s => {
-        const code = String(s.StopCode || '');
-        const name = this.normalize(s.StopDescr || s.stopName || '');
-        const street = this.normalize(s.StopStreet || s.stopStreet || '');
-        const eng = (s.StopDescrEng || '').toLowerCase();
+        const code = s._code || String(s.StopCode || '');
+        const name = s._normName || this.normalize(s.StopDescr || s.stopName || '');
+        const street = s._normStreet || this.normalize(s.StopStreet || s.stopStreet || '');
+        const eng = s._normEng || (s.StopDescrEng || '').toLowerCase();
         return code.includes(query) || name.includes(query) || street.includes(query) || eng.includes(query);
       }).slice(0, 25);
     } else {

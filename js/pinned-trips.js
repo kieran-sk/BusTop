@@ -8,6 +8,7 @@ class PinnedTripsManager {
     this.containerId = containerId;
     this.pinnedItems = JSON.parse(localStorage.getItem('OASA_PINNED_ARRIVALS') || '[]');
     this.liveArrivals = new Map(); // key -> arrival info
+    this.failedStops = new Set(); // track stops with fetch errors
     this.timerInterval = null;
     this.previousDigitsMap = new Map();
   }
@@ -192,9 +193,11 @@ class PinnedTripsManager {
         const data = await window.API.getStopArrivals(code);
         if (data && Array.isArray(data.arrivals)) {
           this.liveArrivals.set(code, data.arrivals);
+          this.failedStops.delete(code);
         }
       } catch (e) {
         console.warn(`Could not refresh pinned stop ${code}:`, e);
+        this.failedStops.add(code);
       }
     }));
 

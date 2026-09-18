@@ -38,8 +38,11 @@ const API = {
   },
 
   async fetchJson(endpoint) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
     try {
-      const res = await fetch(`${this.baseUrl}${endpoint}`);
+      const res = await fetch(`${this.baseUrl}${endpoint}`, { signal: controller.signal });
+      clearTimeout(timeoutId);
       const contentType = res.headers.get('content-type') || '';
       if (!contentType.includes('application/json')) {
         throw new Error(`Μη έγκυρη απόκριση (status ${res.status}): αναμενόταν JSON`);
@@ -49,8 +52,9 @@ const API = {
         throw new Error(errJson.error || `HTTP ${res.status}: ${res.statusText}`);
       }
       const data = await res.json();
-      // Cache response for offline resilience
-      if (endpoint.includes('/api/stops/') || endpoint.includes('/api/lines') || endpoint.includes('/api/routes/')) {
+      // Cache response for offline resilience (skip coordinate-based URLs to avoid cache exhaustion)
+      if ((endpoint.includes('/api/stops/') || endpoint.includes('/api/lines') || endpoint.includes('/api/routes/')) &&
+          !endpoint.includes('lat=') && !endpoint.includes('lng=')) {
         this.saveOfflineCache(endpoint, data);
       }
       return data;

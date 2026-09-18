@@ -447,6 +447,11 @@ class AppController {
         if (searchBar) searchBar.style.display = 'none';
       }
     } else {
+      // Clear arrivals polling when leaving ticker tab to save battery
+      if (this.pollInterval) {
+        clearInterval(this.pollInterval);
+        this.pollInterval = null;
+      }
       // In all other tabs, show search bar
       if (searchBar) searchBar.style.display = '';
     }

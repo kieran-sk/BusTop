@@ -1,11 +1,13 @@
 package com.oasa.athensbus
 
+import android.app.ForegroundServiceStartNotAllowedException
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -79,7 +81,15 @@ class LiveTrackingService : Service() {
                 putExtra(EXTRA_INITIAL_MINS, initialMinutes)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    try {
+                        context.startForegroundService(intent)
+                    } catch (e: ForegroundServiceStartNotAllowedException) {
+                        context.startService(intent)
+                    }
+                } else {
+                    context.startForegroundService(intent)
+                }
             } else {
                 context.startService(intent)
             }
@@ -121,7 +131,11 @@ class LiveTrackingService : Service() {
 
         NotificationHelper.createLiveNotificationChannel(this)
         val initialNotif = buildLiveNotification(initialMinutes)
-        startForeground(NotificationHelper.LIVE_NOTIF_ID, initialNotif)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NotificationHelper.LIVE_NOTIF_ID, initialNotif, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            startForeground(NotificationHelper.LIVE_NOTIF_ID, initialNotif)
+        }
 
         startBackgroundPolling()
 

@@ -111,9 +111,12 @@ class TimetableManager {
       const h = parseInt(match[1], 10);
       const m = parseInt(match[2], 10);
       const tripMins = h * 60 + m;
-      const formatted = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      // Display time: wrap hours >= 24 for display but keep original for comparison
+      const displayH = h >= 24 ? h - 24 : h;
+      const formatted = `${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
-      const isPast = tripMins < currentMins;
+      // For past-midnight trips (h >= 24), treat them as next-day: only past if currentMins is also past midnight and beyond
+      const isPast = h >= 24 ? (currentMins >= 1440 || currentMins > (tripMins - 1440)) && currentMins < tripMins : tripMins < currentMins;
       let isNext = false;
       if (!isPast && !nextTripFound) {
         isNext = true;
@@ -201,15 +204,16 @@ class TimetableManager {
   }
 
   async initRouteMap() {
-    const mapContainer = document.getElementById('line-route-map');
-    if (!mapContainer) return;
-
     if (this.routeMap) {
       try {
+        this.routeMap.off();
         this.routeMap.remove();
       } catch (e) {}
       this.routeMap = null;
     }
+
+    const mapContainer = document.getElementById('line-route-map');
+    if (!mapContainer) return;
 
     this.routeMap = L.map('line-route-map', { zoomControl: true });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {

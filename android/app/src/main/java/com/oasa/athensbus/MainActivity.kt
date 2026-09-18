@@ -297,10 +297,14 @@ class MainActivity : ComponentActivity() {
                 }
 
                 if (!exactScheduled) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+                        } else {
+                            alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+                        }
                     } else {
-                        alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+                        alarmManager.set(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
                     }
                 }
 
@@ -479,6 +483,30 @@ class MainActivity : ComponentActivity() {
         } else {
             @Suppress("DEPRECATION")
             super.onBackPressed()
+        }
+    }
+
+    override fun onDestroy() {
+        if (this::webView.isInitialized) {
+            webView.destroy()
+        }
+        super.onDestroy()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            for (i in permissions.indices) {
+                val perm = permissions[i]
+                val result = grantResults[i]
+                if (result != PackageManager.PERMISSION_GRANTED) {
+                    if (perm == Manifest.permission.POST_NOTIFICATIONS) {
+                        println("POST_NOTIFICATIONS permission denied")
+                    } else if (perm == Manifest.permission.ACCESS_FINE_LOCATION || perm == Manifest.permission.ACCESS_COARSE_LOCATION) {
+                        Toast.makeText(this, "Location features may be limited without permission", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
         }
     }
 }

@@ -98,18 +98,18 @@ class FavoritesManager {
         const parsed = JSON.parse(e.target.result);
         if (Array.isArray(parsed.stops) || Array.isArray(parsed.lines)) {
           if (Array.isArray(parsed.stops)) {
-            // Merge deduplicated stops
+            // Merge deduplicated stops (validate structure)
             parsed.stops.forEach(s => {
-              if (s && s.code && !this.isStopFav(s.code)) {
-                this.favStops.push(s);
+              if (s && s.code && (s.name || s.StopDescr) && !this.isStopFav(s.code)) {
+                this.favStops.push({ code: s.code, name: s.name || s.StopDescr, lat: s.lat || null, lng: s.lng || null });
               }
             });
           }
           if (Array.isArray(parsed.lines)) {
-            // Merge deduplicated lines
+            // Merge deduplicated lines (validate structure)
             parsed.lines.forEach(l => {
-              if (l && l.code && !this.isLineFav(l.code)) {
-                this.favLines.push(l);
+              if (l && l.code && (l.id || l.LineID) && !this.isLineFav(l.code)) {
+                this.favLines.push({ code: l.code, id: l.id || l.LineID, descr: l.descr || l.LineDescr || '' });
               }
             });
           }

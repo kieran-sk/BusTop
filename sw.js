@@ -3,7 +3,7 @@
  * Background alarm notification scheduler and offline caching
  */
 
-const CACHE_NAME = 'oasa-bus-v33';
+const CACHE_NAME = 'oasa-bus-v34';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -36,7 +36,8 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
-          if (key !== CACHE_NAME) {
+          // Preserve the API offline cache across SW updates
+          if (key !== CACHE_NAME && key !== 'oasa-api-cache') {
             console.log('Purging obsolete cache:', key);
             return caches.delete(key);
           }
@@ -267,6 +268,6 @@ self.addEventListener('fetch', (event) => {
         }
         return networkResponse;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => caches.match(event.request, { ignoreSearch: true }))
   );
 });
