@@ -287,6 +287,32 @@ class SearchManager {
   }
 
   /**
+   * Offline / zero-data fallback: Computes closest stops from the preloaded 9,425 stops index
+   */
+  getLocalClosestStops(userLat, userLng, limit = 35) {
+    const stopsSource = (Array.isArray(this.allStops) && this.allStops.length > 0)
+      ? this.allStops
+      : (window.Ticker && Array.isArray(window.Ticker.allStops) && window.Ticker.allStops.length > 0 ? window.Ticker.allStops : []);
+    if (!Array.isArray(stopsSource) || stopsSource.length === 0) return [];
+
+    const stopsWithDist = [];
+    for (const s of stopsSource) {
+      const sLat = parseFloat(s.StopLat);
+      const sLng = parseFloat(s.StopLng);
+      if (isNaN(sLat) || isNaN(sLng)) continue;
+      const dLat = (sLat - userLat) * 111139;
+      const dLng = (sLng - userLng) * (111139 * Math.cos(userLat * Math.PI / 180));
+      const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+      stopsWithDist.push({
+        ...s,
+        distanceMeters: Math.round(dist)
+      });
+    }
+    stopsWithDist.sort((a, b) => a.distanceMeters - b.distanceMeters);
+    return stopsWithDist.slice(0, limit);
+  }
+
+  /**
    * "Near Me" GPS Radar
    */
   async findNearbyStops(silent = false) {
@@ -328,24 +354,22 @@ class SearchManager {
       }
       try {
         const stops = await window.API.getClosestStops(lat, lng);
-        this.nearbyStops = Array.isArray(stops) ? stops : [];
-        this.sortStopsWithFavorites();
-        this.renderNearbyStops(lat, lng);
-        if (window.App && window.App.mapManager) {
-          window.App.mapManager.renderNearbyStops(this.nearbyStops);
-        }
-        if (window.App && window.App.ticker && !window.App.currentStop) {
-          window.App.ticker.render();
-        }
+        this.nearbyStops = (Array.isArray(stops) && stops.length > 0) ? stops : this.getLocalClosestStops(lat, lng);
       } catch (err) {
-        if (container) {
-          container.innerHTML = `<div class="m3-card" style="color: var(--md-sys-color-error); padding: 1rem;">Αδυναμία φόρτωσης κοντινών στάσεων: ${err.message}</div>`;
-        }
-      } finally {
-        if (radarBtn) {
-          radarBtn.classList.remove('spin-animation');
-          radarBtn.disabled = false;
-        }
+        console.warn('API getClosestStops failed, using local index:', err);
+        this.nearbyStops = this.getLocalClosestStops(lat, lng);
+      }
+      this.sortStopsWithFavorites();
+      this.renderNearbyStops(lat, lng);
+      if (window.App && window.App.mapManager) {
+        window.App.mapManager.renderNearbyStops(this.nearbyStops);
+      }
+      if (window.App && window.App.ticker && !window.App.currentStop) {
+        window.App.ticker.render();
+      }
+      if (radarBtn) {
+        radarBtn.classList.remove('spin-animation');
+        radarBtn.disabled = false;
       }
     };
 
@@ -367,28 +391,24 @@ class SearchManager {
 
         try {
           const stops = await window.API.getClosestStops(latitude, longitude);
-          this.nearbyStops = Array.isArray(stops) ? stops : [];
-          this.sortStopsWithFavorites();
-          this.renderNearbyStops(latitude, longitude);
-          if (window.App && window.App.mapManager) {
-            window.App.mapManager.renderNearbyStops(this.nearbyStops);
-          }
-          if (window.App && window.App.ticker && !window.App.currentStop) {
-            window.App.ticker.render();
-          }
+          this.nearbyStops = (Array.isArray(stops) && stops.length > 0) ? stops : this.getLocalClosestStops(latitude, longitude);
         } catch (err) {
-          if (container) {
-            container.innerHTML = `
-              <div class="m3-card" style="color: var(--md-sys-color-error); padding: 1rem;">
-                Αδυναμία φόρτωσης κοντινών στάσεων: ${err.message}
-              </div>
-            `;
-          }
-        } finally {
-          if (radarBtn) {
-            radarBtn.classList.remove('spin-animation');
-            radarBtn.disabled = false;
-          }
+          console.warn('API getClosestStops error, using local index:', err);
+          this.nearbyStops = this.getLocalClosestStops(latitude, longitude);
+        }
+
+        this.sortStopsWithFavorites();
+        this.renderNearbyStops(latitude, longitude);
+        if (window.App && window.App.mapManager) {
+          window.App.mapManager.renderNearbyStops(this.nearbyStops);
+        }
+        if (window.App && window.App.ticker && !window.App.currentStop) {
+          window.App.ticker.render();
+        }
+
+        if (radarBtn) {
+          radarBtn.classList.remove('spin-animation');
+          radarBtn.disabled = false;
         }
       },
       async (err) => {
