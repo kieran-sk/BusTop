@@ -31,11 +31,15 @@ class AppController {
    */
   triggerHaptic(type = 'light') {
     const patterns = {
+      selection: 15,
+      tick: 20,
       light: 35,
       medium: 65,
       heavy: 110,
-      success: [35, 50, 45],
-      warning: [60, 60, 60]
+      rigid: [40, 20, 20],
+      soft: 25,
+      success: [25, 40, 45],
+      warning: [60, 50, 60]
     };
     const pattern = patterns[type] || 35;
     if (window.AndroidBridge && typeof window.AndroidBridge.vibrate === 'function') {
@@ -202,7 +206,30 @@ class AppController {
       if (this.mapManager) {
         this.mapManager.invalidateSize();
       }
+    });
 
+    // Adaptive Background Polling: Relax polling to 45s when backgrounded, restore 15s when active
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (this.pollInterval) {
+          clearInterval(this.pollInterval);
+          this.pollInterval = setInterval(() => {
+            if (this.currentStop && this.activeTab === 'ticker') {
+              this.refreshStopArrivals(this.currentStopRequestId);
+            }
+          }, 45000);
+        }
+      } else {
+        if (this.activeTab === 'ticker' && this.currentStop) {
+          this.refreshStopArrivals(this.currentStopRequestId);
+          if (this.pollInterval) clearInterval(this.pollInterval);
+          this.pollInterval = setInterval(() => {
+            if (this.currentStop && this.activeTab === 'ticker') {
+              this.refreshStopArrivals(this.currentStopRequestId);
+            }
+          }, 15000);
+        }
+      }
     });
 
     // Restore variant grouping checkbox state
@@ -416,6 +443,7 @@ class AppController {
     }
 
     this.activeTab = tabId;
+    this.triggerHaptic('selection');
 
     // Update bottom nav bar active state
     document.querySelectorAll('.m3-nav-item').forEach(btn => {

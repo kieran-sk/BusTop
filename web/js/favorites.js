@@ -8,6 +8,8 @@ class FavoritesManager {
     this.favStops = JSON.parse(localStorage.getItem('OASA_FAV_STOPS') || '[]');
     this.favLines = JSON.parse(localStorage.getItem('OASA_FAV_LINES') || '[]');
     this.activeFilter = 'all'; // 'all', 'stops', 'lines'
+    this.nextArrivalsCache = new Map();
+    this.isFetchingNextArrivals = false;
     this.restoreFromNativeBridge();
   }
 
@@ -168,6 +170,59 @@ class FavoritesManager {
     return this.isLineFav(lineCode);
   }
 
+  getNextArrivalBadgeHtml(stopCode) {
+    if (!this.nextArrivalsCache.has(stopCode)) {
+      return `<span class="m3-badge" style="background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-primary); font-size: 0.72rem; font-weight: 700;">Αφίξεις ➔</span>`;
+    }
+    const next = this.nextArrivalsCache.get(stopCode);
+    if (!next) {
+      return `<span class="m3-badge" style="background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-outline); font-size: 0.7rem; font-weight: 600;">Χωρίς αφίξεις</span>`;
+    }
+    const m = next.btime2;
+    if (m <= 3) {
+      return `<span class="m3-badge urgency-now" style="background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-size: 0.74rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;"><span class="m3-pulse-dot" style="width: 5px; height: 5px; background: #dc2626;"></span>${next.lineId} σε ${m}λ</span>`;
+    } else if (m <= 10) {
+      return `<span class="m3-badge urgency-soon" style="background: #fffbeb; color: #b45309; border: 1px solid #fde68a; font-size: 0.74rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;"><span class="m3-pulse-dot" style="width: 5px; height: 5px; background: #b45309;"></span>${next.lineId} σε ${m}λ</span>`;
+    } else {
+      return `<span class="m3-badge" style="background: #eff6ff; color: #005ac1; border: 1px solid #bfdbfe; font-size: 0.74rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;">🚍 ${next.lineId} σε ${m}λ</span>`;
+    }
+  }
+
+  async fetchNextArrivalsForFavorites() {
+    if (this.isFetchingNextArrivals || this.favStops.length === 0) return;
+    this.isFetchingNextArrivals = true;
+
+    // Fetch live arrivals for top favorite stops
+    const stopsToFetch = this.favStops.slice(0, 8);
+    await Promise.all(stopsToFetch.map(async (s) => {
+      try {
+        const data = await window.API.getStopArrivals(s.code);
+        if (data && Array.isArray(data.arrivals) && data.arrivals.length > 0) {
+          const sorted = [...data.arrivals].filter(a => typeof a.btime2 === 'number').sort((a, b) => a.btime2 - b.btime2);
+          if (sorted.length > 0) {
+            const earliest = sorted[0];
+            this.nextArrivalsCache.set(s.code, {
+              lineId: earliest.line_id || earliest.LineID || 'BUS',
+              btime2: earliest.btime2,
+              isLive: earliest.is_live
+            });
+          } else {
+            this.nextArrivalsCache.set(s.code, null);
+          }
+        } else {
+          this.nextArrivalsCache.set(s.code, null);
+        }
+      } catch (err) {}
+
+      const el = document.getElementById(`fav-next-bus-${s.code}`);
+      if (el) {
+        el.innerHTML = this.getNextArrivalBadgeHtml(s.code);
+      }
+    }));
+
+    this.isFetchingNextArrivals = false;
+  }
+
   render(containerId = 'favorites-container') {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -239,8 +294,8 @@ class FavoritesManager {
                   </div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
-                  <span class="m3-badge" style="background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-primary); font-size: 0.72rem; font-weight: 700;">
-                    Αφίξεις ➔
+                  <span id="fav-next-bus-${s.code}">
+                    ${this.getNextArrivalBadgeHtml(s.code)}
                   </span>
                   <button class="m3-icon-btn" title="Αφαίρεση" style="width: 32px; height: 32px; color: var(--md-sys-color-error); flex-shrink: 0;" onclick="event.stopPropagation(); window.Favorites.toggleStop('${s.code}', '${safeName}');">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -291,6 +346,10 @@ class FavoritesManager {
     }
 
     container.innerHTML = tabsHeaderHtml + contentHtml;
+
+    if (this.favStops.length > 0 && (this.activeFilter === 'all' || this.activeFilter === 'stops')) {
+      this.fetchNextArrivalsForFavorites();
+    }
   }
 }
 

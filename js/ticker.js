@@ -28,6 +28,117 @@ class AirportTicker {
     window.Ticker = this;
     this.startClock();
     this.loadAllStops();
+    this.initPullToRefresh();
+  }
+
+  /**
+   * Pull-to-Refresh Gesture Engine for Departures Board
+   */
+  initPullToRefresh() {
+    let startY = 0;
+    let currentY = 0;
+    let isPulling = false;
+    let isRefreshing = false;
+    const threshold = 65;
+
+    const getIndicator = () => document.getElementById('ticker-pull-indicator');
+    const getIcon = () => document.getElementById('ticker-pull-icon');
+    const getText = () => document.getElementById('ticker-pull-text');
+
+    window.addEventListener('touchstart', (e) => {
+      if (isRefreshing) return;
+      if (window.App && window.App.activeTab !== 'ticker') return;
+      if (window.scrollY > 5) return;
+      if (e.touches.length !== 1) return;
+      startY = e.touches[0].clientY;
+      currentY = startY;
+      isPulling = true;
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (e) => {
+      if (!isPulling || isRefreshing) return;
+      if (window.scrollY > 5) {
+        isPulling = false;
+        const ind = getIndicator();
+        if (ind) ind.style.display = 'none';
+        return;
+      }
+      currentY = e.touches[0].clientY;
+      const pullDist = Math.max(0, currentY - startY);
+      if (pullDist > 12) {
+        const ind = getIndicator();
+        const icon = getIcon();
+        const text = getText();
+        if (ind) {
+          ind.style.display = 'flex';
+          const dampDist = Math.min(threshold + 20, pullDist * 0.45);
+          ind.style.transform = `translateY(${dampDist}px)`;
+          if (pullDist >= threshold) {
+            if (icon) icon.style.transform = 'rotate(180deg)';
+            if (text) text.innerText = 'Αφήστε για ανανέωση...';
+          } else {
+            if (icon) icon.style.transform = 'rotate(0deg)';
+            if (text) text.innerText = 'Τραβήξτε για ανανέωση...';
+          }
+        }
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchend', async () => {
+      if (!isPulling || isRefreshing) return;
+      isPulling = false;
+      const pullDist = Math.max(0, currentY - startY);
+      const ind = getIndicator();
+      const icon = getIcon();
+      const text = getText();
+
+      if (pullDist >= threshold && window.scrollY <= 5) {
+        isRefreshing = true;
+        if (window.App && typeof window.App.triggerHaptic === 'function') {
+          window.App.triggerHaptic('medium');
+        }
+        if (icon) {
+          icon.innerText = '🔄';
+          icon.style.transform = 'none';
+          icon.classList.add('spin-animation');
+        }
+        if (text) text.innerText = 'Ανανέωση αφίξεων...';
+
+        try {
+          if (window.App && window.App.currentStop) {
+            await window.App.refreshStopArrivals(window.App.currentStopRequestId);
+          } else if (window.Search) {
+            await window.Search.findNearbyStops(true);
+          }
+        } catch (e) {
+          console.warn('Pull-to-refresh error:', e);
+        }
+
+        if (text) text.innerText = '✓ Ενημερώθηκε!';
+        if (icon) icon.classList.remove('spin-animation');
+        if (window.App && typeof window.App.triggerHaptic === 'function') {
+          window.App.triggerHaptic('light');
+        }
+
+        setTimeout(() => {
+          if (ind) {
+            ind.style.transform = 'translateY(-100%)';
+            setTimeout(() => {
+              ind.style.display = 'none';
+              if (icon) icon.innerText = '⬇️';
+              isRefreshing = false;
+            }, 200);
+          } else {
+            isRefreshing = false;
+          }
+        }, 550);
+      } else {
+        if (ind) {
+          ind.style.transform = 'translateY(-100%)';
+          setTimeout(() => { ind.style.display = 'none'; }, 200);
+        }
+      }
+    }, { passive: true });
   }
 
   setStopsSortBy(mode) {
@@ -351,7 +462,7 @@ class AirportTicker {
     const walkMins = (walk && typeof walk.minutes === 'number') ? walk.minutes : null;
 
     return `
-      <div class="ticker-row" onclick="window.App.openLineTimetableBothDirections('${arr.line_code}', '${arr.line_id}', '${safeDescr}')" title="Κλικ για προβολή πλήρους δρομολογίου και στάσεων">
+      <div class="ticker-row" onclick="if(window.App && window.App.triggerHaptic) window.App.triggerHaptic('tick'); window.App.openLineTimetableBothDirections('${arr.line_code}', '${arr.line_id}', '${safeDescr}')" title="Κλικ για προβολή πλήρους δρομολογίου και στάσεων">
         <!-- Top Section: Line Badge, Destination, Direction, GPS Status & Labeled Arrival Countdown -->
         <div class="ticker-row-top">
           <div class="ticker-cell-line">
