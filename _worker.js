@@ -121,7 +121,7 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
         line_descr: route.LineDescr || route.RouteDescr || 'Λεωφορείο ΟΑΣΑ',
         route_descr: route.RouteDescr || '',
         destination: cleanRouteDestination(route),
-        direction: /κυκλικη|circular/i.test(route.LineDescr || '') ? '🔄' : (route.RouteType === '2' ? '←' : '→'),
+        direction: /κυκλικη|circular/i.test(route.LineDescr || '') ? '🔄' : (route.RouteType === '2' ? '⬅️' : '➡️'),
         veh_code: arr.veh_code || null,
         btime2: btime2,
         estimated_arrival_time: estTime,
@@ -184,7 +184,7 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
               line_id: lineId,
               line_descr: route.LineDescr || route.RouteDescr || 'Λεωφορείο ΟΑΣΑ',
               route_descr: route.RouteDescr || '',
-              direction: /κυκλικη|circular/i.test(route.LineDescr || '') ? '🔄' : (route.RouteType === '2' ? '←' : '→'),
+              direction: /κυκλικη|circular/i.test(route.LineDescr || '') ? '🔄' : (route.RouteType === '2' ? '⬅️' : '➡️'),
               veh_code: null,
               btime2: rem,
               estimated_arrival_time: estFormatted,
@@ -278,7 +278,7 @@ export default {
           return jsonRes((Array.isArray(rts) ? rts : []).map(r => ({
             ...r,
             cleanDestination: cleanRouteDestination(r),
-            directionLabel: /κυκλικη|circular/i.test(r.RouteDescr||'') ? '🔄' : (r.RouteType === '2' ? '←' : '→')
+            directionLabel: /κυκλικη|circular/i.test(r.RouteDescr||'') ? '🔄' : (r.RouteType === '2' ? '⬅️' : '➡️')
           })));
         }
         const mArr = path.match(/^\/api\/stops\/([^\/]+)\/arrivals$/);
@@ -427,7 +427,7 @@ export default {
                     linesMap.set(r.LineID, {
                       line_id: r.LineID,
                       last_stop: cleanRouteDestination(r),
-                      direction: /κυκλικη/i.test(r.RouteDescr||'') ? '🔄' : (r.RouteType === '2' ? '←' : '→')
+                      direction: /κυκλικη/i.test(r.RouteDescr||'') ? '🔄' : (r.RouteType === '2' ? '⬅️' : '➡️')
                     });
                   }
                 }

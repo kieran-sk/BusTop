@@ -151,7 +151,7 @@ class MapManager {
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 3px 0; border-bottom: 1px dashed #e2e8f0; font-size: 0.8rem;">
             <span style="font-weight: 800; color: #005ac1; background: #e0f2fe; padding: 1px 6px; border-radius: 4px;">${l.line_id}</span>
             <span style="flex: 1; margin: 0 4px; color: #0f172a; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;">to ${l.last_stop}</span>
-            <span style="font-size: 0.7rem; color: #64748b;">${l.direction || ''}</span>
+            <span style="font-size: 0.8rem; color: #64748b;">${l.direction === '←' ? '⬅️' : (l.direction === '→' ? '➡️' : (l.direction || ''))}</span>
           </div>
         `).join('');
       }
@@ -212,7 +212,7 @@ class MapManager {
                   <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 3px 0; border-bottom: 1px dashed #e2e8f0; font-size: 0.8rem;">
                     <span style="font-weight: 800; color: #005ac1; background: #e0f2fe; padding: 1px 6px; border-radius: 4px;">${l.line_id}</span>
                     <span style="flex: 1; margin: 0 4px; color: #0f172a; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;">προς ${l.last_stop}</span>
-                    <span style="font-size: 0.7rem; color: #64748b;">${l.direction}</span>
+                    <span style="font-size: 0.8rem; color: #64748b;">${l.direction === '←' ? '⬅️' : (l.direction === '→' ? '➡️' : (l.direction || ''))}</span>
                   </div>
                 `).join('');
               } else {

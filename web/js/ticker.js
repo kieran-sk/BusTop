@@ -297,7 +297,8 @@ class AirportTicker {
     const busMins = arr.btime2;
     const advice = this.getCommuteAdvice(busMins, walk ? walk.minutes : null);
     const isLive = arr.is_live;
-    const directionText = arr.direction || '→';
+    const rawDir = arr.direction || '➡️';
+    const directionText = rawDir === '←' ? '⬅️' : (rawDir === '→' ? '➡️' : rawDir);
     const lineDescr = arr.route_descr || arr.line_descr || 'Διαδρομή Λεωφορείου';
     const safeDescr = lineDescr.replace(/'/g, "\\'");
 
