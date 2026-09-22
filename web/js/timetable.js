@@ -462,9 +462,9 @@ class TimetableManager {
     const isScheduleMode = this.currentViewMode === 'schedule';
     const isMapMode = this.currentViewMode === 'map';
 
-    // Subtitle description
+    // Subtitle description (clean without repeating circular)
     const subtitleText = isCircular
-      ? `🔄 Κυκλική Διαδρομή • ${outStops.length} στάσεις • ${isStopsMode ? 'Πλήρης κύκλος διαδρομής' : `${goTrips.length} προγραμματισμένα δρομολόγια`}`
+      ? `${outStops.length} στάσεις • ${isStopsMode ? 'Πλήρης κύκλος διαδρομής' : `${goTrips.length} προγραμματισμένα δρομολόγια`}`
       : `Πλήρες Δρομολόγιο • 2 Κατευθύνσεις (${outStops.length} στάσεις Μετάβαση / ${inStops.length} Επιστροφή)`;
 
     // Main Content
@@ -514,10 +514,7 @@ class TimetableManager {
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.85rem; border-bottom: 1px solid var(--md-sys-color-outline-variant); padding-bottom: 0.6rem;">
             <div>
               <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <span style="font-weight: 800; font-size: 1rem; color: var(--md-sys-color-primary);">Κυκλική Διαδρομή</span>
-                <span class="m3-badge" style="background: #eff6ff; color: #005ac1; font-size: 0.72rem; font-weight: 800; padding: 2px 8px;">
-                  🔄 Κυκλική
-                </span>
+                <span style="font-weight: 800; font-size: 1rem; color: var(--md-sys-color-primary);">Στάσεις &amp; Διαδρομή</span>
               </div>
               <div style="font-size: 0.78rem; color: #64748b; margin-top: 2px;">
                 ${outRoute.RouteDescr || this.currentLine.lineDescr || 'Πλήρης Κύκλος Διαδρομής'} • ${isStopsMode ? `${outStops.length} στάσεις` : `${goTrips.length} δρομολόγια`}
@@ -567,16 +564,22 @@ class TimetableManager {
       `;
     }
 
+    // Clean line title if it already ends with (ΚΥΚΛΙΚΗ)
+    let displayTitle = this.currentLine.lineDescr || 'Γραμμή ΟΑΣΑ';
+    if (isCircular) {
+      displayTitle = displayTitle.replace(/\s*\(\s*ΚΥΚΛΙΚΗ\s*\)/gi, '').trim();
+    }
+
     container.innerHTML = `
       <div class="m3-card" style="margin-bottom: ${isMapMode ? '0.5rem' : '1.5rem'}; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);">
         <!-- Header -->
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
-          <div>
-            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.25rem;">
+          <div style="flex: 1; min-width: 0;">
+            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.25rem; flex-wrap: wrap;">
               <span class="ticker-line-badge" style="font-size: 1.05rem;">
                 ${this.currentLine.lineId || 'BUS'}
               </span>
-              <h2 style="font-size: 1.2rem; font-weight: 900; color: var(--md-sys-color-on-surface);">${this.currentLine.lineDescr || 'Γραμμή ΟΑΣΑ'}</h2>
+              <h2 style="font-size: 1.2rem; font-weight: 900; color: var(--md-sys-color-on-surface); margin: 0;">${displayTitle}</h2>
               ${isCircular ? `
                 <span class="m3-badge" style="background: #eff6ff; color: #005ac1; font-weight: 800; font-size: 0.72rem; padding: 2px 8px;">
                   🔄 Κυκλική Διαδρομή
@@ -590,10 +593,6 @@ class TimetableManager {
               ${subtitleText}
             </div>
           </div>
-          <button class="m3-btn m3-btn-tonal" style="padding: 0.4rem 0.85rem; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 6px;" onclick="window.App.goBack()" title="Επιστροφή στην προηγούμενη οθόνη">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-            <span>Πίσω</span>
-          </button>
         </div>
 
         <!-- View Mode Segmented Control: Stops vs Schedule vs Route Map -->
