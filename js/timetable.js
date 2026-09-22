@@ -150,22 +150,44 @@ class TimetableManager {
       `;
     }
 
+    // Pre-calculate nearest stop for each live bus to prevent multiple stops showing the same bus
+    const stopBusMap = new Map(); // stopCode -> bus
+    if (Array.isArray(liveBuses) && liveBuses.length > 0) {
+      liveBuses.forEach(b => {
+        const bLat = parseFloat(b.CS_LAT);
+        const bLng = parseFloat(b.CS_LNG);
+        if (isNaN(bLat) || isNaN(bLng)) return;
+
+        let closestStop = null;
+        let minDistance = Infinity;
+
+        stops.forEach(s => {
+          const sLat = parseFloat(s.StopLat);
+          const sLng = parseFloat(s.StopLng);
+          if (isNaN(sLat) || isNaN(sLng)) return;
+
+          // Euclidean distance approx in degrees (1 deg ~ 111km)
+          const dist = Math.hypot(bLat - sLat, (bLng - sLng) * Math.cos(sLat * Math.PI / 180));
+          if (dist < minDistance) {
+            minDistance = dist;
+            closestStop = s;
+          }
+        });
+
+        // Only assign if nearest stop is within ~450 meters (0.004 degrees approx)
+        if (closestStop && minDistance < 0.004) {
+          stopBusMap.set(String(closestStop.StopCode), b);
+        }
+      });
+    }
+
     return stops.map((s, idx) => {
       const stopOrder = s.RouteStopOrder || (idx + 1);
       const stopTitle = s.StopDescr || `Στάση #${s.StopCode}`;
       const safeTitle = stopTitle.replace(/'/g, "\\'");
       const lat = parseFloat(s.StopLat) || 'null';
       const lng = parseFloat(s.StopLng) || 'null';
-
-      // Check if any live bus is located near this stop (within ~300m)
-      const nearBus = liveBuses.find(b => {
-        if (!b.CS_LAT || !b.CS_LNG || isNaN(lat) || isNaN(lng)) return false;
-        const bLat = parseFloat(b.CS_LAT);
-        const bLng = parseFloat(b.CS_LNG);
-        const dLat = Math.abs(bLat - lat);
-        const dLng = Math.abs(bLng - lng);
-        return dLat < 0.003 && dLng < 0.003;
-      });
+      const nearBus = stopBusMap.get(String(s.StopCode));
 
       return `
         <div class="route-stop-item stop-interactive-card" data-stop-code="${s.StopCode}" data-stop-title="${safeTitle}" data-stop-lat="${lat}" data-stop-lng="${lng}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0.9rem; border-radius: 12px; margin-bottom: 0.4rem; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); cursor: pointer; transition: all 0.2s;" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', ${lat}, ${lng}, true)" title="Κλικ για προβολή αφίξεων στη στάση ${stopTitle}">
@@ -180,14 +202,13 @@ class TimetableManager {
               <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 1px;">
                 ${s.StopStreet ? s.StopStreet + ' • ' : ''}#${s.StopCode}
               </div>
-              ${nearBus ? `
-                <div style="display: inline-flex; align-items: center; gap: 4px; margin-top: 3px; font-size: 0.7rem; font-weight: 700; color: #047857; background: #ecfdf5; padding: 1px 6px; border-radius: 4px;">
-                  <span class="m3-pulse-dot" style="background: #047857; width: 6px; height: 6px;"></span>
-                  Λεωφ. #${nearBus.VEH_NO} (${nearBus.report_age_gr || 'ζωντανά'})
-                </div>
-              ` : ''}
             </div>
           </div>
+          ${nearBus ? `
+            <div style="display: flex; align-items: center; flex-shrink: 0; margin-left: 0.5rem;" title="Το λεωφορείο βρίσκεται εδώ τώρα">
+              <span style="font-size: 1.35rem; line-height: 1;">🚌</span>
+            </div>
+          ` : ''}
         </div>
       `;
     }).join('');
@@ -512,17 +533,7 @@ class TimetableManager {
       `;
     } else if (isCircular) {
       mainContentHtml = `
-        <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 16px; padding: 1.15rem;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.85rem; border-bottom: 1px solid var(--md-sys-color-outline-variant); padding-bottom: 0.6rem;">
-            <div>
-              <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <span style="font-weight: 800; font-size: 1rem; color: var(--md-sys-color-primary);">Στάσεις &amp; Διαδρομή</span>
-              </div>
-              <div style="font-size: 0.78rem; color: #64748b; margin-top: 2px;">
-                ${outRoute.RouteDescr || this.currentLine.lineDescr || 'Πλήρης Κύκλος Διαδρομής'} • ${isStopsMode ? `${outStops.length} στάσεις` : `${goTrips.length} δρομολόγια`}
-              </div>
-            </div>
-          </div>
+        <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 16px; padding: 0.75rem;">
           <div style="max-height: 520px; overflow-y: auto; padding-right: 4px;">
             ${isStopsMode ? outStopsHtml : outScheduleHtml}
           </div>
@@ -532,14 +543,9 @@ class TimetableManager {
       mainContentHtml = `
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 1.25rem;">
           <!-- Direction 1: Outbound / Μετάβαση -->
-          <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 16px; padding: 1rem;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; border-bottom: 1px solid var(--md-sys-color-outline-variant); padding-bottom: 0.5rem;">
-              <div>
-                <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-primary);">Κατεύθυνση 1: Μετάβαση</div>
-                <div style="font-size: 0.75rem; color: #64748b;">
-                  ${outRoute.RouteDescr || 'Προς Τέρμα'} • ${isStopsMode ? `${outStops.length} στάσεις` : `${goTrips.length} δρομολόγια`}
-                </div>
-              </div>
+          <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 16px; padding: 0.85rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--md-sys-color-outline-variant);">
+              <span style="font-weight: 800; font-size: 0.85rem; color: var(--md-sys-color-primary);">${outRoute.RouteDescr || 'Μετάβαση'}</span>
               <span class="m3-badge" style="background: #eff6ff; color: #005ac1; font-size: 0.65rem;">Μετάβαση</span>
             </div>
             <div style="max-height: 480px; overflow-y: auto; padding-right: 4px;">
@@ -548,14 +554,9 @@ class TimetableManager {
           </div>
 
           <!-- Direction 2: Inbound / Επιστροφή -->
-          <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 16px; padding: 1rem;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; border-bottom: 1px solid var(--md-sys-color-outline-variant); padding-bottom: 0.5rem;">
-              <div>
-                <div style="font-weight: 800; font-size: 0.95rem; color: #047857;">Κατεύθυνση 2: Επιστροφή</div>
-                <div style="font-size: 0.75rem; color: #64748b;">
-                  ${inRoute.RouteDescr || 'Προς Αφετηρία'} • ${isStopsMode ? `${inStops.length} στάσεις` : `${comeTrips.length} δρομολόγια`}
-                </div>
-              </div>
+          <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 16px; padding: 0.85rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--md-sys-color-outline-variant);">
+              <span style="font-weight: 800; font-size: 0.85rem; color: #047857;">${inRoute.RouteDescr || 'Επιστροφή'}</span>
               <span class="m3-badge" style="background: #ecfdf5; color: #047857; font-size: 0.65rem;">Επιστροφή</span>
             </div>
             <div style="max-height: 480px; overflow-y: auto; padding-right: 4px;">
