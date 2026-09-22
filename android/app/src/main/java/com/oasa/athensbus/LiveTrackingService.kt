@@ -1,11 +1,13 @@
 package com.oasa.athensbus
 
+import android.app.ForegroundServiceStartNotAllowedException
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -33,10 +35,10 @@ class LiveTrackingService : Service() {
     private var stopName: String = ""
     private var destination: String = ""
     private var walkMinutes: Int = 0
-    private var thresholdMinutes: Int = 5
+    private var thresholdMinutes: Int = 0
     private var initialMinutes: Int = 10
     private var startedAtMs: Long = 0L
-    private var ringUntilDismissed: Boolean = true
+    private var ringUntilDismissed: Boolean = false
     private var isAlarmTriggered = false
     private var wakeLock: PowerManager.WakeLock? = null
 
@@ -63,7 +65,7 @@ class LiveTrackingService : Service() {
             destination: String,
             walkMinutes: Int,
             threshold: Int,
-            ringUntilDismissed: Boolean = true,
+            ringUntilDismissed: Boolean = false,
             initialMinutes: Int = 10
         ) {
             val intent = Intent(context, LiveTrackingService::class.java).apply {
@@ -79,7 +81,15 @@ class LiveTrackingService : Service() {
                 putExtra(EXTRA_INITIAL_MINS, initialMinutes)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    try {
+                        context.startForegroundService(intent)
+                    } catch (e: ForegroundServiceStartNotAllowedException) {
+                        context.startService(intent)
+                    }
+                } else {
+                    context.startForegroundService(intent)
+                }
             } else {
                 context.startService(intent)
             }
@@ -97,6 +107,11 @@ class LiveTrackingService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            val stopToUnpin = intent.getStringExtra(EXTRA_STOP_CODE) ?: stopCode
+            val lineToUnpin = intent.getStringExtra(EXTRA_LINE_ID) ?: lineId
+            if (stopToUnpin.isNotBlank() && lineToUnpin.isNotBlank()) {
+                MainActivity.currentInstance?.unpinAndDismiss(stopToUnpin, lineToUnpin)
+            }
             releaseWakeLock()
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -111,22 +126,21 @@ class LiveTrackingService : Service() {
         stopName = intent?.getStringExtra(EXTRA_STOP_NAME) ?: "Στάση ΟΑΣΑ"
         destination = intent?.getStringExtra(EXTRA_DESTINATION) ?: ""
         walkMinutes = intent?.getIntExtra(EXTRA_WALK_MINUTES, 0) ?: 0
-        val newThreshold = intent?.getIntExtra(EXTRA_THRESHOLD, 5) ?: 5
-        // If an alarm is already actively set (> 0), don't allow a quiet pin (0) to disarm it
-        if (newThreshold > 0 || thresholdMinutes == 0) {
-            thresholdMinutes = newThreshold
-        }
-        val newRing = intent?.getBooleanExtra(EXTRA_RING_UNTIL_DISMISSED, true) ?: true
-        if (newThreshold > 0) {
-            ringUntilDismissed = newRing
-        }
+        val newThreshold = intent?.getIntExtra(EXTRA_THRESHOLD, 0) ?: 0
+        thresholdMinutes = newThreshold
+        val newRing = intent?.getBooleanExtra(EXTRA_RING_UNTIL_DISMISSED, false) ?: false
+        ringUntilDismissed = newRing
         initialMinutes = intent?.getIntExtra(EXTRA_INITIAL_MINS, 10) ?: 10
         startedAtMs = System.currentTimeMillis()
         isAlarmTriggered = false
 
         NotificationHelper.createLiveNotificationChannel(this)
         val initialNotif = buildLiveNotification(initialMinutes)
-        startForeground(NotificationHelper.LIVE_NOTIF_ID, initialNotif)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NotificationHelper.LIVE_NOTIF_ID, initialNotif, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            startForeground(NotificationHelper.LIVE_NOTIF_ID, initialNotif)
+        }
 
         startBackgroundPolling()
 
@@ -171,6 +185,7 @@ class LiveTrackingService : Service() {
 
                     updateNotification(remainingMins)
 
+                    var minsForDelay = remainingMins
                     if (thresholdMinutes > 0 && remainingMins <= thresholdMinutes && !isAlarmTriggered) {
                         isAlarmTriggered = true
                         triggerAlarmWakeup(remainingMins)
@@ -179,7 +194,21 @@ class LiveTrackingService : Service() {
                     e.printStackTrace()
                 }
 
-                delay(20000)
+                val currentMins = (initialMinutes) // fallback
+                // Adaptive background polling delay: Save battery when far, increase frequency when close
+                val delayMins = try {
+                    fetchLiveArrivalMinutes() ?: initialMinutes
+                } catch (_: Exception) {
+                    initialMinutes
+                }
+
+                val pollDelayMs = when {
+                    delayMins > 20 -> 45000L  // Far (>20m away): 45s (massive battery saving)
+                    delayMins > 8  -> 25000L  // Approaching (8-20m away): 25s
+                    delayMins > 3  -> 15000L  // Close (3-8m away): 15s
+                    else           -> 10000L  // Arriving now (<=3m away): 10s for high precision
+                }
+                delay(pollDelayMs)
             }
         }
     }
@@ -266,6 +295,8 @@ class LiveTrackingService : Service() {
 
         val stopIntent = Intent(this, LiveTrackingService::class.java).apply {
             action = ACTION_STOP
+            putExtra(EXTRA_STOP_CODE, stopCode)
+            putExtra(EXTRA_LINE_ID, lineId)
         }
         val pStop = PendingIntent.getService(
             this,

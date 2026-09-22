@@ -116,6 +116,12 @@ class AlarmManager {
     this.stopAlarmRinging();
     this.isRinging = true;
 
+    // If running inside Android APK (AndroidBridge present), only ring the native alarm!
+    // Do not ring Web Audio oscillator siren or browser vibration to prevent dual/overlapping alarms.
+    if (window.AndroidBridge) {
+      return;
+    }
+
     // 1. Aggressive repeating vibration pattern (800ms vibrate, 200ms pause)
     if ('vibrate' in navigator) {
       navigator.vibrate([800, 200, 800, 200, 800, 200, 1200]);
@@ -126,9 +132,15 @@ class AlarmManager {
       }, 3500);
     }
 
+    this.ringingStartedAt = Date.now();
+
     // 2. Loud alternating two-tone alarm siren
     const playSirenBurst = () => {
       if (!this.isRinging) return;
+      if (Date.now() - this.ringingStartedAt > 35000) {
+        this.stopAlarmRinging();
+        return;
+      }
       try {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         if (!this.audioCtx && AudioCtx) this.audioCtx = new AudioCtx();
@@ -188,6 +200,20 @@ class AlarmManager {
       try {
         window.AndroidBridge.dismissAlarm();
       } catch (e) {}
+    }
+
+    // Dismiss triggered alarms and clean up corresponding pinned trips
+    const triggeredAlarms = this.alarms.filter(a => a.triggered);
+    if (triggeredAlarms.length > 0) {
+      triggeredAlarms.forEach(a => {
+        this.clearLiveNotification(a.id);
+        if (window.PinnedTrips && typeof window.PinnedTrips.removePinByStopAndLine === 'function') {
+          window.PinnedTrips.removePinByStopAndLine(a.stopCode, a.lineId);
+        }
+      });
+      this.alarms = this.alarms.filter(a => !a.triggered);
+      this.save();
+      this.renderUI();
     }
   }
 
@@ -421,12 +447,24 @@ class AlarmManager {
     }
   }
 
+  removeAlarmByStopAndLine(stopCode, lineId) {
+    const sCode = String(stopCode || '').trim();
+    const lId = String(lineId || '').trim().toUpperCase();
+    const matching = this.alarms.filter(a =>
+      String(a.stopCode || '').trim() === sCode &&
+      String(a.lineId || '').trim().toUpperCase() === lId
+    );
+    matching.forEach(a => {
+      this.removeAlarm(a.id);
+    });
+  }
+
   formatMinutesHuman(mins) {
     if (typeof mins !== 'number' || isNaN(mins)) return '--';
-    if (mins < 60) return `${mins}λ`;
+    if (mins < 60) return `${mins}'`;
     const hours = Math.floor(mins / 60);
     const remMins = mins % 60;
-    return remMins > 0 ? `${hours}ω ${remMins}λ` : `${hours}ω`;
+    return remMins > 0 ? `${hours}ʰ ${remMins}'` : `${hours}ʰ`;
   }
 
   startWatcher() {
@@ -483,7 +521,7 @@ class AlarmManager {
           // Sort by proximity to expected remaining time so we don't pick a scheduled bus 5 hours away!
           matchingArrivals.sort((a, b) => Math.abs(a.btime2 - expectedMins) - Math.abs(b.btime2 - expectedMins));
           const best = matchingArrivals[0];
-          if (Math.abs(best.btime2 - expectedMins) <= 20 || best.btime2 <= expectedMins + 15) {
+          if (Math.abs(best.btime2 - expectedMins) <= 45 || best.btime2 <= expectedMins + 30) {
             currentMins = best.btime2;
           }
         }
@@ -639,7 +677,7 @@ class AlarmManager {
             if (a.triggered && a.triggeredAt) {
               const minsSince = Math.floor((Date.now() - a.triggeredAt) / 60000);
               const remainingBeforeDismiss = Math.max(1, 10 - minsSince);
-              triggeredNote = ` • Αυτόματη αφαίρεση σε ${remainingBeforeDismiss}λ`;
+              triggeredNote = ` • Αυτόματη αφαίρεση σε ${remainingBeforeDismiss}'`;
             }
 
             const cleanStopName = (a.stopName || '').replace(/'/g, "\\'");

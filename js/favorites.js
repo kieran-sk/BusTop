@@ -8,6 +8,8 @@ class FavoritesManager {
     this.favStops = JSON.parse(localStorage.getItem('OASA_FAV_STOPS') || '[]');
     this.favLines = JSON.parse(localStorage.getItem('OASA_FAV_LINES') || '[]');
     this.activeFilter = 'all'; // 'all', 'stops', 'lines'
+    this.nextArrivalsCache = new Map();
+    this.isFetchingNextArrivals = false;
     this.restoreFromNativeBridge();
   }
 
@@ -21,18 +23,26 @@ class FavoritesManager {
           const stops = typeof parsed.stops === 'string' ? JSON.parse(parsed.stops) : parsed.stops;
           const lines = typeof parsed.lines === 'string' ? JSON.parse(parsed.lines) : parsed.lines;
           let changed = false;
-          if (this.favStops.length === 0 && Array.isArray(stops) && stops.length > 0) {
-            this.favStops = stops;
-            localStorage.setItem('OASA_FAV_STOPS', JSON.stringify(this.favStops));
-            changed = true;
+          if (Array.isArray(stops)) {
+            stops.forEach(s => {
+              if (s && s.code && !this.isStopFav(s.code)) {
+                this.favStops.push(s);
+                changed = true;
+              }
+            });
+            if (changed) localStorage.setItem('OASA_FAV_STOPS', JSON.stringify(this.favStops));
           }
-          if (this.favLines.length === 0 && Array.isArray(lines) && lines.length > 0) {
-            this.favLines = lines;
-            localStorage.setItem('OASA_FAV_LINES', JSON.stringify(this.favLines));
-            changed = true;
+          if (Array.isArray(lines)) {
+            lines.forEach(l => {
+              if (l && l.code && !this.isLineFav(l.code)) {
+                this.favLines.push(l);
+                changed = true;
+              }
+            });
+            if (changed) localStorage.setItem('OASA_FAV_LINES', JSON.stringify(this.favLines));
           }
           if (changed) {
-            console.log('[Favorites] Restored from Android SharedPreferences auto-backup!');
+            console.log('[Favorites] Merged & restored from Android SharedPreferences auto-backup!');
           }
         }
       } catch (e) {
@@ -54,6 +64,18 @@ class FavoritesManager {
       } catch (e) {}
     }
     this.render();
+    // Quickly refresh other UI components so stars and favorite lists update immediately
+    if (window.Search && typeof window.Search.sortStopsWithFavorites === 'function') {
+      window.Search.sortStopsWithFavorites();
+      const uLat = window.App && window.App.userLocation ? window.App.userLocation.lat : null;
+      const uLng = window.App && window.App.userLocation ? window.App.userLocation.lng : null;
+      if (typeof window.Search.renderNearbyStops === 'function' && document.getElementById('nearby-stops-container')) {
+        window.Search.renderNearbyStops(uLat, uLng);
+      }
+    }
+    if (window.App && window.App.ticker && !window.App.currentStop) {
+      window.App.ticker.render();
+    }
   }
 
   exportBackup() {
@@ -86,18 +108,18 @@ class FavoritesManager {
         const parsed = JSON.parse(e.target.result);
         if (Array.isArray(parsed.stops) || Array.isArray(parsed.lines)) {
           if (Array.isArray(parsed.stops)) {
-            // Merge deduplicated stops
+            // Merge deduplicated stops (validate structure)
             parsed.stops.forEach(s => {
-              if (s && s.code && !this.isStopFav(s.code)) {
-                this.favStops.push(s);
+              if (s && s.code && (s.name || s.StopDescr) && !this.isStopFav(s.code)) {
+                this.favStops.push({ code: s.code, name: s.name || s.StopDescr, lat: s.lat || null, lng: s.lng || null });
               }
             });
           }
           if (Array.isArray(parsed.lines)) {
-            // Merge deduplicated lines
+            // Merge deduplicated lines (validate structure)
             parsed.lines.forEach(l => {
-              if (l && l.code && !this.isLineFav(l.code)) {
-                this.favLines.push(l);
+              if (l && l.code && (l.id || l.LineID) && !this.isLineFav(l.code)) {
+                this.favLines.push({ code: l.code, id: l.id || l.LineID, descr: l.descr || l.LineDescr || '' });
               }
             });
           }
@@ -146,6 +168,59 @@ class FavoritesManager {
     }
     this.save();
     return this.isLineFav(lineCode);
+  }
+
+  getNextArrivalBadgeHtml(stopCode) {
+    if (!this.nextArrivalsCache.has(stopCode)) {
+      return `<span class="m3-badge" style="background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-primary); font-size: 0.72rem; font-weight: 700;">Αφίξεις ➔</span>`;
+    }
+    const next = this.nextArrivalsCache.get(stopCode);
+    if (!next) {
+      return `<span class="m3-badge" style="background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-outline); font-size: 0.7rem; font-weight: 600;">Χωρίς αφίξεις</span>`;
+    }
+    const m = next.btime2;
+    if (m <= 3) {
+      return `<span class="m3-badge urgency-now" style="background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-size: 0.74rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;"><span class="m3-pulse-dot" style="width: 5px; height: 5px; background: #dc2626;"></span>${next.lineId} σε ${m}'</span>`;
+    } else if (m <= 10) {
+      return `<span class="m3-badge urgency-soon" style="background: #fffbeb; color: #b45309; border: 1px solid #fde68a; font-size: 0.74rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;"><span class="m3-pulse-dot" style="width: 5px; height: 5px; background: #b45309;"></span>${next.lineId} σε ${m}'</span>`;
+    } else {
+      return `<span class="m3-badge" style="background: #eff6ff; color: #005ac1; border: 1px solid #bfdbfe; font-size: 0.74rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;">🚍 ${next.lineId} σε ${m}'</span>`;
+    }
+  }
+
+  async fetchNextArrivalsForFavorites() {
+    if (this.isFetchingNextArrivals || this.favStops.length === 0) return;
+    this.isFetchingNextArrivals = true;
+
+    // Fetch live arrivals for top favorite stops
+    const stopsToFetch = this.favStops.slice(0, 8);
+    await Promise.all(stopsToFetch.map(async (s) => {
+      try {
+        const data = await window.API.getStopArrivals(s.code);
+        if (data && Array.isArray(data.arrivals) && data.arrivals.length > 0) {
+          const sorted = [...data.arrivals].filter(a => typeof a.btime2 === 'number').sort((a, b) => a.btime2 - b.btime2);
+          if (sorted.length > 0) {
+            const earliest = sorted[0];
+            this.nextArrivalsCache.set(s.code, {
+              lineId: earliest.line_id || earliest.LineID || 'BUS',
+              btime2: earliest.btime2,
+              isLive: earliest.is_live
+            });
+          } else {
+            this.nextArrivalsCache.set(s.code, null);
+          }
+        } else {
+          this.nextArrivalsCache.set(s.code, null);
+        }
+      } catch (err) {}
+
+      const el = document.getElementById(`fav-next-bus-${s.code}`);
+      if (el) {
+        el.innerHTML = this.getNextArrivalBadgeHtml(s.code);
+      }
+    }));
+
+    this.isFetchingNextArrivals = false;
   }
 
   render(containerId = 'favorites-container') {
@@ -208,19 +283,19 @@ class FavoritesManager {
           ${this.favStops.map(s => {
             const safeName = (s.name || '').replace(/'/g, "\\'");
             return `
-              <div class="m3-card stop-interactive-card" data-stop-code="${s.code}" data-stop-title="${safeName}" data-stop-lat="${s.lat || ''}" data-stop-lng="${s.lng || ''}" style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.85rem 1rem; margin-bottom: 0; cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-left: 3.5px solid var(--md-sys-color-primary);" onclick="window.App.selectStop('${s.code}', '${safeName}', '${s.lat || ''}', '${s.lng || ''}')">
+              <div class="m3-card stop-interactive-card is-favourite-stop" data-stop-code="${s.code}" data-stop-title="${safeName}" data-stop-lat="${s.lat || ''}" data-stop-lng="${s.lng || ''}" style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.85rem 1rem; margin-bottom: 0; cursor: pointer; background: #fffdf5;" onclick="window.App.selectStop('${s.code}', '${safeName}', '${s.lat || ''}', '${s.lng || ''}')">
                 <div style="display: flex; align-items: center; gap: 0.75rem; min-width: 0; flex: 1;">
                   <div class="m3-icon-btn" style="width: 36px; height: 36px; background: #eff6ff; color: var(--md-sys-color-primary); border: 1.5px solid #bfdbfe; flex-shrink: 0;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"></path><circle cx="12" cy="9" r="2.5"></circle></svg>
                   </div>
                   <div style="min-width: 0; flex: 1;">
                     <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: break-word;">${s.name}</div>
-                    <div style="font-size: 0.75rem; color: var(--md-sys-color-outline); margin-top: 2px;">Στάση #${s.code}</div>
+                    <div style="font-size: 0.75rem; color: var(--md-sys-color-outline); margin-top: 2px;">#${s.code}</div>
                   </div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
-                  <span class="m3-badge" style="background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-primary); font-size: 0.72rem; font-weight: 700;">
-                    Αφίξεις ➔
+                  <span id="fav-next-bus-${s.code}">
+                    ${this.getNextArrivalBadgeHtml(s.code)}
                   </span>
                   <button class="m3-icon-btn" title="Αφαίρεση" style="width: 32px; height: 32px; color: var(--md-sys-color-error); flex-shrink: 0;" onclick="event.stopPropagation(); window.Favorites.toggleStop('${s.code}', '${safeName}');">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -271,6 +346,10 @@ class FavoritesManager {
     }
 
     container.innerHTML = tabsHeaderHtml + contentHtml;
+
+    if (this.favStops.length > 0 && (this.activeFilter === 'all' || this.activeFilter === 'stops')) {
+      this.fetchNextArrivalsForFavorites();
+    }
   }
 }
 

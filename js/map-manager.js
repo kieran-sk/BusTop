@@ -15,6 +15,7 @@ class MapManager {
     this.isLoaded = false;
     this.moveDebounceTimer = null;
     this.stopMarkersMap = new Map();
+    this.vehicleHistoryMap = new Map(); // vehNo -> { lat, lng, heading }
   }
 
   async init() {
@@ -23,7 +24,15 @@ class MapManager {
 
     if (typeof L === 'undefined') {
       console.warn('Leaflet not loaded yet, waiting...');
-      return;
+      let retries = 0;
+      while (typeof L === 'undefined' && retries < 20) {
+        await new Promise(r => setTimeout(r, 100));
+        retries++;
+      }
+      if (typeof L === 'undefined') {
+        console.error('Leaflet failed to load');
+        return;
+      }
     }
 
     if (this.map) {
@@ -39,12 +48,11 @@ class MapManager {
 
     this.map = L.map(this.containerId, {
       center: initialCenter,
-      zoom: 15,
+      zoom: 17.5,
       zoomControl: false
     });
 
-    // Add zoom control in bottom right
-    L.control.zoom({ position: 'bottomright' }).addTo(this.map);
+    // Zoom control intentionally hidden — pinch/scroll to zoom
 
     // OpenStreetMap Tile Layer (Crisp, light mode)
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -67,6 +75,11 @@ class MapManager {
     });
 
     this.isLoaded = true;
+
+    // Ensure Leaflet recalculates viewport bounds
+    setTimeout(() => {
+      if (this.map) this.map.invalidateSize();
+    }, 150);
 
     // If nearby stops already exist in Search, render them now
     if (window.Search && window.Search.nearbyStops && window.Search.nearbyStops.length > 0) {
@@ -230,9 +243,9 @@ class MapManager {
       }
     });
 
-    // Prune markers that are way outside the expanded viewport
-    if (this.stopMarkersMap.size > 80) {
-      const currentBounds = this.map.getBounds().pad(0.5);
+    // Prune markers that are far outside the expanded viewport
+    if (this.stopMarkersMap.size > 200) {
+      const currentBounds = this.map.getBounds().pad(1.2);
       for (const [code, marker] of this.stopMarkersMap.entries()) {
         const latLng = marker.getLatLng();
         if (!currentBounds.contains(latLng)) {
@@ -261,7 +274,7 @@ class MapManager {
       className: 'map-bus-stop-icon',
       html: `
         <div style="display: flex; flex-direction: column; align-items: center; width: 120px; margin-left: -48px; pointer-events: auto; cursor: pointer;">
-          <div style="background: ${pinColor}; width: 24px; height: 24px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.28); border: 2px solid #ffffff;">
+          <div style="background: ${pinColor}; width: 24px; height: 24px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; box-shadow: ${isFav ? '0 2px 8px rgba(217,119,6,0.45)' : '0 2px 5px rgba(0,0,0,0.28)'}; border: 2px solid #ffffff;">
             ${isFav ? `
               <span style="transform: rotate(45deg); font-size: 11px; line-height: 1;">⭐</span>
             ` : `
@@ -272,7 +285,7 @@ class MapManager {
               </svg>
             `}
           </div>
-          <div style="margin-top: 3px; font-size: 0.65rem; font-weight: 800; color: #0f172a; background: ${isFav ? '#fef9c3' : 'rgba(255,255,255,0.95)'}; padding: 1px 6px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 115px; border: 1px solid ${isFav ? '#fde047' : 'rgba(0,0,0,0.1)'}; text-align: center; line-height: 1.25;">
+          <div style="margin-top: 3px; font-size: 0.65rem; font-weight: 800; color: #0f172a; background: ${isFav ? '#fef9c3' : 'rgba(255,255,255,0.95)'}; padding: 1px 6px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 115px; border: ${isFav ? '1px solid #d97706' : '1px solid rgba(0,0,0,0.1)'}; text-align: center; line-height: 1.25;">
             ${isFav ? '⭐ ' : ''}${stopTitle}
           </div>
         </div>
@@ -291,7 +304,7 @@ class MapManager {
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 3px 0; border-bottom: 1px dashed #e2e8f0; font-size: 0.75rem;">
           <span style="font-weight: 800; color: #005ac1; background: #e0f2fe; padding: 1px 5px; border-radius: 4px;">${l.line_id}</span>
           <span style="flex: 1; margin: 0 4px; color: #0f172a; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">προς ${l.last_stop}</span>
-          <span style="font-size: 0.65rem; color: #64748b;">${l.direction || ''}</span>
+          <span style="font-size: 0.75rem; color: #64748b;">${l.direction === '←' ? '⬅️' : (l.direction === '→' ? '➡️' : (l.direction || ''))}</span>
         </div>
       `).join('');
     }
@@ -302,7 +315,7 @@ class MapManager {
           ${stopTitle}
         </div>
         <div style="font-size: 0.72rem; color: #64748b; margin-bottom: 6px;">
-          ${s.StopStreet ? s.StopStreet + ' • ' : ''}Στάση #${s.StopCode}
+          ${s.StopStreet ? s.StopStreet + ' • ' : ''}#${s.StopCode}
         </div>
         <div style="font-size: 0.7rem; font-weight: 800; color: #005ac1; text-transform: uppercase; margin-bottom: 3px; letter-spacing: 0.04em;">
           Γραμμές &amp; Κατευθύνσεις
@@ -355,7 +368,7 @@ class MapManager {
               <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 3px 0; border-bottom: 1px dashed #e2e8f0; font-size: 0.8rem;">
                 <span style="font-weight: 800; color: #005ac1; background: #e0f2fe; padding: 1px 6px; border-radius: 4px;">${l.line_id}</span>
                 <span style="flex: 1; margin: 0 4px; color: #0f172a; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;">προς ${l.last_stop}</span>
-                <span style="font-size: 0.7rem; color: #64748b;">${l.direction}</span>
+                <span style="font-size: 0.8rem; color: #64748b;">${l.direction === '←' ? '⬅️' : (l.direction === '→' ? '➡️' : (l.direction || ''))}</span>
               </div>
             `).join('');
           } else {
@@ -377,7 +390,7 @@ class MapManager {
    * @param {Array} [nearbyStops] - Optional list of nearby stops to include in bounds
    * @param {number} [radiusMeters=500] - Radius around user in meters
    */
-  fitAreaAroundUser(lat, lng, nearbyStops = [], radiusMeters = 350) {
+  fitAreaAroundUser(lat, lng, nearbyStops = [], radiusMeters = 200) {
     if (!this.map) return;
     const pLat = parseFloat(lat);
     const pLng = parseFloat(lng);
@@ -426,9 +439,9 @@ class MapManager {
       if (!this.map) return;
       this.map.invalidateSize();
       if (typeof this.map.flyToBounds === 'function') {
-        this.map.flyToBounds(bounds, { padding: [35, 35], maxZoom: 17, duration: 0.8 });
+        this.map.flyToBounds(bounds, { padding: [35, 35], maxZoom: 18, duration: 0.8 });
       } else {
-        this.map.fitBounds(bounds, { padding: [35, 35], maxZoom: 17, animate: true });
+        this.map.fitBounds(bounds, { padding: [35, 35], maxZoom: 18, animate: true });
       }
     };
 
@@ -469,12 +482,29 @@ class MapManager {
   }
 
   /**
-   * Redesigned Live Bus Vehicle Marker - Highly distinct glowing 3D capsule with pulse beacon
+   * Calculates bearing angle in degrees from lat1,lng1 to lat2,lng2
+   */
+  calculateBearing(lat1, lng1, lat2, lng2) {
+    const toRad = deg => (deg * Math.PI) / 180;
+    const toDeg = rad => (rad * 180) / Math.PI;
+    const phi1 = toRad(lat1);
+    const phi2 = toRad(lat2);
+    const deltaLambda = toRad(lng2 - lng1);
+
+    const y = Math.sin(deltaLambda) * Math.cos(phi2);
+    const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
+    const bearing = toDeg(Math.atan2(y, x));
+    return (bearing + 360) % 360;
+  }
+
+  /**
+   * Redesigned Live Bus Vehicle Marker - Glowing 3D capsule with real-time directional heading chevron
    */
   updateBuses(buses = [], defaultLineId = 'BUS') {
     if (!this.map || !this.busLayer) return;
     this.busLayer.clearLayers();
 
+    const activeVehNos = new Set();
     buses.forEach(b => {
       const lat = parseFloat(b.CS_LAT);
       const lng = parseFloat(b.CS_LNG);
@@ -482,35 +512,100 @@ class MapManager {
 
       const lineId = b.line_id || b.LINE_ID || defaultLineId;
       const vehNo = b.VEH_NO || '';
+      if (vehNo) activeVehNos.add(vehNo);
+
+      // Determine vehicle heading from movement history
+      let heading = null;
+      if (vehNo && this.vehicleHistoryMap.has(vehNo)) {
+        const prev = this.vehicleHistoryMap.get(vehNo);
+        const distMoved = Math.hypot(lat - prev.lat, lng - prev.lng);
+        // Only calculate heading if bus moved more than ~8 meters
+        if (distMoved > 0.00008) {
+          heading = Math.round(this.calculateBearing(prev.lat, prev.lng, lat, lng));
+        } else {
+          heading = prev.heading;
+        }
+      }
+      this.vehicleHistoryMap.set(vehNo, { lat, lng, heading });
+
+      const headingHtml = (heading !== null && heading !== undefined) ? `
+        <div style="position: absolute; top: -5px; right: -5px; width: 14px; height: 14px; border-radius: 50%; background: #0f172a; border: 1.5px solid #ffffff; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transform: rotate(${heading}deg); transition: transform 0.4s ease;" title="Κατεύθυνση: ${heading}°">
+          <svg width="8" height="8" viewBox="0 0 24 24" fill="#fbbf24">
+            <polygon points="12,2 22,21 12,17 2,21" />
+          </svg>
+        </div>
+      ` : '';
 
       const busIcon = L.divIcon({
         className: 'map-live-bus-icon',
         html: `
           <div style="display: flex; flex-direction: column; align-items: center; pointer-events: auto; cursor: pointer; transform: translateZ(0);">
-            <div style="background: linear-gradient(135deg, #16a34a, #15803d); color: #ffffff; padding: 2.5px 8px; border-radius: 9999px; font-weight: 900; font-size: 0.78rem; box-shadow: 0 3px 8px rgba(0,0,0,0.35); border: 2px solid #ffffff; display: flex; align-items: center; gap: 4px; letter-spacing: 0.02em;">
-              <span class="m3-pulse-dot" style="background: #ffffff; width: 6px; height: 6px; box-shadow: 0 0 5px #ffffff;"></span>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="#ffffff"><path d="M4 16c0 .88.39 1.67 1 2.22V20c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h8v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm9 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-6H6V6h12v5z"/></svg>
-              <span>${lineId}</span>
+            <div style="position: relative; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));">
+              <span style="font-size: 1.5rem; line-height: 1;">🚌</span>
+              ${headingHtml}
             </div>
-            ${vehNo ? `
-              <div style="margin-top: 2px; font-size: 0.62rem; font-weight: 800; color: #166534; background: rgba(240,253,244,0.96); padding: 0 4px; border-radius: 3px; border: 1px solid #bbf7d0; box-shadow: 0 1px 2px rgba(0,0,0,0.15);">
-                #${vehNo}
-              </div>
-            ` : ''}
+            <div style="margin-top: 1px; font-size: 0.68rem; font-weight: 900; color: #0f172a; background: rgba(255,255,255,0.96); padding: 1px 5px; border-radius: 4px; border: 1px solid rgba(15,23,42,0.2); box-shadow: 0 1px 3px rgba(0,0,0,0.18); letter-spacing: 0.02em; white-space: nowrap; line-height: 1.2;">
+              ${lineId}
+            </div>
           </div>
         `,
-        iconSize: [56, 36],
-        iconAnchor: [28, 18]
+        iconSize: [36, 46],
+        iconAnchor: [18, 23]
       });
 
+      const headingTxt = (heading !== null && heading !== undefined) ? ` | Κατεύθυνση: ${heading}°` : '';
       L.marker([lat, lng], { icon: busIcon }).addTo(this.busLayer)
-        .bindTooltip(`🚍 Λεωφορείο ${lineId} (Όχημα #${vehNo})`, { direction: 'top' });
+        .bindTooltip(`🚍 Λεωφορείο ${lineId}${headingTxt}`, { direction: 'top' });
     });
+
+    // Prune offline vehicles from history cache
+    if (activeVehNos.size > 0) {
+      for (const vKey of this.vehicleHistoryMap.keys()) {
+        if (!activeVehNos.has(vKey)) {
+          this.vehicleHistoryMap.delete(vKey);
+        }
+      }
+    }
   }
 
   clearAll() {
     if (this.routeLayer) this.routeLayer.clearLayers();
     if (this.busLayer) this.busLayer.clearLayers();
+  }
+
+  toggleFullscreen() {
+    const card = document.getElementById('map-card-wrapper');
+    const btn = document.getElementById('map-fullscreen-btn');
+    if (!card) return;
+
+    const isFull = card.classList.toggle('map-card-fullscreen');
+    if (btn) {
+      btn.innerHTML = isFull ? `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="4 14 10 14 10 20"></polyline>
+          <polyline points="20 10 14 10 14 4"></polyline>
+          <line x1="14" y1="10" x2="21" y2="3"></line>
+          <line x1="3" y1="21" x2="10" y2="14"></line>
+        </svg>
+      ` : `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 3 21 3 21 9"></polyline>
+          <polyline points="9 21 3 21 3 15"></polyline>
+          <line x1="21" y1="3" x2="14" y2="10"></line>
+          <line x1="3" y1="21" x2="10" y2="14"></line>
+        </svg>
+      `;
+      btn.title = isFull ? 'Κλείσιμο πλήρους οθόνης' : 'Πλήρης οθόνη χάρτη';
+    }
+
+    if (this.map) {
+      setTimeout(() => {
+        this.map.invalidateSize();
+      }, 100);
+      setTimeout(() => {
+        this.map.invalidateSize();
+      }, 300);
+    }
   }
 }
 

@@ -109,7 +109,7 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
       const rc = String(arr.route_code);
       routesWithLive.add(rc);
       const route = routesByCode.get(rc) || {};
-      const lid = route.LineID || arr.line_id || 'BUS';
+      const lid = route.LineID || arr.line_id || (arr.route_code ? `#${arr.route_code}` : '?');
       if (lid) linesWithLive.add(String(lid).trim());
       const btime2 = parseInt(arr.btime2, 10);
       const arrMin = currentMinutes + btime2;
@@ -121,7 +121,7 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
         line_descr: route.LineDescr || route.RouteDescr || 'Λεωφορείο ΟΑΣΑ',
         route_descr: route.RouteDescr || '',
         destination: cleanRouteDestination(route),
-        direction: /κυκλικη|circular/i.test(route.LineDescr || '') ? 'Κυκλική' : (route.RouteType === '2' ? 'Επιστροφή' : 'Μετάβαση'),
+        direction: /κυκλικη|circular/i.test(route.LineDescr || '') ? '🔄' : (route.RouteType === '2' ? '⬅️' : '➡️'),
         veh_code: arr.veh_code || null,
         btime2: btime2,
         estimated_arrival_time: estTime,
@@ -132,6 +132,19 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
     }
   }
 
+  // Helper to prioritize active operational routes over defunct/school/variant lines
+  const routeScore = (r) => {
+    const descr = r.RouteDescr || '';
+    let score = 100;
+    if (descr.startsWith('***')) score -= 60;
+    if (/^[Α-ΩA-Z]\*|^\*/.test(descr)) score -= 40;
+    if (/σχολικ/i.test(descr)) score -= 30;
+    if (/νυχτεριν/i.test(descr)) score -= 10;
+    const lc = parseInt(r.LineCode, 10);
+    if (!isNaN(lc)) score += Math.min(20, lc / 100);
+    return score;
+  };
+
   // Group candidate routes by line_id so every line is represented
   const lineRoutesMap = new Map();
   for (const r of stopRoutes) {
@@ -141,8 +154,17 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
   }
   const candidateRoutes = [];
   for (const [lid, routes] of lineRoutesMap.entries()) {
-    const primary = routes.find(r => !((r.RouteDescr || '').startsWith('***')));
-    candidateRoutes.push(primary || routes[0]);
+    routes.sort((a, b) => routeScore(b) - routeScore(a));
+    const seenLineCodes = new Set();
+    let count = 0;
+    for (const r of routes) {
+      const lc = String(r.LineCode);
+      if (!seenLineCodes.has(lc) && count < 2) {
+        seenLineCodes.add(lc);
+        candidateRoutes.push(r);
+        count++;
+      }
+    }
   }
 
   await Promise.all(candidateRoutes.map(async (route) => {
@@ -160,7 +182,7 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
       try {
         const rs = await oasaRequest('webGetStops', { p1: rc }, 1800);
         if (Array.isArray(rs)) {
-          const f = rs.find(s => String(s.StopCode) === String(stopCode));
+          const f = rs.find(s => String(s.StopCode) === String(stopCode) || String(s.StopID) === String(stopCode));
           if (f && f.RouteStopOrder) stopOrder = parseInt(f.RouteStopOrder, 10);
         }
       } catch(e) {}
@@ -184,7 +206,7 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
               line_id: lineId,
               line_descr: route.LineDescr || route.RouteDescr || 'Λεωφορείο ΟΑΣΑ',
               route_descr: route.RouteDescr || '',
-              direction: /κυκλικη|circular/i.test(route.LineDescr || '') ? 'Κυκλική' : (route.RouteType === '2' ? 'Επιστροφή' : 'Μετάβαση'),
+              direction: /κυκλικη|circular/i.test(route.LineDescr || '') ? '🔄' : (route.RouteType === '2' ? '⬅️' : '➡️'),
               veh_code: null,
               btime2: rem,
               estimated_arrival_time: estFormatted,
@@ -214,25 +236,39 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
   return { stop_code: stopCode, athens_time: athensNow.formatted, target_day: targetDay, total_arrivals: finalResults.length, arrivals: finalResults };
 }
 
-const jsonRes = (data, status = 200) => new Response(JSON.stringify(data), {
-  status,
-  headers: {
+function getCorsHeaders(request) {
+  const origin = request.headers.get('Origin') || '';
+  const isAllowed = !origin ||
+    origin.includes('bustop.pages.dev') ||
+    origin.includes('localhost') ||
+    origin.includes('127.0.0.1') ||
+    origin.startsWith('android-app://') ||
+    origin === 'null';
+
+  return {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': isAllowed ? (origin || '*') : 'https://bustop.pages.dev',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': '*'
-  }
-});
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+  };
+}
+
+const jsonRes = (data, status = 200, req = null) => {
+  const body = (data === null || data === undefined) ? { success: false, data: null } : data;
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: req ? getCorsHeaders(req) : {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*'
+    }
+  });
+};
 
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') {
       return new Response(null, {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': '*'
-        }
+        headers: getCorsHeaders(request)
       });
     }
 
@@ -264,11 +300,118 @@ export default {
           return jsonRes((Array.isArray(rts) ? rts : []).map(r => ({
             ...r,
             cleanDestination: cleanRouteDestination(r),
-            directionLabel: /κυκλικη|circular/i.test(r.RouteDescr||'') ? 'Κυκλική' : (r.RouteType === '2' ? 'Επιστροφή' : 'Μετάβαση')
+            directionLabel: /κυκλικη|circular/i.test(r.RouteDescr||'') ? '🔄' : (r.RouteType === '2' ? '⬅️' : '➡️')
           })));
         }
         const mArr = path.match(/^\/api\/stops\/([^\/]+)\/arrivals$/);
         if (mArr) return jsonRes(await getCombinedArrivals(mArr[1], url.searchParams.get('day') || 'today'));
+        if (path === '/api/stops/all') {
+          const cached = getCache('all_master_stops');
+          if (cached) return jsonRes(cached);
+          try {
+            // First attempt to load bundled static all_stops.json from assets
+            const assetRes = await env.ASSETS.fetch(new Request(new URL('/data/all_stops.json', request.url)));
+            if (assetRes.ok) {
+              const stops = await assetRes.json();
+              if (Array.isArray(stops) && stops.length > 0) {
+                setCache('all_master_stops', stops, 86400);
+                return jsonRes(stops);
+              }
+            }
+          } catch(assetErr) {}
+
+          try {
+            const res = await fetch('https://telematics.oasa.gr/api/?act=getStops', {
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+                'Accept': '*/*'
+              }
+            });
+            if (!res.ok) throw new Error('OASA API error');
+            const rawText = await res.text();
+            // Parse OASA SQL/tuple format: (-order, "StopCode", "StopDescr", "StopDescrEng", "StopStreet", "StopStreetEng", Heading, StopLng, StopLat, ...)
+            const stops = [];
+            const regex = /\(-?\d+,\s*"([^"]+)",\s*"([^"]*)",\s*"([^"]*)",\s*"([^"]*)",\s*"([^"]*)",\s*[^,]+,\s*([0-9.]+),\s*([0-9.]+)/g;
+            let match;
+            while ((match = regex.exec(rawText)) !== null) {
+              const stopCode = match[1];
+              const descr = match[2];
+              const descrEng = match[3];
+              const street = match[4] === 'null' ? '' : match[4];
+              const lng = parseFloat(match[6]);
+              const lat = parseFloat(match[7]);
+              stops.push({
+                StopCode: stopCode,
+                StopDescr: descr,
+                StopDescrEng: descrEng,
+                StopStreet: street,
+                StopLat: lat,
+                StopLng: lng
+              });
+            }
+            if (stops.length > 0) {
+              setCache('all_master_stops', stops, 86400);
+              return jsonRes(stops);
+            }
+            return jsonRes([]);
+          } catch(e) {
+            return jsonRes([]);
+          }
+        }
+        if (path === '/api/stops/search') {
+          const q = (url.searchParams.get('q') || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+          if (!q) return jsonRes([]);
+
+          // 1. First try searching in master stops list
+          let allStops = getCache('all_master_stops');
+          if (!allStops || allStops.length === 0) {
+            try {
+              const assetRes = await env.ASSETS.fetch(new Request(new URL('/data/all_stops.json', request.url)));
+              if (assetRes.ok) {
+                allStops = await assetRes.json();
+                if (Array.isArray(allStops) && allStops.length > 0) {
+                  setCache('all_master_stops', allStops, 86400);
+                }
+              }
+            } catch(e) {}
+          }
+
+          if (Array.isArray(allStops) && allStops.length > 0) {
+            const matches = allStops.filter(s => {
+              const sCode = String(s.StopCode || '');
+              const sName = (s.StopDescr || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+              const sStreet = (s.StopStreet || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+              const sEng = (s.StopDescrEng || '').toLowerCase();
+              return sCode.includes(q) || sName.includes(q) || sStreet.includes(q) || sEng.includes(q);
+            }).slice(0, 30);
+            return jsonRes(matches);
+          }
+
+          // Fallback: search central hubs
+          const hubs = [
+            { lat: 37.9845, lng: 23.7335 }, // Center / Omonia / Syntagma
+            { lat: 37.9429, lng: 23.6469 }, // Piraeus
+            { lat: 38.0483, lng: 23.8055 }, // Marousi / Kifisia
+            { lat: 37.9056, lng: 23.7547 }  // Glyfada / South
+          ];
+          const results = await Promise.all(hubs.map(h => oasaRequest('getClosestStops', { p1: h.lat, p2: h.lng }, 120).catch(() => [])));
+          const merged = new Map();
+          for (const list of results) {
+            if (Array.isArray(list)) {
+              for (const s of list) {
+                const sCode = String(s.StopCode);
+                if (!merged.has(sCode)) {
+                  const sName = (s.StopDescr || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+                  const sStreet = (s.StopStreet || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+                  if (sCode.includes(q) || sName.includes(q) || sStreet.includes(q)) {
+                    merged.set(sCode, s);
+                  }
+                }
+              }
+            }
+          }
+          return jsonRes(Array.from(merged.values()).slice(0, 30));
+        }
         if (path === '/api/stops/closest') {
           const lat = parseFloat(url.searchParams.get('lat')), lng = parseFloat(url.searchParams.get('lng'));
           if (isNaN(lat) || isNaN(lng)) return jsonRes([]);
@@ -306,7 +449,7 @@ export default {
                     linesMap.set(r.LineID, {
                       line_id: r.LineID,
                       last_stop: cleanRouteDestination(r),
-                      direction: /κυκλικη/i.test(r.RouteDescr||'') ? 'Κυκλική' : (r.RouteType === '2' ? 'Επιστροφή' : 'Μετάβαση')
+                      direction: /κυκλικη/i.test(r.RouteDescr||'') ? '🔄' : (r.RouteType === '2' ? '⬅️' : '➡️')
                     });
                   }
                 }

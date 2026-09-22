@@ -8,6 +8,7 @@ class PinnedTripsManager {
     this.containerId = containerId;
     this.pinnedItems = JSON.parse(localStorage.getItem('OASA_PINNED_ARRIVALS') || '[]');
     this.liveArrivals = new Map(); // key -> arrival info
+    this.failedStops = new Set(); // track stops with fetch errors
     this.timerInterval = null;
     this.previousDigitsMap = new Map();
   }
@@ -39,9 +40,12 @@ class PinnedTripsManager {
     );
 
     if (existingIdx !== -1) {
-      this.pinnedItems.splice(existingIdx, 1);
+      const removed = this.pinnedItems.splice(existingIdx, 1)[0];
       this.save();
       this.showToast(`Ξεκαρφιτσώθηκε η γραμμή ${lineId}`);
+      if (window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
+        window.Alarms.removeAlarmByStopAndLine(stopCode, lineId);
+      }
       if (window.App && typeof window.App.triggerHaptic === 'function') {
         window.App.triggerHaptic('light');
       }
@@ -71,20 +75,16 @@ class PinnedTripsManager {
       if (window.App && typeof window.App.triggerHaptic === 'function') {
         window.App.triggerHaptic('success');
       }
-      if (window.Alarms) {
-        window.Alarms.playTone(659.25, 0.12);
-        setTimeout(() => window.Alarms.playTone(880, 0.15), 100);
-      }
 
-      // Check if an active alarm exists for this stop and line to preserve threshold & ringing!
-      const activeAlarm = (window.Alarms && Array.isArray(window.Alarms.alarms))
+      // Check if the user has explicitly created an alarm for this stop and line
+      const explicitAlarm = (window.Alarms && Array.isArray(window.Alarms.alarms))
         ? window.Alarms.alarms.find(a => !a.triggered && String(a.stopCode).trim() === stopCode && String(a.lineId).trim().toUpperCase() === lineId.toUpperCase())
         : null;
 
-      const threshold = activeAlarm ? (activeAlarm.thresholdMinutes || 5) : 0;
-      const ringUntilDismissed = activeAlarm ? (activeAlarm.ringUntilDismissed !== false) : false;
+      const threshold = explicitAlarm ? (explicitAlarm.thresholdMinutes || 5) : 0;
+      const ringUntilDismissed = explicitAlarm ? (explicitAlarm.ringUntilDismissed !== false) : false;
 
-      // Start Android Live Tracking Notification immediately for this pinned bus
+      // Start Android Live Tracking Notification immediately for this pinned bus (silent live tracker, no alarm ringing unless explicitAlarm)
       if (window.AndroidBridge && typeof window.AndroidBridge.startLiveTracking === 'function') {
         try {
           const busMins = (arrival && typeof arrival.btime2 === 'number') ? arrival.btime2 : 10;
@@ -129,20 +129,57 @@ class PinnedTripsManager {
   }
 
   removePin(pinId) {
+    const item = this.pinnedItems.find(p => p.id === pinId);
     this.pinnedItems = this.pinnedItems.filter(p => p.id !== pinId);
     this.save();
     this.showToast('Το σκέλος αφαιρέθηκε');
+    if (item && window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
+      window.Alarms.removeAlarmByStopAndLine(item.stopCode, item.lineId);
+    }
+    if (this.pinnedItems.length === 0) {
+      if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
+        try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
+      }
+    }
     this.updateLiveAndroidNotification();
     if (window.App && window.App.ticker) {
       window.App.ticker.render();
     }
   }
 
+  removePinByStopAndLine(stopCode, lineId) {
+    const normStop = String(stopCode || '').trim();
+    const normLine = String(lineId || '').trim().toUpperCase();
+    const initialCount = this.pinnedItems.length;
+    this.pinnedItems = this.pinnedItems.filter(p => !(String(p.stopCode).trim() === normStop && String(p.lineId).trim().toUpperCase() === normLine));
+    if (this.pinnedItems.length !== initialCount) {
+      this.save();
+      if (window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
+        window.Alarms.removeAlarmByStopAndLine(normStop, normLine);
+      }
+      if (this.pinnedItems.length === 0) {
+        if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
+          try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
+        }
+      }
+      this.updateLiveAndroidNotification();
+      if (window.App && window.App.ticker) {
+        window.App.ticker.render();
+      }
+    }
+  }
+
   clearAll() {
     if (this.pinnedItems.length === 0) return;
     if (confirm('Θέλετε να αφαιρέσετε όλες τις καρφιτσωμένες αφίξεις;')) {
+      const removedItems = [...this.pinnedItems];
       this.pinnedItems = [];
       this.save();
+      if (window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
+        removedItems.forEach(item => {
+          window.Alarms.removeAlarmByStopAndLine(item.stopCode, item.lineId);
+        });
+      }
       if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
         try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
       }
@@ -150,6 +187,25 @@ class PinnedTripsManager {
       if (window.App && window.App.ticker) {
         window.App.ticker.render();
       }
+    }
+  }
+
+  clearAllSilently() {
+    if (this.pinnedItems.length === 0) return;
+    const removedItems = [...this.pinnedItems];
+    this.pinnedItems = [];
+    this.save();
+    if (window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
+      removedItems.forEach(item => {
+        window.Alarms.removeAlarmByStopAndLine(item.stopCode, item.lineId);
+      });
+    }
+    if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
+      try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
+    }
+    this.updateLiveAndroidNotification();
+    if (window.App && window.App.ticker) {
+      window.App.ticker.render();
     }
   }
 
@@ -182,11 +238,33 @@ class PinnedTripsManager {
         const data = await window.API.getStopArrivals(code);
         if (data && Array.isArray(data.arrivals)) {
           this.liveArrivals.set(code, data.arrivals);
+          this.failedStops.delete(code);
         }
       } catch (e) {
         console.warn(`Could not refresh pinned stop ${code}:`, e);
+        this.failedStops.add(code);
       }
     }));
+
+    // Auto-dismiss pinned trips when the bus arrives/departs (btime2 <= 0)
+    let autoDismissed = false;
+    for (const item of [...this.pinnedItems]) {
+      const arrs = this.liveArrivals.get(item.stopCode) || [];
+      const match = arrs.find(a => 
+        String(a.line_id || a.LineID).trim().toUpperCase() === String(item.lineId).trim().toUpperCase() &&
+        (!item.routeCode || String(a.route_code) === String(item.routeCode))
+      );
+      if (match && typeof match.btime2 === 'number' && match.btime2 <= 0) {
+        this.pinnedItems = this.pinnedItems.filter(p => p.id !== item.id);
+        autoDismissed = true;
+      }
+    }
+    if (autoDismissed) {
+      this.save();
+      if (window.App && window.App.ticker) {
+        window.App.ticker.render();
+      }
+    }
 
     this.renderUI();
     this.updateLiveAndroidNotification();
@@ -263,7 +341,15 @@ class PinnedTripsManager {
   startPolling() {
     if (this.timerInterval) clearInterval(this.timerInterval);
     this.fetchAllPinnedArrivals();
-    this.timerInterval = setInterval(() => this.fetchAllPinnedArrivals(), 15000);
+    const isBatterySaver = window.App && typeof window.App.isBatterySaverEnabled === 'function' 
+      ? window.App.isBatterySaverEnabled() 
+      : (localStorage.getItem('OASA_BATTERY_SAVER') === 'true');
+    const intervalMs = isBatterySaver ? 35000 : 15000;
+    this.timerInterval = setInterval(() => {
+      if (!document.hidden) {
+        this.fetchAllPinnedArrivals();
+      }
+    }, intervalMs);
   }
 
   stopPolling() {
@@ -275,15 +361,19 @@ class PinnedTripsManager {
 
   formatMinutesHuman(mins) {
     if (typeof mins !== 'number' || isNaN(mins)) return '--';
-    if (mins < 60) return `${mins}λ`;
+    if (mins < 60) return `${mins}'`;
     const hours = Math.floor(mins / 60);
     const remMins = mins % 60;
-    return remMins > 0 ? `${hours}ω ${remMins}λ` : `${hours}ω`;
+    return remMins > 0 ? `${hours}ʰ ${remMins}'` : `${hours}ʰ`;
   }
 
   renderSplitFlapDigits(key, text) {
     const chars = String(text).split('');
     const prevChars = (this.previousDigitsMap.get(key) || '').split('');
+    if (this.previousDigitsMap.size > 100) {
+      const oldestKey = this.previousDigitsMap.keys().next().value;
+      if (oldestKey) this.previousDigitsMap.delete(oldestKey);
+    }
     this.previousDigitsMap.set(key, String(text));
 
     const html = chars.map((ch, idx) => {
@@ -308,24 +398,21 @@ class PinnedTripsManager {
 
     if (this.pinnedItems.length === 0) {
       container.innerHTML = `
-        <div class="m3-card" style="text-align: center; padding: 3rem 1.5rem; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);">
-          <div style="width: 54px; height: 54px; border-radius: 50%; background: #eff6ff; color: var(--md-sys-color-primary); display: flex; align-items: center; justify-content: center; margin: 0 auto 1.25rem;">
-            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="12" y1="17" x2="12" y2="22"></line>
-              <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
-            </svg>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.5rem;">
+          <div>
+            <h2 style="font-size: 1.25rem; font-weight: 800; margin: 0; color: #0f172a;">📌 Καρφιτσωμένες Αφίξεις</h2>
+            <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">Ζωντανή παρακολούθηση επιλεγμένων αφίξεων σε συγκεντρωτικό πίνακα</div>
           </div>
-          <h3 style="font-size: 1.2rem; font-weight: 800; color: var(--md-sys-color-on-surface); margin-bottom: 0.5rem;">
-            Καρφίτσες • Καρφιτσωμένες Αφίξεις
-          </h3>
-          <p style="font-size: 0.9rem; color: var(--md-sys-color-outline); max-width: 440px; margin: 0 auto 1.5rem; line-height: 1.5;">
-            Καρφιτσώστε λεωφορεία από οποιαδήποτε στάση για να παρακολουθείτε ζωντανά τις αφίξεις τους σε έναν συγκεντρωτικό πίνακα!
+        </div>
+        <div class="m3-card" style="text-align: center; padding: 2.5rem 1.25rem; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);">
+          <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">📌</div>
+          <div style="font-weight: 800; font-size: 1.1rem; color: var(--md-sys-color-on-surface); margin-bottom: 0.4rem;">Δεν υπάρχουν καρφιτσωμένες αφίξεις</div>
+          <p style="color: var(--md-sys-color-outline); font-size: 0.85rem; max-width: 380px; margin: 0 auto 1.25rem; line-height: 1.4;">
+            Πατήστε το εικονίδιο καρφίτσας δίπλα σε οποιαδήποτε άφιξη στον πίνακα για να παρακολουθείτε ζωντανά το λεωφορείο σας.
           </p>
-          <div style="display: inline-flex; align-items: center; gap: 8px; font-size: 0.82rem; font-weight: 700; color: var(--md-sys-color-primary); background: var(--md-sys-color-surface-container-high); padding: 8px 16px; border-radius: 9999px;">
-            <span>Πατήστε το εικονίδιο</span>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 12V4H17V2H7V4H8V12L6 14V16H11V22H13V16H18V14L16 12Z"/></svg>
-            <span>σε οποιαδήποτε άφιξη</span>
-          </div>
+          <button class="m3-btn m3-btn-primary" style="border-radius: 9999px; padding: 0.5rem 1.2rem; font-weight: 800;" onclick="window.App.switchTab('ticker')">
+            Προβολή Αφίξεων ➜
+          </button>
         </div>
       `;
       return;
@@ -357,67 +444,40 @@ class PinnedTripsManager {
         walkMins = Math.ceil(walkDistanceM / 75) + 2;
       }
 
-      if (matchingArr) {
-        const isLive = matchingArr.is_live;
-        const mins = matchingArr.btime2;
-        let dueText = '';
-        if (isLive) {
-          dueText = mins >= 60 ? this.formatMinutesHuman(mins) : `${String(mins).padStart(2, '0')}λ`;
-        } else if (matchingArr.estimated_arrival_time) {
-          dueText = matchingArr.estimated_arrival_time;
-        } else if (typeof mins === 'number') {
-          dueText = this.formatMinutesHuman(mins);
-        } else {
-          dueText = '--:--';
-        }
-
-        dueBadgeHtml = `
-          <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 2px;">
-            ${this.renderSplitFlapDigits(`pin_due_${item.id}`, dueText)}
-            <span style="font-size: 0.72rem; font-weight: 700; color: ${isLive ? '#008744' : '#64748b'};">
-              ${isLive ? 'Ζωντανό GPS' : 'Προγραμματισμένο'}
-            </span>
-          </div>
-        `;
-      } else {
-        dueBadgeHtml = `
-          <div style="font-size: 0.82rem; font-weight: 700; color: #64748b;">
-            Αναμονή...
-          </div>
-        `;
-      }
+      const isLive = matchingArr && matchingArr.is_live;
+      const isUrgent = (matchingArr && typeof matchingArr.btime2 === 'number' && matchingArr.btime2 <= 5);
+      const cleanStopName = (item.stopName || '').replace(/'/g, "\\'");
+      const cleanLineDescr = (item.lineDescr || '').replace(/'/g, "\\'");
+      const displayMinutes = (matchingArr && typeof matchingArr.btime2 === 'number') ? matchingArr.btime2 : null;
+      const formattedTime = displayMinutes !== null ? this.formatMinutesHuman(displayMinutes) : (matchingArr && matchingArr.estimated_arrival_time ? matchingArr.estimated_arrival_time : '--');
 
       return `
-        <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.75rem; padding: 1.1rem; background: var(--md-sys-color-surface-container); margin-bottom: 0.75rem; border: 1px solid var(--md-sys-color-outline-variant); border-left: 4px solid var(--md-sys-color-primary);">
-          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem;">
-            <div style="display: flex; align-items: center; gap: 0.6rem;">
-              <span class="m3-badge" style="background: #0f172a; color: #ffffff; font-weight: 800; font-size: 0.72rem;">
-                Σκέλος ${idx + 1}
-              </span>
-              <span class="ticker-line-badge" style="font-size: 1rem;">
+        <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem; margin-bottom: 0; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-left: 4px solid ${isUrgent ? '#ea580c' : 'var(--md-sys-color-primary)'}; cursor: pointer;" onclick="window.App.switchTab('ticker'); window.App.selectStop('${item.stopCode}', '${cleanStopName}', ${item.stopLat || 'null'}, ${item.stopLng || 'null'});">
+          <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
+            <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
+              <span class="ticker-line-badge" style="font-size: 1rem; min-width: 48px; flex-shrink: 0;">
                 ${item.lineId}
               </span>
-              <div style="font-weight: 800; font-size: 1.05rem; color: var(--md-sys-color-on-surface);">
-                ${item.stopName}
+              <div style="min-width: 0; flex: 1;">
+                <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: break-word;">${item.stopName}</div>
+                <div style="font-size: 0.76rem; color: var(--md-sys-color-outline); margin-top: 2px;">
+                  ${item.direction ? `<strong style="color: var(--md-sys-color-primary); margin-right: 4px;">${item.direction}</strong> • ` : ''}Στάση #${item.stopCode} • <span style="color: var(--md-sys-color-primary); text-decoration: underline;">Προβολή στάσης ➜</span>
+                </div>
               </div>
             </div>
-            ${dueBadgeHtml}
-          </div>
-
-          <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; color: var(--md-sys-color-outline); flex-wrap: wrap; gap: 0.5rem;">
-            <div>
-              <span style="font-weight: 700; color: var(--md-sys-color-on-surface);">${item.direction || 'Μετάβαση'}</span>
-              ${item.lineDescr ? ` • ${item.lineDescr}` : ''}
-            </div>
-            <div style="display: flex; align-items: center; gap: 0.75rem;">
-              <span style="font-weight: 700; color: var(--md-sys-color-primary);">
-                🚶 ${walkMins} λεπτά (${walkDistanceM}μ.)
+            <div style="text-align: right; flex-shrink: 0;">
+              <span class="m3-badge" style="background: ${isLive ? '#dcfce7' : '#e0f2fe'}; color: ${isLive ? '#15803d' : '#005ac1'}; font-size: 0.72rem; font-weight: 800; padding: 2px 7px;">
+                ${isLive ? `⚡ ~${formattedTime}` : (displayMinutes !== null ? `🕒 ~${formattedTime}` : '⏳ Αναμονή')}
               </span>
-              <button class="m3-btn m3-btn-tonal" style="padding: 0.3rem 0.65rem; font-size: 0.75rem;" onclick="window.App.selectStop('${item.stopCode}', '${item.stopName.replace(/'/g, "\\'")}', ${item.stopLat || 'null'}, ${item.stopLng || 'null'})">
-                Προβολή Στάσης
-              </button>
-              <button class="m3-icon-btn" title="Αφαίρεση καρφιτσώματος" style="width: 28px; height: 28px; color: var(--md-sys-color-error);" onclick="window.PinnedTrips.removePin('${item.id}')">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px dashed var(--md-sys-color-outline-variant); padding-top: 0.5rem; font-size: 0.8rem; color: var(--md-sys-color-outline);">
+            <div>
+              🚶 <strong style="color: var(--md-sys-color-on-surface);">${walkMins}'</strong> (${walkDistanceM}μ. περπάτημα)
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+              <button class="m3-btn m3-btn-tonal" onclick="event.stopPropagation(); window.PinnedTrips.removePin('${item.id}')" style="padding: 0.3rem 0.75rem; font-size: 0.78rem; border-radius: 9999px;">
+                Ξεκαρφίτσωμα
               </button>
             </div>
           </div>
@@ -426,24 +486,19 @@ class PinnedTripsManager {
     }).join('');
 
     container.innerHTML = `
-      <div class="m3-card" style="margin-bottom: 1.25rem; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; border-bottom: 1px solid var(--md-sys-color-outline-variant); padding-bottom: 0.75rem;">
-          <div>
-            <h2 style="font-size: 1.25rem; font-weight: 900; color: var(--md-sys-color-on-surface); margin: 0;">
-              Καρφίτσες • Καρφιτσωμένες Αφίξεις
-            </h2>
-            <div style="font-size: 0.8rem; color: var(--md-sys-color-outline); margin-top: 2px;">
-              ${this.pinnedItems.length} καρφιτσωμένες γραμμές
-            </div>
-          </div>
-          <button class="m3-btn m3-btn-tonal" style="color: var(--md-sys-color-error); font-size: 0.8rem; padding: 0.4rem 0.8rem;" onclick="window.PinnedTrips.clearAll()">
-            Καθαρισμός
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.5rem;">
+        <div>
+          <h2 style="font-size: 1.25rem; font-weight: 800; margin: 0; color: #0f172a;">📌 Καρφιτσωμένες Αφίξεις</h2>
+          <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">${this.pinnedItems.length} καρφιτσωμένες γραμμές για γρήγορη παρακολούθηση</div>
+        </div>
+        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+          <button class="m3-btn m3-btn-outlined" style="font-size: 0.75rem; padding: 3px 10px; border-radius: 9999px; color: var(--md-sys-color-error); border-color: #ef4444;" onclick="window.PinnedTrips.clearAll()">
+            🗑️ Διαγραφή Όλων
           </button>
         </div>
-
-        <div style="display: flex; flex-direction: column;">
-          ${itemsHtml}
-        </div>
+      </div>
+      <div style="display: grid; gap: 0.65rem;">
+        ${itemsHtml}
       </div>
     `;
   }

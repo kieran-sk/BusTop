@@ -1,0 +1,418 @@
+/**
+ * BusTop "Cloud" Theme (100% Light Mode • Ethereal Translucent Liquid Glass & Hazy Elements)
+ * True Cloud Aesthetic:
+ * Crisp pearl-white mist, translucent frosted acrylic glass layers,
+ * subtle dreamy pastel gradients (sky, fog, cotton cloud),
+ * pure liquid glass borders with soft specular refraction, floating diffused pill docks,
+ * NO dark mode, NO neon lights.
+ */
+
+:root {
+  /* Cloud Light Atmosphere Palette */
+  --cloud-sky-backdrop: linear-gradient(175deg, #e8f0fe 0%, #f1f5f9 35%, #edf2f7 70%, #f8fafc 100%);
+  
+  /* Opaque Cloud Cards & Surfaces (Not Transparent) */
+  --cloud-card-bg: #ffffff;
+  --cloud-card-hover: #f8fafc;
+  --cloud-bar-bg: #ffffff;
+  --cloud-sunken: #f1f5f9;
+  
+  /* Frost Borders & Specular Glass Refraction */
+  --cloud-border-glass: #e2e8f0;
+  --cloud-border-outline: #cbd5e1;
+  --cloud-specular-edge: inset 0 1px 0 0 rgba(255, 255, 255, 0.9), 0 1px 3px 0 rgba(148, 163, 184, 0.12);
+  --cloud-shadow-floating: 0 4px 16px -2px rgba(148, 163, 184, 0.14), 0 2px 6px rgba(148, 163, 184, 0.06);
+  --cloud-shadow-hover: 0 8px 24px -3px rgba(148, 163, 184, 0.2), 0 3px 8px rgba(148, 163, 184, 0.08);
+
+  /* Cloud Fog & Mist Diffusion */
+  --cloud-blur-heavy: blur(28px) saturate(160%);
+  --cloud-blur-medium: blur(18px) saturate(150%);
+  --cloud-blur-subtle: blur(10px);
+
+  /* Dreamy Cloud Accents (Sky Blue, Soft Mist Gray, Slate) */
+  --cloud-primary: #3b82f6;
+  --cloud-primary-tint: rgba(59, 130, 246, 0.08);
+  --cloud-primary-border: rgba(147, 197, 253, 0.6);
+  --cloud-text-title: #1e293b;
+  --cloud-text-body: #334155;
+  --cloud-text-muted: #64748b;
+  --cloud-text-subtle: #94a3b8;
+}
+
+/* Atmospheric Pure Light Mode Backdrop with Ambient Cloud Clusters */
+body {
+  background: var(--cloud-sky-backdrop) !important;
+  background-attachment: fixed !important;
+  color: var(--cloud-text-body) !important;
+  min-height: 100vh;
+}
+
+/* Atmospheric Soft White / Light Sky Cloud Orbs */
+body::before {
+  content: '';
+  position: fixed;
+  top: -80px;
+  right: -60px;
+  width: 520px;
+  height: 520px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.85) 0%, rgba(219, 234, 254, 0.45) 45%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(50px);
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  bottom: 40px;
+  left: -80px;
+  width: 550px;
+  height: 550px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.9) 0%, rgba(224, 231, 255, 0.4) 50%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(60px);
+}
+
+/* ================= 1. TOP APP BAR: TRANSLUCENT MIST STRIP ================= */
+.m3-top-app-bar {
+  background: var(--cloud-bar-bg) !important;
+  backdrop-filter: var(--cloud-blur-heavy) !important;
+  -webkit-backdrop-filter: var(--cloud-blur-heavy) !important;
+  border-bottom: 1px solid var(--cloud-border-glass) !important;
+  box-shadow: 0 4px 20px -2px rgba(148, 163, 184, 0.12) !important;
+  z-index: 1000;
+}
+
+#top-bar-settings-btn,
+#global-back-btn,
+.m3-back-btn {
+  background: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: var(--cloud-blur-subtle) !important;
+  -webkit-backdrop-filter: var(--cloud-blur-subtle) !important;
+  border: 1px solid var(--cloud-border-glass) !important;
+  box-shadow: var(--cloud-specular-edge), 0 2px 8px rgba(148, 163, 184, 0.1) !important;
+  color: var(--cloud-text-title) !important;
+  border-radius: 9999px !important;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+#top-bar-settings-btn:active,
+#global-back-btn:active,
+.m3-back-btn:active {
+  transform: scale(0.94) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* EXP badge: Frosted subtle mist pill */
+.m3-top-app-bar span[style*="EXP"] {
+  background: rgba(255, 255, 255, 0.75) !important;
+  border: 1px solid rgba(203, 213, 225, 0.7) !important;
+  color: #475569 !important;
+  border-radius: 9999px !important;
+  padding: 2px 7px !important;
+  box-shadow: var(--cloud-specular-edge) !important;
+}
+
+/* Header Live Clock: Frosted Acrylic Glass Pill */
+.m3-top-app-bar .ticker-clock {
+  background: rgba(255, 255, 255, 0.65) !important;
+  border: 1px solid var(--cloud-border-glass) !important;
+  box-shadow: var(--cloud-specular-edge), 0 4px 14px rgba(148, 163, 184, 0.1) !important;
+  border-radius: 9999px !important;
+  padding: 3px 10px !important;
+  backdrop-filter: var(--cloud-blur-subtle) !important;
+  -webkit-backdrop-filter: var(--cloud-blur-subtle) !important;
+}
+
+.m3-top-app-bar .ticker-clock .flap-digit-box {
+  background: rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid rgba(226, 232, 240, 0.8) !important;
+  color: #334155 !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 1), 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+  text-shadow: none !important;
+}
+
+.m3-top-app-bar .ticker-clock .flap-separator {
+  color: #94a3b8 !important;
+}
+
+/* ================= 2. SEARCH BAR: FLOATING FROST CAPSULE ================= */
+.m3-search-bar {
+  background: rgba(255, 255, 255, 0.7) !important;
+  backdrop-filter: var(--cloud-blur-heavy) !important;
+  -webkit-backdrop-filter: var(--cloud-blur-heavy) !important;
+  border: 1.5px solid var(--cloud-border-glass) !important;
+  border-radius: 9999px !important;
+  box-shadow: var(--cloud-specular-edge), var(--cloud-shadow-floating) !important;
+  transition: all 0.25s ease !important;
+}
+
+.m3-search-bar:focus-within {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: rgba(147, 197, 253, 0.8) !important;
+  box-shadow: var(--cloud-specular-edge), 0 12px 36px -4px rgba(59, 130, 246, 0.15) !important;
+}
+
+.m3-search-bar input {
+  color: var(--cloud-text-title) !important;
+  font-family: inherit !important;
+}
+
+.m3-search-bar input::placeholder {
+  color: var(--cloud-text-subtle) !important;
+}
+
+#global-search-dropdown {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: var(--cloud-blur-heavy) !important;
+  -webkit-backdrop-filter: var(--cloud-blur-heavy) !important;
+  border: 1px solid var(--cloud-border-glass) !important;
+  box-shadow: var(--cloud-specular-edge), 0 20px 48px -8px rgba(148, 163, 184, 0.28) !important;
+  border-radius: 20px !important;
+}
+
+/* ================= 3. OPAQUE SOLID CLOUD CARDS ================= */
+.m3-card,
+.ticker-row,
+.route-stop-item {
+  background: #ffffff !important;
+  border: 1px solid var(--cloud-border-glass) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 4px 18px -2px rgba(148, 163, 184, 0.16), 0 1px 3px rgba(148, 163, 184, 0.08) !important;
+  color: var(--cloud-text-body) !important;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.m3-card:hover,
+.ticker-row:hover,
+.route-stop-item:hover {
+  background: #ffffff !important;
+  box-shadow: 0 8px 24px -2px rgba(148, 163, 184, 0.24), 0 2px 6px rgba(148, 163, 184, 0.1) !important;
+  transform: translateY(-2px) !important;
+}
+
+.ticker-dest-name {
+  color: var(--cloud-text-title) !important;
+  font-weight: 800 !important;
+}
+
+.ticker-dest-title {
+  color: var(--cloud-text-title) !important;
+  font-weight: 800 !important;
+}
+
+/* Selected Stop Banner: Solid Opaque Cloud Card with Sky Blue Accent */
+#selected-stop-banner {
+  background: #ffffff !important;
+  border: 1px solid var(--cloud-border-glass) !important;
+  border-left: 4.5px solid #38bdf8 !important;
+  border-radius: 18px !important;
+  box-shadow: 0 4px 18px -2px rgba(148, 163, 184, 0.16) !important;
+}
+
+#selected-stop-banner.is-favourite,
+.m3-card.is-favourite,
+.m3-card.is-favourite-stop {
+  background: #fffdf5 !important;
+  border: 1.5px solid rgba(252, 211, 77, 0.7) !important;
+  box-shadow: 0 4px 18px -2px rgba(245, 158, 11, 0.15) !important;
+}
+
+/* ================= 4. SPLIT-FLAP TILES: FROSTED ACRYLIC TILES (LIGHT) ================= */
+.flap-digit-box {
+  background: rgba(255, 255, 255, 0.9) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(226, 232, 240, 0.9) !important;
+  color: #1e293b !important;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 1), 0 2px 5px rgba(148, 163, 184, 0.1) !important;
+  border-radius: 6px !important;
+}
+
+.split-flap-board.urgency-now .flap-digit-box {
+  background: rgba(254, 242, 242, 0.9) !important;
+  border-color: rgba(252, 165, 165, 0.8) !important;
+  color: #dc2626 !important;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 1), 0 2px 6px rgba(239, 68, 68, 0.15) !important;
+}
+
+.split-flap-board.urgency-soon .flap-digit-box {
+  background: rgba(240, 253, 244, 0.9) !important;
+  border-color: rgba(134, 239, 172, 0.8) !important;
+  color: #16a34a !important;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 1), 0 2px 6px rgba(22, 163, 74, 0.15) !important;
+}
+
+.split-flap-board.urgency-normal .flap-digit-box {
+  background: rgba(239, 246, 255, 0.9) !important;
+  border-color: rgba(147, 197, 253, 0.8) !important;
+  color: #2563eb !important;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 1), 0 2px 6px rgba(37, 99, 235, 0.12) !important;
+}
+
+.split-flap-board.urgency-scheduled .flap-digit-box {
+  background: rgba(248, 250, 252, 0.9) !important;
+  border-color: rgba(203, 213, 225, 0.8) !important;
+  color: #475569 !important;
+}
+
+/* ================= 5. LINE BADGES: ETHEREAL SKY PILL ================= */
+.ticker-line-badge {
+  background: linear-gradient(135deg, rgba(239, 246, 255, 0.95), rgba(224, 231, 255, 0.8)) !important;
+  border: 1px solid rgba(191, 219, 254, 0.8) !important;
+  color: #1d4ed8 !important;
+  box-shadow: var(--cloud-specular-edge), 0 2px 8px rgba(148, 163, 184, 0.12) !important;
+  border-radius: 12px !important;
+  font-weight: 900 !important;
+}
+
+/* ================= 6. LIQUID GLASS BUTTONS & CONTROLS ================= */
+.m3-btn {
+  border-radius: 9999px !important;
+  backdrop-filter: var(--cloud-blur-subtle) !important;
+  -webkit-backdrop-filter: var(--cloud-blur-subtle) !important;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+.m3-btn-primary {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.4) !important;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.4) !important;
+}
+
+.m3-btn-primary:active {
+  transform: scale(0.96) !important;
+}
+
+.m3-btn-tonal {
+  background: rgba(255, 255, 255, 0.6) !important;
+  border: 1px solid var(--cloud-border-glass) !important;
+  color: var(--cloud-text-title) !important;
+  box-shadow: var(--cloud-specular-edge), 0 2px 6px rgba(148, 163, 184, 0.08) !important;
+}
+
+.m3-btn-tonal:hover {
+  background: rgba(255, 255, 255, 0.85) !important;
+}
+
+.m3-btn-outlined {
+  background: rgba(255, 255, 255, 0.4) !important;
+  border: 1px solid rgba(203, 213, 225, 0.7) !important;
+  color: var(--cloud-text-body) !important;
+}
+
+/* Filter Groups & Segmented Controls */
+#arrivals-options-bar > div,
+.ticker-filter-bar {
+  background: rgba(255, 255, 255, 0.55) !important;
+  backdrop-filter: var(--cloud-blur-subtle) !important;
+  -webkit-backdrop-filter: var(--cloud-blur-subtle) !important;
+  border: 1px solid var(--cloud-border-glass) !important;
+  border-radius: 9999px !important;
+  box-shadow: var(--cloud-specular-edge), 0 2px 8px rgba(148, 163, 184, 0.08) !important;
+}
+
+.ticker-filter-pill {
+  background: rgba(255, 255, 255, 0.65) !important;
+  border: 1px solid rgba(226, 232, 240, 0.8) !important;
+  color: var(--cloud-text-body) !important;
+}
+
+.ticker-filter-pill.is-active {
+  background: rgba(59, 130, 246, 0.12) !important;
+  color: #1d4ed8 !important;
+  border-color: rgba(147, 197, 253, 0.9) !important;
+}
+
+/* ================= 7. BOTTOM NAVIGATION: FROSTED GLASS DOCK ================= */
+.m3-nav-bar {
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: var(--cloud-blur-heavy) !important;
+  -webkit-backdrop-filter: var(--cloud-blur-heavy) !important;
+  border-top: 1px solid var(--cloud-border-glass) !important;
+  box-shadow: 0 -4px 24px rgba(148, 163, 184, 0.15) !important;
+}
+
+.m3-nav-item span {
+  color: var(--cloud-text-body) !important;
+}
+
+.m3-nav-item.active span {
+  color: #1d4ed8 !important;
+  font-weight: 700;
+}
+
+.m3-nav-item.active .m3-nav-pill {
+  background: rgba(59, 130, 246, 0.12) !important;
+  color: #1d4ed8 !important;
+  border: 1px solid rgba(191, 219, 254, 0.7) !important;
+  box-shadow: var(--cloud-specular-edge) !important;
+}
+
+/* ================= 8. MODALS & DIALOGS: FROSTED GLASS WINDOWS ================= */
+.m3-dialog-backdrop {
+  backdrop-filter: blur(14px) !important;
+  -webkit-backdrop-filter: blur(14px) !important;
+  background: rgba(15, 23, 42, 0.25) !important;
+}
+
+.m3-dialog-content {
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: var(--cloud-blur-heavy) !important;
+  -webkit-backdrop-filter: var(--cloud-blur-heavy) !important;
+  border: 1.5px solid var(--cloud-border-glass) !important;
+  border-radius: 24px !important;
+  box-shadow: var(--cloud-specular-edge), 0 24px 60px -8px rgba(148, 163, 184, 0.35) !important;
+  color: var(--cloud-text-body) !important;
+}
+
+.m3-dialog-content input,
+.m3-dialog-content select {
+  background: rgba(255, 255, 255, 0.75) !important;
+  border: 1px solid rgba(203, 213, 225, 0.8) !important;
+  color: var(--cloud-text-title) !important;
+  border-radius: 12px !important;
+}
+
+/* Badges & Walk Pills */
+.ticker-walk-pill,
+#selected-stop-walk-pill {
+  background: rgba(239, 246, 255, 0.8) !important;
+  border: 1px solid rgba(191, 219, 254, 0.8) !important;
+  color: #1d4ed8 !important;
+  backdrop-filter: blur(8px) !important;
+  box-shadow: var(--cloud-specular-edge) !important;
+}
+
+.m3-badge {
+  background: rgba(255, 255, 255, 0.7) !important;
+  border: 1px solid rgba(226, 232, 240, 0.8) !important;
+  color: var(--cloud-text-body) !important;
+}
+
+/* Map Card */
+#map-card-wrapper {
+  border-radius: 20px !important;
+  border: 1.5px solid var(--cloud-border-glass) !important;
+  box-shadow: var(--cloud-specular-edge), var(--cloud-shadow-floating) !important;
+}
+
+/* Frosted Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
+}

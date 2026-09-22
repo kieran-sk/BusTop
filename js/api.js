@@ -6,9 +6,43 @@ const API = {
   // Can be pointed to any hosted backend URL (e.g. Render, Railway, Localtunnel, etc.)
   baseUrl: localStorage.getItem('OASA_API_BASE_URL') || window.location.origin,
 
-  async fetchJson(endpoint) {
+  // Local Offline Stop & Schedule Storage
+  getOfflineCache() {
     try {
-      const res = await fetch(`${this.baseUrl}${endpoint}`);
+      return JSON.parse(localStorage.getItem('OASA_OFFLINE_STOPS_CACHE') || '{}');
+    } catch (e) {
+      return {};
+    }
+  },
+
+  saveOfflineCache(key, data) {
+    try {
+      const cache = this.getOfflineCache();
+      cache[key] = { data, timestamp: Date.now() };
+      // Keep most recent 250 items to conserve storage
+      const keys = Object.keys(cache);
+      if (keys.length > 250) {
+        delete cache[keys[0]];
+      }
+      localStorage.setItem('OASA_OFFLINE_STOPS_CACHE', JSON.stringify(cache));
+    } catch (e) {}
+  },
+
+  getFromOfflineCache(key) {
+    try {
+      const cache = this.getOfflineCache();
+      return cache[key] ? cache[key].data : null;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  async fetchJson(endpoint) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    try {
+      const res = await fetch(`${this.baseUrl}${endpoint}`, { signal: controller.signal });
+      clearTimeout(timeoutId);
       const contentType = res.headers.get('content-type') || '';
       if (!contentType.includes('application/json')) {
         throw new Error(`Μη έγκυρη απόκριση (status ${res.status}): αναμενόταν JSON`);
@@ -17,8 +51,20 @@ const API = {
         const errJson = await res.json().catch(() => ({}));
         throw new Error(errJson.error || `HTTP ${res.status}: ${res.statusText}`);
       }
-      return await res.json();
+      const data = await res.json();
+      // Cache response for offline resilience (skip coordinate-based URLs to avoid cache exhaustion)
+      if ((endpoint.includes('/api/stops/') || endpoint.includes('/api/lines') || endpoint.includes('/api/routes/')) &&
+          !endpoint.includes('lat=') && !endpoint.includes('lng=')) {
+        this.saveOfflineCache(endpoint, data);
+      }
+      return data;
     } catch (err) {
+      // Offline fallback: Attempt to serve from local storage cache
+      const cached = this.getFromOfflineCache(endpoint);
+      if (cached) {
+        console.log(`[Zero Data Mode] Serving offline cached data for: ${endpoint}`);
+        return cached;
+      }
       console.error(`API error for ${endpoint}:`, err);
       throw err;
     }
@@ -62,6 +108,18 @@ const API = {
 
   async getClosestStops(lat, lng) {
     return this.fetchJson(`/api/stops/closest?lat=${lat}&lng=${lng}`);
+  },
+
+  async getAllStops() {
+    try {
+      const res = await this.fetchJson('/api/stops/all');
+      if (Array.isArray(res) && res.length > 0) return res;
+    } catch (e) {}
+    try {
+      const res2 = await this.fetchJson('/data/all_stops.json');
+      if (Array.isArray(res2) && res2.length > 0) return res2;
+    } catch (e2) {}
+    return [];
   },
 
   async getStopsInBounds(north, south, east, west, limit = 80) {

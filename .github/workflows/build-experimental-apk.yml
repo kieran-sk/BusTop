@@ -1,0 +1,84 @@
+name: Build Experimental Android APK
+
+on:
+  push:
+    branches: [ experimental ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Prepare Experimental Assets & Package Identity
+        run: |
+          echo "Configuring standalone experimental APK (com.oasa.athensbus.experimental)..."
+          
+          # 1. Update Android strings.xml to name app BusTop Exp
+          sed -i 's|<string name="app_name">BusTop</string>|<string name="app_name">BusTop Exp</string>|g' android/app/src/main/res/values/strings.xml
+          
+          # 2. Update Android build.gradle.kts with experimental applicationId
+          sed -i 's|applicationId = "com.oasa.athensbus"|applicationId = "com.oasa.athensbus.experimental"|g' android/app/build.gradle.kts
+          
+          # 3. Update webview initial URL in MainActivity.kt to load experimental Cloudflare deployment
+          sed -i 's|https://bustop.pages.dev|https://experimental.bustop.pages.dev|g' android/app/src/main/java/com/oasa/athensbus/MainActivity.kt
+          
+          cat << 'EOF' > release_body.md
+          ### 👾 BusTop Experimental (Phone & Wear OS Watch Edition)
+          
+          This release contains the standalone **Phone APK** and the **OnePlus Watch 3 / Wear OS APK**:
+          
+          1. 📱 **Phone**: `bustop-experimental.apk` (Package: `com.oasa.athensbus.experimental`)
+             - Installs alongside your stable BusTop app without overwriting it.
+             - Features Settings menu, theme selection, and full Dot-Matrix Transit UI.
+          2. ⌚ **Watch**: `bustop-wear.apk` (Package: `com.oasa.athensbus.wear`)
+             - Native **Wear OS Tile** for your watch face carousel showing your next bus countdown!
+             - Lightweight mini-app for circular AMOLED displays.
+             - Compatible with OnePlus Watch 2 / Watch 3 (Wear OS 4 & 5).
+          
+          ---
+          **Downloads**: Download the APKs below.
+          EOF
+
+      - name: Build Android Debug APKs (Phone + Wear OS)
+        working-directory: ./android
+        run: |
+          gradle wrapper
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug :wear:assembleDebug --stacktrace
+          
+          # Prepare Phone APK
+          cp app/build/outputs/apk/debug/*.apk bustop-experimental.apk
+          echo "Prepared bustop-experimental.apk"
+          
+          # Prepare Wear OS APK
+          cp wear/build/outputs/apk/debug/*.apk bustop-wear.apk
+          echo "Prepared bustop-wear.apk"
+
+      - name: Release Experimental APKs on GitHub
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: experimental-latest
+          name: BusTop Experimental (Phone & OnePlus Watch Edition)
+          body_path: release_body.md
+          files: |
+            android/bustop-experimental.apk
+            android/bustop-wear.apk
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

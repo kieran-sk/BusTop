@@ -1,5 +1,6 @@
 package com.oasa.athensbus
 
+import android.app.ForegroundServiceStartNotAllowedException
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -7,6 +8,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
@@ -45,7 +47,15 @@ class AlarmRingingService : Service() {
                 putExtra(EXTRA_STOP_CODE, stopCode)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    try {
+                        context.startForegroundService(intent)
+                    } catch (e: ForegroundServiceStartNotAllowedException) {
+                        context.startService(intent)
+                    }
+                } else {
+                    context.startForegroundService(intent)
+                }
             } else {
                 context.startService(intent)
             }
@@ -78,7 +88,11 @@ class AlarmRingingService : Service() {
         createNotificationChannel()
 
         val notification = buildAlarmNotification(lineId, stopName, minsAway, stopCode)
-        startForeground(NOTIFICATION_ID, notification)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SHORT_SERVICE)
+        } else {
+            startForeground(NOTIFICATION_ID, notification)
+        }
 
         startSoundAndVibration()
 

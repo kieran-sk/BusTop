@@ -370,6 +370,18 @@ app.get('/api/stops/search', async (req, res) => {
 });
 
 /**
+ * Retrieve all stops across Athens
+ */
+app.get('/api/stops/all', async (req, res) => {
+  try {
+    const stops = await oasa.getAllStops();
+    res.json(stops);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch all stops', details: err.message });
+  }
+});
+
+/**
  * Comprehensive timetable for a line (Daily, Saturday, Sunday)
  */
 app.get('/api/lines/:lineCode/timetable', async (req, res) => {

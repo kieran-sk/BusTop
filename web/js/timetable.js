@@ -111,9 +111,12 @@ class TimetableManager {
       const h = parseInt(match[1], 10);
       const m = parseInt(match[2], 10);
       const tripMins = h * 60 + m;
-      const formatted = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+      // Display time: wrap hours >= 24 for display but keep original for comparison
+      const displayH = h >= 24 ? h - 24 : h;
+      const formatted = `${String(displayH).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 
-      const isPast = tripMins < currentMins;
+      // For past-midnight trips (h >= 24), treat them as next-day: only past if currentMins is also past midnight and beyond
+      const isPast = h >= 24 ? (currentMins >= 1440 || currentMins > (tripMins - 1440)) && currentMins < tripMins : tripMins < currentMins;
       let isNext = false;
       if (!isPast && !nextTripFound) {
         isNext = true;
@@ -147,22 +150,44 @@ class TimetableManager {
       `;
     }
 
+    // Pre-calculate nearest stop for each live bus to prevent multiple stops showing the same bus
+    const stopBusMap = new Map(); // stopCode -> bus
+    if (Array.isArray(liveBuses) && liveBuses.length > 0) {
+      liveBuses.forEach(b => {
+        const bLat = parseFloat(b.CS_LAT);
+        const bLng = parseFloat(b.CS_LNG);
+        if (isNaN(bLat) || isNaN(bLng)) return;
+
+        let closestStop = null;
+        let minDistance = Infinity;
+
+        stops.forEach(s => {
+          const sLat = parseFloat(s.StopLat);
+          const sLng = parseFloat(s.StopLng);
+          if (isNaN(sLat) || isNaN(sLng)) return;
+
+          // Euclidean distance approx in degrees (1 deg ~ 111km)
+          const dist = Math.hypot(bLat - sLat, (bLng - sLng) * Math.cos(sLat * Math.PI / 180));
+          if (dist < minDistance) {
+            minDistance = dist;
+            closestStop = s;
+          }
+        });
+
+        // Only assign if nearest stop is within ~450 meters (0.004 degrees approx)
+        if (closestStop && minDistance < 0.004) {
+          stopBusMap.set(String(closestStop.StopCode), b);
+        }
+      });
+    }
+
     return stops.map((s, idx) => {
       const stopOrder = s.RouteStopOrder || (idx + 1);
       const stopTitle = s.StopDescr || `Στάση #${s.StopCode}`;
       const safeTitle = stopTitle.replace(/'/g, "\\'");
       const lat = parseFloat(s.StopLat) || 'null';
       const lng = parseFloat(s.StopLng) || 'null';
-
-      // Check if any live bus is located near this stop (within ~300m)
-      const nearBus = liveBuses.find(b => {
-        if (!b.CS_LAT || !b.CS_LNG || isNaN(lat) || isNaN(lng)) return false;
-        const bLat = parseFloat(b.CS_LAT);
-        const bLng = parseFloat(b.CS_LNG);
-        const dLat = Math.abs(bLat - lat);
-        const dLng = Math.abs(bLng - lng);
-        return dLat < 0.003 && dLng < 0.003;
-      });
+      const nearBus = stopBusMap.get(String(s.StopCode));
 
       return `
         <div class="route-stop-item stop-interactive-card" data-stop-code="${s.StopCode}" data-stop-title="${safeTitle}" data-stop-lat="${lat}" data-stop-lng="${lng}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0.9rem; border-radius: 12px; margin-bottom: 0.4rem; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); cursor: pointer; transition: all 0.2s;" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', ${lat}, ${lng}, true)" title="Κλικ για προβολή αφίξεων στη στάση ${stopTitle}">
@@ -175,19 +200,15 @@ class TimetableManager {
                 ${stopTitle}
               </div>
               <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 1px;">
-                ${s.StopStreet ? s.StopStreet + ' • ' : ''}Στάση #${s.StopCode}
+                ${s.StopStreet ? s.StopStreet + ' • ' : ''}#${s.StopCode}
               </div>
-              ${nearBus ? `
-                <div style="display: inline-flex; align-items: center; gap: 4px; margin-top: 3px; font-size: 0.7rem; font-weight: 700; color: #047857; background: #ecfdf5; padding: 1px 6px; border-radius: 4px;">
-                  <span class="m3-pulse-dot" style="background: #047857; width: 6px; height: 6px;"></span>
-                  Λεωφ. #${nearBus.VEH_NO} (${nearBus.report_age_gr || 'ζωντανά'})
-                </div>
-              ` : ''}
             </div>
           </div>
-          <span class="m3-badge" style="background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-primary); font-size: 0.9rem; font-weight: 800; flex-shrink: 0; margin-left: 0.5rem; padding: 3px 8px;" title="Προβολή Αφίξεων">
-            ➔
-          </span>
+          ${nearBus ? `
+            <div style="display: flex; align-items: center; flex-shrink: 0; margin-left: 0.5rem;" title="Το λεωφορείο βρίσκεται εδώ τώρα">
+              <span style="font-size: 1.35rem; line-height: 1;">🚌</span>
+            </div>
+          ` : ''}
         </div>
       `;
     }).join('');
@@ -201,15 +222,16 @@ class TimetableManager {
   }
 
   async initRouteMap() {
-    const mapContainer = document.getElementById('line-route-map');
-    if (!mapContainer) return;
-
     if (this.routeMap) {
       try {
+        this.routeMap.off();
         this.routeMap.remove();
       } catch (e) {}
       this.routeMap = null;
     }
+
+    const mapContainer = document.getElementById('line-route-map');
+    if (!mapContainer) return;
 
     this.routeMap = L.map('line-route-map', { zoomControl: true });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -329,18 +351,23 @@ class TimetableManager {
           const busIcon = L.divIcon({
             className: 'route-live-bus',
             html: `
-              <div style="background: #e11d48; color: #ffffff; border-radius: 8px; padding: 2px 6px; font-size: 0.7rem; font-weight: 800; box-shadow: 0 2px 6px rgba(0,0,0,0.3); border: 2px solid #ffffff; display: flex; align-items: center; gap: 4px;">
-                <span>🚌 #${b.VEH_NO || ''}</span>
+              <div style="display: flex; flex-direction: column; align-items: center; pointer-events: auto; cursor: pointer; transform: translateZ(0);">
+                <div style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));">
+                  <span style="font-size: 1.4rem; line-height: 1;">🚌</span>
+                </div>
+                <div style="margin-top: 1px; font-size: 0.65rem; font-weight: 900; color: #0f172a; background: rgba(255,255,255,0.96); padding: 1px 5px; border-radius: 4px; border: 1px solid rgba(15,23,42,0.2); box-shadow: 0 1px 3px rgba(0,0,0,0.18); letter-spacing: 0.02em; white-space: nowrap; line-height: 1.2;">
+                  ${this.currentLine.lineId || 'BUS'}
+                </div>
               </div>
             `,
-            iconSize: [60, 24],
-            iconAnchor: [30, 12]
+            iconSize: [36, 44],
+            iconAnchor: [18, 22]
           });
 
           const bm = L.marker([bLat, bLng], { icon: busIcon }).addTo(this.routeMap);
           bm.bindPopup(`
             <div style="font-family: inherit; font-size: 0.85rem;">
-              <strong>Λεωφορείο #${b.VEH_NO}</strong><br>
+              <strong>Λεωφορείο ${this.currentLine.lineId || ''}</strong><br>
               Στίγμα: ${b.report_age_gr || 'ζωντανά'}
             </div>
           `);
@@ -458,10 +485,10 @@ class TimetableManager {
     const isScheduleMode = this.currentViewMode === 'schedule';
     const isMapMode = this.currentViewMode === 'map';
 
-    // Subtitle description
+    // Subtitle description (clean without repeating circular, only parenthesis content)
     const subtitleText = isCircular
-      ? `🔄 Κυκλική Διαδρομή • ${outStops.length} στάσεις • ${isStopsMode ? 'Πλήρης κύκλος διαδρομής' : `${goTrips.length} προγραμματισμένα δρομολόγια`}`
-      : `Πλήρες Δρομολόγιο • 2 Κατευθύνσεις (${outStops.length} στάσεις Μετάβαση / ${inStops.length} Επιστροφή)`;
+      ? `${outStops.length} στάσεις`
+      : `${outStops.length} στάσεις Μετάβαση / ${inStops.length} Επιστροφή`;
 
     // Main Content
     let mainContentHtml = '';
@@ -496,7 +523,7 @@ class TimetableManager {
                 </span>
               ` : ''}
               <span style="display: inline-flex; align-items: center; gap: 4px;">
-                <span style="display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: #e11d48;"></span>
+                <span>🚌</span>
                 Ζωντανά Λεωφορεία
               </span>
             </div>
@@ -506,20 +533,7 @@ class TimetableManager {
       `;
     } else if (isCircular) {
       mainContentHtml = `
-        <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 16px; padding: 1.15rem;">
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.85rem; border-bottom: 1px solid var(--md-sys-color-outline-variant); padding-bottom: 0.6rem;">
-            <div>
-              <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <span style="font-weight: 800; font-size: 1rem; color: var(--md-sys-color-primary);">Κυκλική Διαδρομή</span>
-                <span class="m3-badge" style="background: #eff6ff; color: #005ac1; font-size: 0.72rem; font-weight: 800; padding: 2px 8px;">
-                  🔄 Κυκλική
-                </span>
-              </div>
-              <div style="font-size: 0.78rem; color: #64748b; margin-top: 2px;">
-                ${outRoute.RouteDescr || this.currentLine.lineDescr || 'Πλήρης Κύκλος Διαδρομής'} • ${isStopsMode ? `${outStops.length} στάσεις` : `${goTrips.length} δρομολόγια`}
-              </div>
-            </div>
-          </div>
+        <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 16px; padding: 0.75rem;">
           <div style="max-height: 520px; overflow-y: auto; padding-right: 4px;">
             ${isStopsMode ? outStopsHtml : outScheduleHtml}
           </div>
@@ -529,14 +543,9 @@ class TimetableManager {
       mainContentHtml = `
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 1.25rem;">
           <!-- Direction 1: Outbound / Μετάβαση -->
-          <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 16px; padding: 1rem;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; border-bottom: 1px solid var(--md-sys-color-outline-variant); padding-bottom: 0.5rem;">
-              <div>
-                <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-primary);">Κατεύθυνση 1: Μετάβαση</div>
-                <div style="font-size: 0.75rem; color: #64748b;">
-                  ${outRoute.RouteDescr || 'Προς Τέρμα'} • ${isStopsMode ? `${outStops.length} στάσεις` : `${goTrips.length} δρομολόγια`}
-                </div>
-              </div>
+          <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 16px; padding: 0.85rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--md-sys-color-outline-variant);">
+              <span style="font-weight: 800; font-size: 0.85rem; color: var(--md-sys-color-primary);">${outRoute.RouteDescr || 'Μετάβαση'}</span>
               <span class="m3-badge" style="background: #eff6ff; color: #005ac1; font-size: 0.65rem;">Μετάβαση</span>
             </div>
             <div style="max-height: 480px; overflow-y: auto; padding-right: 4px;">
@@ -545,14 +554,9 @@ class TimetableManager {
           </div>
 
           <!-- Direction 2: Inbound / Επιστροφή -->
-          <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 16px; padding: 1rem;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; border-bottom: 1px solid var(--md-sys-color-outline-variant); padding-bottom: 0.5rem;">
-              <div>
-                <div style="font-weight: 800; font-size: 0.95rem; color: #047857;">Κατεύθυνση 2: Επιστροφή</div>
-                <div style="font-size: 0.75rem; color: #64748b;">
-                  ${inRoute.RouteDescr || 'Προς Αφετηρία'} • ${isStopsMode ? `${inStops.length} στάσεις` : `${comeTrips.length} δρομολόγια`}
-                </div>
-              </div>
+          <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 16px; padding: 0.85rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; padding-bottom: 0.4rem; border-bottom: 1px solid var(--md-sys-color-outline-variant);">
+              <span style="font-weight: 800; font-size: 0.85rem; color: #047857;">${inRoute.RouteDescr || 'Επιστροφή'}</span>
               <span class="m3-badge" style="background: #ecfdf5; color: #047857; font-size: 0.65rem;">Επιστροφή</span>
             </div>
             <div style="max-height: 480px; overflow-y: auto; padding-right: 4px;">
@@ -563,33 +567,39 @@ class TimetableManager {
       `;
     }
 
+    // Clean line title if it already ends with (ΚΥΚΛΙΚΗ)
+    let displayTitle = this.currentLine.lineDescr || 'Γραμμή ΟΑΣΑ';
+    if (isCircular) {
+      displayTitle = displayTitle.replace(/\s*\(\s*ΚΥΚΛΙΚΗ\s*\)/gi, '').trim();
+    }
+
     container.innerHTML = `
       <div class="m3-card" style="margin-bottom: ${isMapMode ? '0.5rem' : '1.5rem'}; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);">
         <!-- Header -->
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
-          <div>
-            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.25rem;">
+        <div style="margin-bottom: 1rem;">
+          <!-- Top row: Line Badge (and Circular indicator) on left, Favorite Star diametrically on right -->
+          <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 0.4rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
               <span class="ticker-line-badge" style="font-size: 1.05rem;">
                 ${this.currentLine.lineId || 'BUS'}
               </span>
-              <h2 style="font-size: 1.2rem; font-weight: 900; color: var(--md-sys-color-on-surface);">${this.currentLine.lineDescr || 'Γραμμή ΟΑΣΑ'}</h2>
               ${isCircular ? `
                 <span class="m3-badge" style="background: #eff6ff; color: #005ac1; font-weight: 800; font-size: 0.72rem; padding: 2px 8px;">
                   🔄 Κυκλική Διαδρομή
                 </span>
               ` : ''}
-              <button class="m3-icon-btn" style="width: 36px; height: 36px; border: none; cursor: pointer; background: none;" title="Αποθήκευση γραμμής" onclick="event.stopPropagation(); const isFav = window.Favorites.toggleLine('${this.currentLine.lineCode}', '${this.currentLine.lineId}', '${(this.currentLine.lineDescr || '').replace(/'/g, "\\'")}'); this.querySelector('svg').setAttribute('fill', isFav ? '#eab308' : 'none'); this.querySelector('svg').setAttribute('stroke', isFav ? '#ca8a04' : '#64748b');">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="${window.Favorites && window.Favorites.isLineFav(this.currentLine.lineCode) ? '#eab308' : 'none'}" stroke="${window.Favorites && window.Favorites.isLineFav(this.currentLine.lineCode) ? '#ca8a04' : '#64748b'}" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              </button>
             </div>
-            <div style="font-size: 0.8rem; color: #64748b;">
+            <button class="m3-icon-btn" style="width: 36px; height: 36px; border: none; cursor: pointer; background: none; flex-shrink: 0;" title="Αποθήκευση γραμμής" onclick="event.stopPropagation(); const isFav = window.Favorites.toggleLine('${this.currentLine.lineCode}', '${this.currentLine.lineId}', '${(this.currentLine.lineDescr || '').replace(/'/g, "\\'")}'); this.querySelector('svg').setAttribute('fill', isFav ? '#eab308' : 'none'); this.querySelector('svg').setAttribute('stroke', isFav ? '#ca8a04' : '#64748b');">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="${window.Favorites && window.Favorites.isLineFav(this.currentLine.lineCode) ? '#eab308' : 'none'}" stroke="${window.Favorites && window.Favorites.isLineFav(this.currentLine.lineCode) ? '#ca8a04' : '#64748b'}" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            </button>
+          </div>
+          <!-- Second row: Title and concise subtitle -->
+          <div>
+            <h2 style="font-size: 1.2rem; font-weight: 900; color: var(--md-sys-color-on-surface); margin: 0 0 0.25rem 0; line-height: 1.25;">${displayTitle}</h2>
+            <div style="font-size: 0.8rem; color: #64748b; font-weight: 600;">
               ${subtitleText}
             </div>
           </div>
-          <button class="m3-btn m3-btn-tonal" style="padding: 0.4rem 0.85rem; font-size: 0.8rem; display: inline-flex; align-items: center; gap: 6px;" onclick="window.App.goBack()" title="Επιστροφή στην προηγούμενη οθόνη">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-            <span>Πίσω</span>
-          </button>
         </div>
 
         <!-- View Mode Segmented Control: Stops vs Schedule vs Route Map -->

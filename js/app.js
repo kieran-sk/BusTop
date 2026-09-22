@@ -31,11 +31,15 @@ class AppController {
    */
   triggerHaptic(type = 'light') {
     const patterns = {
+      selection: 15,
+      tick: 20,
       light: 35,
       medium: 65,
       heavy: 110,
-      success: [35, 50, 45],
-      warning: [60, 60, 60]
+      rigid: [40, 20, 20],
+      soft: 25,
+      success: [25, 40, 45],
+      warning: [60, 50, 60]
     };
     const pattern = patterns[type] || 35;
     if (window.AndroidBridge && typeof window.AndroidBridge.vibrate === 'function') {
@@ -51,8 +55,104 @@ class AppController {
     }
   }
 
+  openSettingsModal() {
+    const modal = document.getElementById('settings-modal');
+    if (modal) {
+      modal.classList.add('open');
+      this.syncBatterySaverUI();
+      this.updateOfflineCacheCount();
+      this.updateBackButtonsVisibility();
+    }
+  }
+
+  updateOfflineCacheCount() {
+    const countEl = document.getElementById('offline-cache-count');
+    if (!countEl) return;
+    try {
+      const knownStops = Object.keys(JSON.parse(localStorage.getItem('OASA_KNOWN_STOPS') || '{}')).length;
+      const favStops = (JSON.parse(localStorage.getItem('OASA_FAV_STOPS') || '[]')).length;
+      const total = knownStops + favStops;
+      countEl.innerText = `${total} στάσεις αποθηκευμένες`;
+    } catch (e) {
+      countEl.innerText = `Ενεργό`;
+    }
+  }
+
+  isBatterySaverEnabled() {
+    return localStorage.getItem('OASA_BATTERY_SAVER') === 'true';
+  }
+
+  toggleBatterySaver(enabled) {
+    localStorage.setItem('OASA_BATTERY_SAVER', enabled ? 'true' : 'false');
+    this.syncBatterySaverUI();
+    this.applyBatterySaverPolicy(enabled);
+    this.triggerHaptic('light');
+  }
+
+  syncBatterySaverUI() {
+    const enabled = this.isBatterySaverEnabled();
+    const toggle = document.getElementById('battery-saver-toggle');
+    const badge = document.getElementById('battery-saver-badge');
+    const slider = document.getElementById('battery-saver-slider');
+    if (toggle) toggle.checked = enabled;
+    if (badge) badge.style.display = enabled ? 'inline-block' : 'none';
+    if (slider) {
+      slider.style.backgroundColor = enabled ? '#10b981' : '#cbd5e1';
+    }
+  }
+
+  applyBatterySaverPolicy(enabled) {
+    // If enabled, throttle live polling interval in pinned trips and ticker
+    if (window.PinnedTrips) {
+      window.PinnedTrips.stopPolling();
+      const intervalMs = enabled ? 35000 : 15000;
+      window.PinnedTrips.timerInterval = setInterval(() => {
+        if (!document.hidden) {
+          window.PinnedTrips.fetchAllPinnedArrivals();
+        }
+      }, intervalMs);
+    }
+  }
+
+  closeModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+      modal.classList.remove('open');
+      modal.classList.remove('active');
+    }
+    this.updateBackButtonsVisibility();
+  }
+
+  setThemeMode(mode) {
+    // Only 'm3' (Clean) theme is maintained
+    localStorage.setItem('OASA_APP_THEME', 'm3');
+    localStorage.removeItem('OASA_DOT_MATRIX_THEME');
+    const linkMatrix = document.getElementById('theme-dot-matrix');
+    const linkCloud = document.getElementById('theme-cloud');
+    if (linkMatrix) linkMatrix.disabled = true;
+    if (linkCloud) linkCloud.disabled = true;
+  }
+
+  updateThemeButtonsUI(activeMode) {
+    // Legacy helper kept for backward safety
+  }
+
+  toggleDotMatrixTheme() {
+    // No-op: Only Clean theme is active
+  }
+
+  applyStoredTheme() {
+    localStorage.setItem('OASA_APP_THEME', 'm3');
+    localStorage.removeItem('OASA_DOT_MATRIX_THEME');
+    const linkMatrix = document.getElementById('theme-dot-matrix');
+    const linkCloud = document.getElementById('theme-cloud');
+    if (linkMatrix) linkMatrix.disabled = true;
+    if (linkCloud) linkCloud.disabled = true;
+  }
+
   async init() {
     console.log('[Athens OASA Bus Suite] Initializing Material 3 Expressive & Leaflet Map in Greek...');
+    this.applyStoredTheme();
 
     // Initialize Ticker
     this.ticker = new AirportTicker('ticker-container');
@@ -87,7 +187,30 @@ class AppController {
       if (this.mapManager) {
         this.mapManager.invalidateSize();
       }
+    });
 
+    // Adaptive Background Polling: Relax polling to 45s when backgrounded, restore 15s when active
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (this.pollInterval) {
+          clearInterval(this.pollInterval);
+          this.pollInterval = setInterval(() => {
+            if (this.currentStop && this.activeTab === 'ticker') {
+              this.refreshStopArrivals(this.currentStopRequestId);
+            }
+          }, 45000);
+        }
+      } else {
+        if (this.activeTab === 'ticker' && this.currentStop) {
+          this.refreshStopArrivals(this.currentStopRequestId);
+          if (this.pollInterval) clearInterval(this.pollInterval);
+          this.pollInterval = setInterval(() => {
+            if (this.currentStop && this.activeTab === 'ticker') {
+              this.refreshStopArrivals(this.currentStopRequestId);
+            }
+          }, 15000);
+        }
+      }
     });
 
     // Restore variant grouping checkbox state
@@ -132,6 +255,35 @@ class AppController {
         });
       }).catch(err => {
         console.warn('Service worker registration failed:', err);
+      });
+
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (!event.data) return;
+        if (event.data.type === 'NOTIFICATION_DISMISSED_PIN') {
+          console.log('Pin dismissed from notification');
+          if (window.PinnedTrips && typeof window.PinnedTrips.clearAllSilently === 'function') {
+            window.PinnedTrips.clearAllSilently();
+          } else if (window.PinnedTrips) {
+            const removedItems = [...window.PinnedTrips.pinnedItems];
+            window.PinnedTrips.pinnedItems = [];
+            window.PinnedTrips.save();
+            if (window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
+              removedItems.forEach(item => {
+                window.Alarms.removeAlarmByStopAndLine(item.stopCode, item.lineId);
+              });
+            }
+            if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
+              try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
+            }
+            window.PinnedTrips.updateLiveAndroidNotification();
+            if (this.ticker) this.ticker.render();
+          }
+        } else if (event.data.type === 'NOTIFICATION_DISMISSED_ALARM') {
+          const alarmId = event.data.alarmId;
+          if (alarmId && window.Alarms) {
+            window.Alarms.removeAlarm(alarmId);
+          }
+        }
       });
     }
 
@@ -188,7 +340,7 @@ class AppController {
       if (walkPill) {
         if (walk && typeof walk.minutes === 'number') {
           walkPill.style.display = 'inline-flex';
-          walkPill.innerText = `🚶 ${walk.minutes}λ (${walk.meters}μ)`;
+          walkPill.innerText = `🚶 ${walk.minutes}' (${walk.meters}μ)`;
         } else {
           walkPill.style.display = 'none';
         }
@@ -265,6 +417,11 @@ class AppController {
     if (banner) banner.style.display = 'none';
     const optBar = document.getElementById('arrivals-options-bar');
     if (optBar) optBar.style.display = 'none';
+
+    // Show search bar when viewing all stops / lines
+    const searchBar = document.querySelector('.m3-search-container');
+    if (searchBar) searchBar.style.display = '';
+
     if (this.ticker) {
       this.ticker.currentStop = null;
       this.ticker.render();
@@ -276,10 +433,8 @@ class AppController {
   }
 
   updateBackButtonsVisibility() {
-    const canGoBack = this.navHistory.length > 0 || 
-                      this.activeTab === 'timetable' || 
+    const canGoBack = this.activeTab === 'timetable' || 
                       (this.activeTab === 'ticker' && !!this.currentStop) || 
-                      (this.activeTab !== 'search') ||
                       !!document.querySelector('.m3-dialog-backdrop.open');
 
     const globalBackBtn = document.getElementById('global-back-btn');
@@ -298,6 +453,7 @@ class AppController {
     }
 
     this.activeTab = tabId;
+    this.triggerHaptic('selection');
 
     // Update bottom nav bar active state
     document.querySelectorAll('.m3-nav-item').forEach(btn => {
@@ -309,13 +465,16 @@ class AppController {
       sec.style.display = sec.id === `section-${tabId}` ? 'block' : 'none';
     });
 
-    // When switching to Arrivals tab, show all stops if no stop is explicitly selected
+    const searchBar = document.querySelector('.m3-search-container');
+
+    // When switching to Arrivals / Stops & Lines tab
     if (tabId === 'ticker') {
       const banner = document.getElementById('selected-stop-banner');
       const optBar = document.getElementById('arrivals-options-bar');
       if (!this.currentStop) {
         if (banner) banner.style.display = 'none';
         if (optBar) optBar.style.display = 'none';
+        if (searchBar) searchBar.style.display = '';
         if (this.ticker) this.ticker.render();
         if (window.Search && (!window.Search.nearbyStops || window.Search.nearbyStops.length === 0)) {
           window.Search.findNearbyStops(true);
@@ -323,7 +482,16 @@ class AppController {
       } else {
         if (banner) banner.style.display = 'flex';
         if (optBar) optBar.style.display = 'flex';
+        if (searchBar) searchBar.style.display = 'none';
       }
+    } else {
+      // Clear arrivals polling when leaving ticker tab to save battery
+      if (this.pollInterval) {
+        clearInterval(this.pollInterval);
+        this.pollInterval = null;
+      }
+      // In all other tabs, show search bar
+      if (searchBar) searchBar.style.display = '';
     }
 
     // Invalidate Leaflet Map size if on search / map tab
@@ -466,7 +634,7 @@ class AppController {
     if (banner) {
       banner.style.display = 'flex';
       banner.querySelector('#selected-stop-title').innerText = stopName;
-      banner.querySelector('#selected-stop-code').innerText = `Στάση #${stopCodeStr}`;
+      banner.querySelector('#selected-stop-code').innerText = `#${stopCodeStr}`;
 
       // Populate walking time pill if user location is available
       const walkPill = banner.querySelector('#selected-stop-walk-pill');
@@ -478,7 +646,7 @@ class AppController {
         if (walkInfo && typeof walkInfo.minutes === 'number') {
           this.currentStop.distanceMeters = walkInfo.meters;
           walkPill.style.display = 'inline-flex';
-          walkPill.innerText = `🚶 ${walkInfo.minutes}λ (${walkInfo.meters}μ)`;
+          walkPill.innerText = `🚶 ${walkInfo.minutes}' (${walkInfo.meters}μ)`;
         } else {
           walkPill.style.display = 'none';
         }
@@ -499,10 +667,12 @@ class AppController {
             starSvg.setAttribute('fill', '#eab308');
             starSvg.setAttribute('stroke', '#ca8a04');
             starBtn.title = 'Αποθηκευμένο στα αγαπημένα (κλικ για αφαίρεση)';
+            banner.classList.add('is-favourite');
           } else {
             starSvg.setAttribute('fill', 'none');
             starSvg.setAttribute('stroke', 'currentColor');
             starBtn.title = 'Αποθήκευση στάσης στα αγαπημένα';
+            banner.classList.remove('is-favourite');
           }
         }
       };
@@ -652,7 +822,7 @@ class AppController {
             const walkPill = document.getElementById('selected-stop-walk-pill');
             if (walkPill) {
               walkPill.style.display = 'inline-flex';
-              walkPill.innerText = `🚶 ${walk.minutes}λ (${walk.meters}μ)`;
+              walkPill.innerText = `🚶 ${walk.minutes}' (${walk.meters}μ)`;
             }
           }
         }
@@ -893,7 +1063,17 @@ class AppController {
       };
     }
 
-    // 3. Arrivals button setup
+    // 3. Navigation via Google Maps button setup
+    const navBtn = modal.querySelector('#stop-action-nav-btn');
+    if (navBtn) {
+      navBtn.onclick = () => {
+        this.closeModal('stop-actions-modal');
+        this.triggerHaptic('light');
+        this.navigateToGoogleMaps(sLat, sLng, sName);
+      };
+    }
+
+    // 4. Arrivals button setup
     const arrBtn = modal.querySelector('#stop-action-arrivals-btn');
     if (arrBtn) {
       arrBtn.onclick = () => {
@@ -905,6 +1085,54 @@ class AppController {
 
     modal.classList.add('open');
     this.updateBackButtonsVisibility();
+  }
+
+  /**
+   * Launch external Google Maps turn-by-turn navigation / directions to the selected stop coordinates
+   */
+  navigateToGoogleMaps(lat, lng, label = 'Στάση') {
+    let pLat = parseFloat(lat);
+    let pLng = parseFloat(lng);
+
+    if (isNaN(pLat) || isNaN(pLng)) {
+      if (this.currentStop) {
+        pLat = parseFloat(this.currentStop.StopLat);
+        pLng = parseFloat(this.currentStop.StopLng);
+      }
+    }
+
+    if (isNaN(pLat) || isNaN(pLng)) {
+      if (window.PinnedTrips && typeof window.PinnedTrips.showToast === 'function') {
+        window.PinnedTrips.showToast('⚠️ Δεν βρέθηκαν συντεταγμένες για τη στάση');
+      } else {
+        alert('Δεν βρέθηκαν συντεταγμένες GPS για τη στάση');
+      }
+      return;
+    }
+
+    // Universal Google Maps directions URL for walking/transit
+    const encodedLabel = encodeURIComponent(label || 'Στάση ΟΑΣΑ');
+    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${pLat},${pLng}&travelmode=walking`;
+
+    // If running inside Android WebView bridge
+    if (window.AndroidBridge && typeof window.AndroidBridge.openExternalUrl === 'function') {
+      try {
+        window.AndroidBridge.openExternalUrl(mapsUrl);
+        return;
+      } catch (e) {}
+    }
+
+    // Standard web browser fallback
+    window.open(mapsUrl, '_blank', 'noopener,noreferrer');
+  }
+
+  /**
+   * Direct navigation handler from top stop banner
+   */
+  navigateCurrentStopToGoogleMaps() {
+    if (!this.currentStop) return;
+    const sName = this.currentStop.StopDescr || `Στάση #${this.currentStop.StopCode}`;
+    this.navigateToGoogleMaps(this.currentStop.StopLat, this.currentStop.StopLng, sName);
   }
 
   setupStopLongPressListener() {
@@ -978,4 +1206,7 @@ class AppController {
 document.addEventListener('DOMContentLoaded', () => {
   window.App = new AppController();
   window.App.init();
+  // Start the global clock bar immediately on page load
+  if (window.Ticker) window.Ticker.startClock();
+  else setTimeout(() => { if (window.Ticker) window.Ticker.startClock(); }, 500);
 });

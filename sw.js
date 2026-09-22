@@ -3,7 +3,7 @@
  * Background alarm notification scheduler and offline caching
  */
 
-const CACHE_NAME = 'oasa-bus-v25';
+const CACHE_NAME = 'oasa-bus-v54';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -35,7 +35,8 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
-          if (key !== CACHE_NAME) {
+          // Preserve the API offline cache across SW updates
+          if (key !== CACHE_NAME && key !== 'oasa-api-cache') {
             console.log('Purging obsolete cache:', key);
             return caches.delete(key);
           }
@@ -48,10 +49,10 @@ self.addEventListener('activate', (event) => {
 
 function formatMinutesHuman(mins) {
   if (typeof mins !== 'number' || isNaN(mins)) return '--';
-  if (mins < 60) return `${mins}λ`;
+  if (mins < 60) return `${mins}'`;
   const hours = Math.floor(mins / 60);
   const remMins = mins % 60;
-  return remMins > 0 ? `${hours}ω ${remMins}λ` : `${hours}ω`;
+  return remMins > 0 ? `${hours}ʰ ${remMins}'` : `${hours}ʰ`;
 }
 
 // Active Alarms Map for background countdown
@@ -109,6 +110,19 @@ function tickServiceWorkerAlarms() {
   }
 }
 
+// Background Sync Wakeup (Chrome PWA background execution)
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'check-alarms' || activeAlarms.size > 0) {
+    tickServiceWorkerAlarms();
+  }
+});
+
+self.addEventListener('periodicsync', (event) => {
+  if (activeAlarms.size > 0) {
+    tickServiceWorkerAlarms();
+  }
+});
+
 // Background alarm listener & Android Live Updates
 self.addEventListener('message', (event) => {
   if (!event.data) return;
@@ -129,8 +143,8 @@ self.addEventListener('message', (event) => {
     }
 
     // Show initial live notification immediately
-    self.registration.showNotification(`🚍 ${lineId} σε ${initialMinutes || 10}λ`, {
-      body: `Στάση: ${stopName} • Ειδοποίηση στα ${thresholdMinutes || 5}λ`,
+    self.registration.showNotification(`🚍 ${lineId} σε ${initialMinutes || 10}'`, {
+      body: `Στάση: ${stopName} • Ειδοποίηση στα ${thresholdMinutes || 5}'`,
       tag: `live_alarm_${id}`,
       icon: '/assets/icon-192.png',
       badge: '/assets/icon-192.png',
@@ -207,14 +221,45 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
+self.addEventListener('notificationclose', (event) => {
+  const tag = (event.notification && event.notification.tag) ? event.notification.tag : '';
+  if (tag === 'live-pinned-bus-tracker' || tag.startsWith('live_pinned_')) {
+    // Notify window clients to remove all pinned trips
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        client.postMessage({ type: 'NOTIFICATION_DISMISSED_PIN' });
+      }
+    });
+  } else if (tag.startsWith('live_alarm_')) {
+    const alarmId = tag.replace('live_alarm_', '');
+    activeAlarms.delete(alarmId);
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        client.postMessage({ type: 'NOTIFICATION_DISMISSED_ALARM', alarmId });
+      }
+    });
+  }
+});
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  if (event.action === 'cancel') {
+  if (event.action === 'cancel' || event.action === 'dismiss') {
     const tag = event.notification.tag || '';
     if (tag.startsWith('live_alarm_')) {
       const alarmId = tag.replace('live_alarm_', '');
       activeAlarms.delete(alarmId);
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        for (const client of clientList) {
+          client.postMessage({ type: 'NOTIFICATION_DISMISSED_ALARM', alarmId });
+        }
+      });
+    } else if (tag === 'live-pinned-bus-tracker' || tag.startsWith('live_pinned_')) {
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        for (const client of clientList) {
+          client.postMessage({ type: 'NOTIFICATION_DISMISSED_PIN' });
+        }
+      });
     }
     return;
   }
@@ -250,7 +295,7 @@ self.addEventListener('fetch', (event) => {
           }
           return response;
         })
-        .catch(() => caches.match(event.request))
+        .catch(() => caches.match(event.request, { ignoreSearch: true }))
     );
     return;
   }
@@ -266,6 +311,6 @@ self.addEventListener('fetch', (event) => {
         }
         return networkResponse;
       })
-      .catch(() => caches.match(event.request))
+      .catch(() => caches.match(event.request, { ignoreSearch: true }))
   );
 });

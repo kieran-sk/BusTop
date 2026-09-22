@@ -6,6 +6,7 @@
 class SearchManager {
   constructor() {
     this.allLines = [];
+    this.allStops = [];
     this.nearbyStops = [];
     this.showAllNearby = false;
     this.debounceTimer = null;
@@ -17,6 +18,51 @@ class SearchManager {
       this.allLines = await window.API.getLines();
     } catch (err) {
       console.warn('Failed to prefetch lines for search:', err);
+    }
+    try {
+      this.allStops = await window.API.getAllStops();
+      // Pre-compute normalized search fields once for fast keystroke filtering
+      this.allStops.forEach(s => {
+        s._normName = this.normalize(s.StopDescr || s.stopName || '');
+        s._normStreet = this.normalize(s.StopStreet || s.stopStreet || '');
+        s._normEng = (s.StopDescrEng || '').toLowerCase();
+        s._code = String(s.StopCode || '');
+      });
+    } catch (err) {
+      console.warn('Failed to prefetch all stops for search:', err);
+    }
+    // Add click listener outside dropdown to close it
+    document.addEventListener('click', (e) => {
+      const searchContainer = document.querySelector('.m3-search-container');
+      if (searchContainer && !searchContainer.contains(e.target)) {
+        this.hideDropdown();
+      }
+    });
+  }
+
+  hideDropdown() {
+    const dropdown = document.getElementById('global-search-dropdown');
+    if (dropdown) dropdown.style.display = 'none';
+  }
+
+  showDropdown() {
+    const dropdown = document.getElementById('global-search-dropdown');
+    if (dropdown) dropdown.style.display = 'block';
+  }
+
+  onSearchKeyDown(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      const input = document.getElementById('global-search-input');
+      const q = input ? input.value.trim() : '';
+      this.hideDropdown();
+      if (window.App && window.App.ticker) {
+        window.App.switchTab('ticker');
+        window.App.ticker.setActiveView('stops');
+        window.App.ticker.setStopsFilterQuery(q);
+      }
+    } else if (event.key === 'Escape') {
+      this.hideDropdown();
     }
   }
 
@@ -42,30 +88,34 @@ class SearchManager {
     const query = this.normalize(rawQuery);
     const resultsContainer = document.getElementById('search-results');
     const nearbyContainer = document.getElementById('nearby-stops-container');
-    if (!resultsContainer) return;
+    const dropdown = document.getElementById('global-search-dropdown');
 
     const trimmed = (rawQuery || '').trim();
 
     if (!trimmed) {
-      resultsContainer.innerHTML = '';
-      if (nearbyContainer) {
-        nearbyContainer.style.display = 'block';
-      }
+      if (resultsContainer) resultsContainer.innerHTML = '';
+      if (nearbyContainer) nearbyContainer.style.display = 'block';
+      this.hideDropdown();
       return;
     }
 
-    if (window.App && window.App.activeTab !== 'search') {
-      window.App.switchTab('search');
-    }
-    if (nearbyContainer) {
+    if (nearbyContainer && window.App && window.App.activeTab === 'search') {
       nearbyContainer.style.display = 'none';
     }
 
-    resultsContainer.innerHTML = `
-      <div style="padding: 1.5rem; text-align: center; color: #64748b; font-size: 0.85rem;">
+    const searchingHtml = `
+      <div style="padding: 1rem; text-align: center; color: #64748b; font-size: 0.85rem;">
         Αναζήτηση γραμμών και στάσεων για "${trimmed}"...
       </div>
     `;
+
+    if (dropdown) {
+      dropdown.innerHTML = searchingHtml;
+      this.showDropdown();
+    }
+    if (resultsContainer && window.App && window.App.activeTab === 'search') {
+      resultsContainer.innerHTML = searchingHtml;
+    }
 
     // 1. Search Lines locally
     const matchingLines = (this.allLines || []).filter(l => {
@@ -75,15 +125,56 @@ class SearchManager {
       return id.includes(query) || descr.includes(query) || descrEng.includes(query);
     }).slice(0, 15);
 
-    // 2. Search Stops remotely via server master stops index
+    // 2. Search Stops across full 9,425 citywide stops
     let matchingStops = [];
-    try {
-      const res = await fetch(`/api/stops/search?q=${encodeURIComponent(trimmed)}`);
-      if (res.ok) {
-        matchingStops = await res.json();
+    let isOfflineResults = false;
+
+    // A. Check if allStops is available in search manager or ticker
+    const stopsSource = (Array.isArray(this.allStops) && this.allStops.length > 0)
+      ? this.allStops
+      : (window.Ticker && Array.isArray(window.Ticker.allStops) && window.Ticker.allStops.length > 0 ? window.Ticker.allStops : null);
+
+    if (stopsSource && stopsSource.length > 0) {
+      matchingStops = stopsSource.filter(s => {
+        const code = s._code || String(s.StopCode || '');
+        const name = s._normName || this.normalize(s.StopDescr || s.stopName || '');
+        const street = s._normStreet || this.normalize(s.StopStreet || s.stopStreet || '');
+        const eng = s._normEng || (s.StopDescrEng || '').toLowerCase();
+        return code.includes(query) || name.includes(query) || street.includes(query) || eng.includes(query);
+      }).slice(0, 25);
+    } else {
+      // B. If not yet loaded in client memory, fetch from /api/stops/search
+      try {
+        const res = await fetch(`/api/stops/search?q=${encodeURIComponent(trimmed)}`);
+        if (res.ok) {
+          matchingStops = await res.json();
+          // Cache stop results locally
+          if (Array.isArray(matchingStops) && matchingStops.length > 0) {
+            const stopCache = JSON.parse(localStorage.getItem('OASA_KNOWN_STOPS') || '{}');
+            matchingStops.forEach(s => { stopCache[s.StopCode] = s; });
+            localStorage.setItem('OASA_KNOWN_STOPS', JSON.stringify(stopCache));
+          }
+        } else {
+          throw new Error('Search network response not ok');
+        }
+      } catch (e) {
+        console.warn('Network stop search failed, switching to Zero Data Mode:', e);
+        isOfflineResults = true;
+        // Search in locally cached stops (from previous searches and favourites)
+        const knownStops = Object.values(JSON.parse(localStorage.getItem('OASA_KNOWN_STOPS') || '{}'));
+        const favStops = JSON.parse(localStorage.getItem('OASA_FAV_STOPS') || '[]');
+        const allLocal = [...favStops, ...knownStops];
+        const seen = new Set();
+
+        matchingStops = allLocal.filter(s => {
+          if (!s || !s.StopCode || seen.has(String(s.StopCode))) return false;
+          seen.add(String(s.StopCode));
+          const code = String(s.StopCode);
+          const name = this.normalize(s.StopDescr || s.stopName || '');
+          const street = this.normalize(s.StopStreet || s.stopStreet || '');
+          return code.includes(query) || name.includes(query) || street.includes(query);
+        }).slice(0, 15);
       }
-    } catch (e) {
-      console.warn('Stop search error:', e);
     }
 
     let html = '';
@@ -91,31 +182,31 @@ class SearchManager {
     // Render Lines
     if (matchingLines.length > 0) {
       html += `
-        <div style="font-size: 0.82rem; font-weight: 800; color: var(--md-sys-color-primary); margin: 0.5rem 0 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">
+        <div style="font-size: 0.82rem; font-weight: 800; color: var(--md-sys-color-primary); margin: 0.35rem 0 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">
           Γραμμές Λεωφορείων (${matchingLines.length})
         </div>
-        <div style="display: grid; gap: 0.55rem; margin-bottom: 1.25rem;">
+        <div style="display: grid; gap: 0.55rem; margin-bottom: 1rem;">
           ${matchingLines.map(l => {
             const safeDescr = (l.LineDescr || '').replace(/'/g, "\\'");
             const isLineFav = window.Favorites && window.Favorites.isLineFav(l.LineCode);
             return `
-              <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.65rem; padding: 0.85rem 1rem; margin-bottom: 0; cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);" onclick="window.App.openLineTimetableBothDirections('${l.LineCode}', '${l.LineID}', '${safeDescr}')">
+              <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem 0.9rem; margin-bottom: 0; cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);" onclick="window.Search.hideDropdown(); window.App.openLineTimetableBothDirections('${l.LineCode}', '${l.LineID}', '${safeDescr}')">
                 <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.65rem;">
                   <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
                     <span class="ticker-line-badge" style="font-size: 0.95rem; min-width: 46px; flex-shrink: 0;">
                       ${l.LineID}
                     </span>
                     <div style="min-width: 0; flex: 1;">
-                      <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: break-word;">${l.LineDescr}</div>
-                      <div style="font-size: 0.76rem; color: var(--md-sys-color-outline); margin-top: 2px;">Γραμμή #${l.LineCode}</div>
+                      <div style="font-weight: 800; font-size: 0.92rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: break-word;">${l.LineDescr}</div>
+                      <div style="font-size: 0.74rem; color: var(--md-sys-color-outline); margin-top: 2px;">Γραμμή #${l.LineCode}</div>
                     </div>
                   </div>
-                  <button class="m3-icon-btn" style="width: 36px; height: 36px; border: none; cursor: pointer; background: none; flex-shrink: 0;" title="Αποθήκευση γραμμής" onclick="event.stopPropagation(); const isFav = window.Favorites.toggleLine('${l.LineCode}', '${l.LineID}', '${safeDescr}'); this.querySelector('svg').setAttribute('fill', isFav ? '#eab308' : 'none'); this.querySelector('svg').setAttribute('stroke', isFav ? '#ca8a04' : '#64748b');">
-                    <svg width="22" height="22" viewBox="0 0 24 24" fill="${isLineFav ? '#eab308' : 'none'}" stroke="${isLineFav ? '#ca8a04' : '#64748b'}" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                  <button class="m3-icon-btn" style="width: 32px; height: 32px; border: none; cursor: pointer; background: none; flex-shrink: 0;" title="Αποθήκευση γραμμής" onclick="event.stopPropagation(); const isFav = window.Favorites.toggleLine('${l.LineCode}', '${l.LineID}', '${safeDescr}'); this.querySelector('svg').setAttribute('fill', isFav ? '#eab308' : 'none'); this.querySelector('svg').setAttribute('stroke', isFav ? '#ca8a04' : '#64748b');">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="${isLineFav ? '#eab308' : 'none'}" stroke="${isLineFav ? '#ca8a04' : '#64748b'}" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
                   </button>
                 </div>
-                <div style="display: flex; align-items: center; justify-content: flex-end; border-top: 1px dashed var(--md-sys-color-outline-variant); padding-top: 0.45rem;">
-                  <button class="m3-btn m3-btn-primary" style="padding: 0.35rem 0.85rem; font-size: 0.8rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px;" onclick="event.stopPropagation(); window.App.openLineTimetableBothDirections('${l.LineCode}', '${l.LineID}', '${safeDescr}')">
+                <div style="display: flex; align-items: center; justify-content: flex-end; border-top: 1px dashed var(--md-sys-color-outline-variant); padding-top: 0.35rem;">
+                  <button class="m3-btn m3-btn-primary" style="padding: 0.25rem 0.75rem; font-size: 0.78rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px;" onclick="event.stopPropagation(); window.Search.hideDropdown(); window.App.openLineTimetableBothDirections('${l.LineCode}', '${l.LineID}', '${safeDescr}')">
                     🗺️ Δρομολόγιο &amp; Στάσεις ➜
                   </button>
                 </div>
@@ -129,30 +220,43 @@ class SearchManager {
     // Render Stops
     if (matchingStops.length > 0) {
       html += `
-        <div style="font-size: 0.82rem; font-weight: 800; color: #10b981; margin: 0.5rem 0 0.5rem; text-transform: uppercase; letter-spacing: 0.05em;">
-          Στάσεις Λεωφορείων (${matchingStops.length})
+        <div style="display: flex; align-items: center; justify-content: space-between; margin: 0.35rem 0 0.5rem;">
+          <span style="font-size: 0.82rem; font-weight: 800; color: #10b981; text-transform: uppercase; letter-spacing: 0.05em;">
+            Στάσεις Λεωφορείων (${matchingStops.length})
+          </span>
+          ${isOfflineResults ? `
+            <span class="m3-badge" style="background: #fef3c7; color: #b45309; font-size: 0.7rem; font-weight: 800; padding: 2px 6px;">
+              💾 Zero Data (Offline Cache)
+            </span>
+          ` : ''}
         </div>
         <div style="display: grid; gap: 0.45rem;">
           ${matchingStops.map(s => {
             const stopTitle = s.StopDescr || `Στάση #${s.StopCode}`;
             const safeTitle = stopTitle.replace(/'/g, "\\'");
+            const isFav = window.Favorites && window.Favorites.isStopFav(s.StopCode);
             return `
-              <div class="m3-card stop-interactive-card" data-stop-code="${s.StopCode}" data-stop-title="${safeTitle}" data-stop-lat="${s.StopLat}" data-stop-lng="${s.StopLng}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.85rem 1rem; margin-bottom: 0; cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})">
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                  <div class="m3-icon-btn" style="width: 38px; height: 38px; background: #ecfdf5; color: #047857; border: 1.5px solid #a7f3d0;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"></path>
-                      <circle cx="12" cy="9" r="2.5"></circle>
-                    </svg>
+              <div class="m3-card stop-interactive-card" data-stop-code="${s.StopCode}" data-stop-title="${safeTitle}" data-stop-lat="${s.StopLat}" data-stop-lng="${s.StopLng}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 0.9rem; margin-bottom: 0; cursor: pointer; background: ${isFav ? '#fffdf5' : 'var(--md-sys-color-surface-container)'}; border: ${isFav ? '2px solid #eab308' : '1px solid var(--md-sys-color-outline-variant)'};" onclick="window.Search.hideDropdown(); window.App.selectStop('${s.StopCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})">
+                <div style="display: flex; align-items: center; gap: 0.65rem;">
+                  <div class="m3-icon-btn" style="width: 36px; height: 36px; background: ${isFav ? '#fef9c3' : '#ecfdf5'}; color: ${isFav ? '#ca8a04' : '#047857'}; border: 1.5px solid ${isFav ? '#fde047' : '#a7f3d0'}; flex-shrink: 0;">
+                    ${isFav ? `⭐` : `
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"></path>
+                        <circle cx="12" cy="9" r="2.5"></circle>
+                      </svg>
+                    `}
                   </div>
                   <div>
-                    <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface);">${stopTitle}</div>
-                    <div style="font-size: 0.78rem; color: var(--md-sys-color-outline); margin-top: 2px;">
-                      ${s.StopStreet ? s.StopStreet + ' • ' : ''}Στάση #${s.StopCode}
+                    <div style="font-weight: 800; font-size: 0.92rem; color: var(--md-sys-color-on-surface); display: flex; align-items: center; gap: 4px;">
+                      ${stopTitle}
+                      ${isFav ? `<span style="font-size: 0.7rem; color: #ca8a04; font-weight: 900;">⭐ Αγαπημένη</span>` : ''}
+                    </div>
+                    <div style="font-size: 0.76rem; color: var(--md-sys-color-outline); margin-top: 2px;">
+                      ${s.StopStreet ? s.StopStreet + ' • ' : ''}#${s.StopCode}
                     </div>
                   </div>
                 </div>
-                <button class="m3-btn m3-btn-tonal" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; border-radius: 9999px;">
+                <button class="m3-btn m3-btn-tonal" style="padding: 0.3rem 0.7rem; font-size: 0.78rem; border-radius: 9999px;">
                   Αφίξεις
                 </button>
               </div>
@@ -164,19 +268,50 @@ class SearchManager {
 
     if (matchingLines.length === 0 && matchingStops.length === 0) {
       html = `
-        <div style="padding: 2.5rem; text-align: center; color: #64748b;">
-          <div style="font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem;">Δεν βρέθηκαν αποτελέσματα</div>
-          <div style="font-size: 0.85rem;">Δοκιμάστε με αριθμό γραμμής (π.χ. 040, 306, X95) ή όνομα στάσης στα ελληνικά.</div>
+        <div style="padding: 1.5rem; text-align: center; color: #64748b;">
+          <div style="font-size: 0.95rem; font-weight: 700; margin-bottom: 0.25rem;">Δεν βρέθηκαν αποτελέσματα</div>
+          <div style="font-size: 0.8rem;">Δοκιμάστε με αριθμό γραμμής (π.χ. 040, 306, X95) ή όνομα στάσης στα ελληνικά.</div>
         </div>
       `;
     }
 
-    resultsContainer.innerHTML = html;
+    // Populate dropdown
+    if (dropdown) {
+      dropdown.innerHTML = html;
+      this.showDropdown();
+    }
+    // Also populate search tab results if search tab is active
+    if (resultsContainer && window.App && window.App.activeTab === 'search') {
+      resultsContainer.innerHTML = html;
+    }
   }
 
   /**
-   * "Near Me" GPS Radar
+   * Offline / zero-data fallback: Computes closest stops from the preloaded 9,425 stops index
    */
+  getLocalClosestStops(userLat, userLng, limit = 35) {
+    const stopsSource = (Array.isArray(this.allStops) && this.allStops.length > 0)
+      ? this.allStops
+      : (window.Ticker && Array.isArray(window.Ticker.allStops) && window.Ticker.allStops.length > 0 ? window.Ticker.allStops : []);
+    if (!Array.isArray(stopsSource) || stopsSource.length === 0) return [];
+
+    const stopsWithDist = [];
+    for (const s of stopsSource) {
+      const sLat = parseFloat(s.StopLat);
+      const sLng = parseFloat(s.StopLng);
+      if (isNaN(sLat) || isNaN(sLng)) continue;
+      const dLat = (sLat - userLat) * 111139;
+      const dLng = (sLng - userLng) * (111139 * Math.cos(userLat * Math.PI / 180));
+      const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+      stopsWithDist.push({
+        ...s,
+        distanceMeters: Math.round(dist)
+      });
+    }
+    stopsWithDist.sort((a, b) => a.distanceMeters - b.distanceMeters);
+    return stopsWithDist.slice(0, limit);
+  }
+
   /**
    * "Near Me" GPS Radar
    */
@@ -200,7 +335,7 @@ class SearchManager {
         window.App.userLocation.lat,
         window.App.userLocation.lng,
         this.nearbyStops,
-        350
+        200
       );
     }
 
@@ -215,28 +350,26 @@ class SearchManager {
       const lng = 23.7335;
       if (window.App) window.App.setUserLocation(lat, lng);
       if (window.App && window.App.mapManager) {
-        window.App.mapManager.fitAreaAroundUser(lat, lng, this.nearbyStops, 350);
+        window.App.mapManager.fitAreaAroundUser(lat, lng, this.nearbyStops, 200);
       }
       try {
         const stops = await window.API.getClosestStops(lat, lng);
-        this.nearbyStops = Array.isArray(stops) ? stops : [];
-        this.sortStopsWithFavorites();
-        this.renderNearbyStops(lat, lng);
-        if (window.App && window.App.mapManager) {
-          window.App.mapManager.renderNearbyStops(this.nearbyStops);
-        }
-        if (window.App && window.App.ticker && !window.App.currentStop) {
-          window.App.ticker.render();
-        }
+        this.nearbyStops = (Array.isArray(stops) && stops.length > 0) ? stops : this.getLocalClosestStops(lat, lng);
       } catch (err) {
-        if (container) {
-          container.innerHTML = `<div class="m3-card" style="color: var(--md-sys-color-error); padding: 1rem;">Αδυναμία φόρτωσης κοντινών στάσεων: ${err.message}</div>`;
-        }
-      } finally {
-        if (radarBtn) {
-          radarBtn.classList.remove('spin-animation');
-          radarBtn.disabled = false;
-        }
+        console.warn('API getClosestStops failed, using local index:', err);
+        this.nearbyStops = this.getLocalClosestStops(lat, lng);
+      }
+      this.sortStopsWithFavorites();
+      this.renderNearbyStops(lat, lng);
+      if (window.App && window.App.mapManager) {
+        window.App.mapManager.renderNearbyStops(this.nearbyStops);
+      }
+      if (window.App && window.App.ticker && !window.App.currentStop) {
+        window.App.ticker.render();
+      }
+      if (radarBtn) {
+        radarBtn.classList.remove('spin-animation');
+        radarBtn.disabled = false;
       }
     };
 
@@ -253,33 +386,29 @@ class SearchManager {
           window.App.setUserLocation(latitude, longitude);
         }
         if (window.App && window.App.mapManager) {
-          window.App.mapManager.fitAreaAroundUser(latitude, longitude, this.nearbyStops, 350);
+          window.App.mapManager.fitAreaAroundUser(latitude, longitude, this.nearbyStops, 200);
         }
 
         try {
           const stops = await window.API.getClosestStops(latitude, longitude);
-          this.nearbyStops = Array.isArray(stops) ? stops : [];
-          this.sortStopsWithFavorites();
-          this.renderNearbyStops(latitude, longitude);
-          if (window.App && window.App.mapManager) {
-            window.App.mapManager.renderNearbyStops(this.nearbyStops);
-          }
-          if (window.App && window.App.ticker && !window.App.currentStop) {
-            window.App.ticker.render();
-          }
+          this.nearbyStops = (Array.isArray(stops) && stops.length > 0) ? stops : this.getLocalClosestStops(latitude, longitude);
         } catch (err) {
-          if (container) {
-            container.innerHTML = `
-              <div class="m3-card" style="color: var(--md-sys-color-error); padding: 1rem;">
-                Αδυναμία φόρτωσης κοντινών στάσεων: ${err.message}
-              </div>
-            `;
-          }
-        } finally {
-          if (radarBtn) {
-            radarBtn.classList.remove('spin-animation');
-            radarBtn.disabled = false;
-          }
+          console.warn('API getClosestStops error, using local index:', err);
+          this.nearbyStops = this.getLocalClosestStops(latitude, longitude);
+        }
+
+        this.sortStopsWithFavorites();
+        this.renderNearbyStops(latitude, longitude);
+        if (window.App && window.App.mapManager) {
+          window.App.mapManager.renderNearbyStops(this.nearbyStops);
+        }
+        if (window.App && window.App.ticker && !window.App.currentStop) {
+          window.App.ticker.render();
+        }
+
+        if (radarBtn) {
+          radarBtn.classList.remove('spin-animation');
+          radarBtn.disabled = false;
         }
       },
       async (err) => {
@@ -312,11 +441,6 @@ class SearchManager {
       // Sort by walking distance
       return (a.distanceMeters || 0) - (b.distanceMeters || 0);
     });
-
-    // Strictly limit to 20 nearest stops
-    if (this.nearbyStops.length > 20) {
-      this.nearbyStops = this.nearbyStops.slice(0, 20);
-    }
   }
 
   toggleShowAllNearby() {
@@ -420,20 +544,20 @@ class SearchManager {
           const isFav = window.Favorites && window.Favorites.isStopFav(s.StopCode);
 
           return `
-            <div class="m3-card stop-interactive-card" data-stop-code="${s.StopCode}" data-stop-title="${safeTitle}" data-stop-lat="${s.StopLat}" data-stop-lng="${s.StopLng}" style="display: flex; flex-direction: column; padding: 0.9rem 1.1rem; cursor: pointer; background: ${isFav ? '#fffdf5' : (hasRoutes ? 'var(--md-sys-color-surface-container)' : '#f8fafc')}; margin-bottom: 0; border: ${isFav ? '2px solid #eab308' : (hasRoutes ? '1px solid var(--md-sys-color-outline-variant)' : '1px dashed #cbd5e1')}; opacity: ${hasRoutes ? '1' : '0.8'};" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', '${s.StopLat}', '${s.StopLng}')">
+            <div class="m3-card stop-interactive-card ${isFav ? 'is-favourite-stop' : ''}" data-stop-code="${s.StopCode}" data-stop-title="${safeTitle}" data-stop-lat="${s.StopLat}" data-stop-lng="${s.StopLng}" style="display: flex; flex-direction: column; padding: 0.9rem 1.1rem; cursor: pointer; background: ${isFav ? '#fffdf5' : (hasRoutes ? 'var(--md-sys-color-surface-container)' : '#f8fafc')}; margin-bottom: 0; opacity: ${hasRoutes ? '1' : '0.8'};" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', '${s.StopLat}', '${s.StopLng}')">
               <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
                 <div style="min-width: 0; flex: 1;">
                   <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                    ${isFav ? '<span class="m3-badge" style="background: #fef08a; color: #854d0e; font-size: 0.68rem; font-weight: 800;">⭐ Αγαπημένη</span>' : ''}
+                    ${isFav ? '<span class="m3-badge" style="background: #fef08a; color: #854d0e; font-size: 0.72rem; font-weight: 800; padding: 2px 6px;">⭐</span>' : ''}
                     <div style="font-weight: 800; font-size: 0.94rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: break-word;">${stopTitle}</div>
                   </div>
                   <div style="font-size: 0.75rem; color: var(--md-sys-color-outline); margin-top: 3px;">
-                    ${s.StopStreet ? s.StopStreet + ' • ' : ''}Στάση #${s.StopCode}
+                    ${s.StopStreet ? s.StopStreet + ' • ' : ''}#${s.StopCode}
                   </div>
                 </div>
                 <div style="text-align: right; flex-shrink: 0;">
                   <div style="font-weight: 800; font-size: 0.85rem; color: var(--md-sys-color-primary); background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 2px 8px;">
-                    🚶 ${walkMins}λ
+                    🚶 ${walkMins}'
                   </div>
                   <div style="font-size: 0.7rem; color: var(--md-sys-color-outline); margin-top: 3px;">
                     ${distanceMeters}μ.

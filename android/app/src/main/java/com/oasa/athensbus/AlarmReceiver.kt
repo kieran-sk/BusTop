@@ -29,29 +29,37 @@ class AlarmReceiver : BroadcastReceiver() {
             )
             wakeLock.acquire(15000)
 
-            try {
-                val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
-                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-                val ringtone = RingtoneManager.getRingtone(context.applicationContext, alarmUri)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                    ringtone.audioAttributes = AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build()
+            Thread {
+                try {
+                    val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                        ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE)
+                        ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                    val ringtone = RingtoneManager.getRingtone(context.applicationContext, alarmUri)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                        ringtone.audioAttributes = AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_ALARM)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                            .build()
+                    }
+                    ringtone.play()
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
-                ringtone.play()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+            }.start()
 
             try {
-                val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    vibrator.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 800, 200, 800, 200, 800, 1000), -1))
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? android.os.VibratorManager
+                    val vibrator = vibratorManager?.defaultVibrator
+                    vibrator?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 800, 200, 800, 200, 800, 1000), -1))
                 } else {
                     @Suppress("DEPRECATION")
-                    vibrator.vibrate(longArrayOf(0, 800, 200, 800, 200, 800, 1000), -1)
+                    val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        vibrator?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 800, 200, 800, 200, 800, 1000), -1))
+                    } else {
+                        vibrator?.vibrate(longArrayOf(0, 800, 200, 800, 200, 800, 1000), -1)
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()

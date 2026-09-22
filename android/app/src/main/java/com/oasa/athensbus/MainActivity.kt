@@ -18,7 +18,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.maps.MapsInitializer
@@ -28,13 +28,14 @@ import android.provider.Settings
 import android.net.Uri
 import org.json.JSONObject
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     private lateinit var webView: WebView
     private val PERMISSION_REQUEST_CODE = 1001
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        currentInstance = this
 
         try {
             MapsInitializer.initialize(applicationContext, MapsInitializer.Renderer.LATEST) { renderer ->
@@ -165,9 +166,31 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    fun unpinAndDismiss(stopCode: String, lineId: String) {
+        runOnUiThread {
+            if (this::webView.isInitialized) {
+                val cleanStop = stopCode.replace("'", "\\'")
+                val cleanLine = lineId.replace("'", "\\'")
+                val js = """
+                    (function() {
+                        if (window.PinnedTrips && typeof window.PinnedTrips.removePinByStopAndLine === 'function') {
+                            window.PinnedTrips.removePinByStopAndLine('$cleanStop', '$cleanLine');
+                        }
+                        if (window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
+                            window.Alarms.removeAlarmByStopAndLine('$cleanStop', '$cleanLine');
+                        }
+                    })();
+                """.trimIndent()
+                webView.evaluateJavascript(js, null)
+            }
+        }
+    }
+
     companion object {
         const val EXTRA_STOP_CODE = "EXTRA_STOP_CODE"
         const val EXTRA_STOP_NAME = "EXTRA_STOP_NAME"
+        @Volatile
+        var currentInstance: MainActivity? = null
     }
 
     inner class WebAppInterface(private val context: Context) {
@@ -297,10 +320,14 @@ class MainActivity : ComponentActivity() {
                 }
 
                 if (!exactScheduled) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+                    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+                        } else {
+                            alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+                        }
                     } else {
-                        alarmManager.setExact(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
+                        alarmManager.set(AlarmManager.RTC_WAKEUP, triggerTime, pendingIntent)
                     }
                 }
 
@@ -325,7 +352,7 @@ class MainActivity : ComponentActivity() {
             destination: String,
             walkMinutes: Double,
             thresholdMinutes: Double,
-            ringUntilDismissed: Boolean = true,
+            ringUntilDismissed: Boolean = false,
             initialMinutes: Double = 10.0
         ) {
             try {
@@ -479,6 +506,33 @@ class MainActivity : ComponentActivity() {
         } else {
             @Suppress("DEPRECATION")
             super.onBackPressed()
+        }
+    }
+
+    override fun onDestroy() {
+        if (currentInstance === this) {
+            currentInstance = null
+        }
+        if (this::webView.isInitialized) {
+            webView.destroy()
+        }
+        super.onDestroy()
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == PERMISSION_REQUEST_CODE) {
+            for (i in permissions.indices) {
+                val perm = permissions[i]
+                val result = grantResults[i]
+                if (result != PackageManager.PERMISSION_GRANTED) {
+                    if (perm == Manifest.permission.POST_NOTIFICATIONS) {
+                        println("POST_NOTIFICATIONS permission denied")
+                    } else if (perm == Manifest.permission.ACCESS_FINE_LOCATION || perm == Manifest.permission.ACCESS_COARSE_LOCATION) {
+                        Toast.makeText(this, "Location features may be limited without permission", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
         }
     }
 }

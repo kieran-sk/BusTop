@@ -55,9 +55,10 @@ object NotificationHelper {
             putExtra(MainActivity.EXTRA_STOP_CODE, stopCode)
             putExtra(MainActivity.EXTRA_STOP_NAME, stopName)
         }
+        val notifId = (stopCode.ifEmpty { "stop" } + "_" + lineId).hashCode()
         val pendingIntent = PendingIntent.getActivity(
             context,
-            lineId.hashCode(),
+            notifId,
             intent,
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
@@ -85,7 +86,7 @@ object NotificationHelper {
             .build()
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(lineId.hashCode(), notification)
+        notificationManager.notify(notifId, notification)
     }
 
     const val LIVE_CHANNEL_ID = "oasa_bus_live_channel_v5"

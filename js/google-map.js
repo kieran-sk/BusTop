@@ -151,7 +151,7 @@ class MapManager {
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 3px 0; border-bottom: 1px dashed #e2e8f0; font-size: 0.8rem;">
             <span style="font-weight: 800; color: #005ac1; background: #e0f2fe; padding: 1px 6px; border-radius: 4px;">${l.line_id}</span>
             <span style="flex: 1; margin: 0 4px; color: #0f172a; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;">to ${l.last_stop}</span>
-            <span style="font-size: 0.7rem; color: #64748b;">${l.direction || ''}</span>
+            <span style="font-size: 0.8rem; color: #64748b;">${l.direction === '←' ? '⬅️' : (l.direction === '→' ? '➡️' : (l.direction || ''))}</span>
           </div>
         `).join('');
       }
@@ -162,7 +162,7 @@ class MapManager {
             ${stopTitle}
           </div>
           <div style="font-size: 0.78rem; color: #64748b; margin-bottom: 8px;">
-            ${s.StopStreet ? s.StopStreet + ' • ' : ''}Στάση #${s.StopCode}
+            ${s.StopStreet ? s.StopStreet + ' • ' : ''}#${s.StopCode}
           </div>
           <div style="font-size: 0.75rem; font-weight: 800; color: #005ac1; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.04em;">
             Γραμμές &amp; Κατευθύνσεις
@@ -212,7 +212,7 @@ class MapManager {
                   <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 3px 0; border-bottom: 1px dashed #e2e8f0; font-size: 0.8rem;">
                     <span style="font-weight: 800; color: #005ac1; background: #e0f2fe; padding: 1px 6px; border-radius: 4px;">${l.line_id}</span>
                     <span style="flex: 1; margin: 0 4px; color: #0f172a; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;">προς ${l.last_stop}</span>
-                    <span style="font-size: 0.7rem; color: #64748b;">${l.direction}</span>
+                    <span style="font-size: 0.8rem; color: #64748b;">${l.direction === '←' ? '⬅️' : (l.direction === '→' ? '➡️' : (l.direction || ''))}</span>
                   </div>
                 `).join('');
               } else {
@@ -274,17 +274,21 @@ class MapManager {
       const busIcon = L.divIcon({
         className: 'map-live-bus-icon',
         html: `
-          <div style="background: #16a34a; color: #ffffff; padding: 2px 7px; border-radius: 9999px; font-weight: 800; font-size: 0.75rem; box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 2px solid #ffffff; display: flex; align-items: center; gap: 4px;">
-            <span class="m3-pulse-dot" style="background: #ffffff; width: 6px; height: 6px;"></span>
-            ${lineId}
+          <div style="display: flex; flex-direction: column; align-items: center; pointer-events: auto; cursor: pointer; transform: translateZ(0);">
+            <div style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));">
+              <span style="font-size: 1.5rem; line-height: 1;">🚌</span>
+            </div>
+            <div style="margin-top: 1px; font-size: 0.68rem; font-weight: 900; color: #0f172a; background: rgba(255,255,255,0.96); padding: 1px 5px; border-radius: 4px; border: 1px solid rgba(15,23,42,0.2); box-shadow: 0 1px 3px rgba(0,0,0,0.18); letter-spacing: 0.02em; white-space: nowrap; line-height: 1.2;">
+              ${lineId}
+            </div>
           </div>
         `,
-        iconSize: [48, 24],
-        iconAnchor: [24, 12]
+        iconSize: [36, 46],
+        iconAnchor: [18, 23]
       });
 
       L.marker([lat, lng], { icon: busIcon }).addTo(this.busLayer)
-        .bindTooltip(`Live Bus #${b.VEH_NO || ''}`, { direction: 'top' });
+        .bindTooltip(`🚍 Λεωφορείο ${lineId}`, { direction: 'top' });
     });
   }
 
@@ -296,281 +300,3 @@ class MapManager {
 
 window.MapManager = MapManager;
 window.GoogleMapManager = MapManager; // Backward compatibility
-
-      const script = document.createElement('script');
-      script.id = 'google-maps-script';
-      // Include mandatory solutionChannel and attribution
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&libraries=marker,geometry&solution_channel=GMP_guides_agentskills_v1`;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => resolve();
-      script.onerror = (e) => reject(new Error('Failed to load Google Maps API script. Please check your API key.'));
-      document.head.appendChild(script);
-    });
-  }
-
-  async initMap() {
-    const container = document.getElementById(this.containerId);
-    if (!container) return;
-    container.innerHTML = ''; // clear any prompt
-
-    const { Map } = await google.maps.importLibrary("maps");
-    const { AdvancedMarkerElement, PinElement } = await google.maps.importLibrary("marker");
-    this.AdvancedMarkerElement = AdvancedMarkerElement;
-    this.PinElement = PinElement;
-
-    const athensCenter = { lat: 37.9838, lng: 23.7275 };
-
-    this.map = new Map(container, {
-      center: athensCenter,
-      zoom: 13,
-      mapId: "DEMO_MAP_ID", // Mandatory for AdvancedMarkerElement
-      gestureHandling: "greedy",
-      fullscreenControl: false,
-      mapTypeControl: false,
-      streetViewControl: false,
-      zoomControlOptions: {
-        position: google.maps.ControlPosition.RIGHT_CENTER
-      }
-    });
-
-    this.isLoaded = true;
-    console.log('[Google Maps] Initialized with AdvancedMarkerElement & Athens center');
-  }
-
-  renderKeyPrompt(container, errorMsg = '') {
-    container.innerHTML = `
-      <div style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; text-align: center; background: var(--md-sys-color-surface-container-lowest);">
-        <div style="width: 56px; height: 56px; border-radius: 50%; background: var(--md-sys-color-primary-container); color: var(--md-sys-color-primary); display: flex; align-items: center; justify-content: center; margin-bottom: 1rem; font-size: 0.9rem; font-weight: 800;">
-          MAP
-        </div>
-        <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--md-sys-color-on-surface);">Google Maps Integration</h3>
-        <p style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); max-width: 420px; margin-bottom: 1.25rem;">
-          To activate live bus trajectories, route polylines, and stop markers, enter your Google Maps Platform API key or use the free Maps Demo Key.
-        </p>
-        ${errorMsg ? `<div style="background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); padding: 0.6rem 1rem; border-radius: 12px; font-size: 0.8rem; margin-bottom: 1rem; max-width: 400px;">${errorMsg}</div>` : ''}
-        <div style="display: flex; gap: 0.5rem; width: 100%; max-width: 380px; margin-bottom: 0.75rem;">
-          <input id="gmaps-key-input" type="text" placeholder="Enter Google Maps API Key..." value="${this.apiKey}" 
-            style="flex: 1; padding: 0.6rem 1rem; border-radius: 9999px; border: 1.5px solid var(--md-sys-color-outline-variant); outline: none; font-size: 0.875rem; background: var(--md-sys-color-surface);" />
-          <button id="gmaps-key-save" class="m3-btn m3-btn-primary" style="padding: 0.6rem 1.25rem;">Save</button>
-        </div>
-        <div style="font-size: 0.75rem; color: var(--md-sys-color-outline);">
-          <a href="https://mapsplatform.google.com/maps-demo-key?utm_campaign=gmp_git_agentskills_v1" target="_blank" rel="noopener noreferrer" style="color: var(--md-sys-color-primary); font-weight: 600; text-decoration: underline;">
-            Get a Free Maps Demo Key (No Credit Card)
-          </a>
-        </div>
-      </div>
-    `;
-
-    const saveBtn = container.querySelector('#gmaps-key-save');
-    const input = container.querySelector('#gmaps-key-input');
-    if (saveBtn && input) {
-      saveBtn.onclick = () => {
-        const val = input.value.trim();
-        if (val) {
-          localStorage.setItem('OASA_GOOGLE_MAPS_KEY', val);
-          this.apiKey = val;
-          this.init();
-        }
-      };
-    }
-  }
-
-  /**
-   * Set user current GPS marker
-   */
-  setUserLocation(lat, lng) {
-    if (!this.map || !this.AdvancedMarkerElement) return;
-
-    if (!this.userMarker) {
-      const pin = document.createElement('div');
-      pin.innerHTML = `
-        <div style="position: relative; width: 22px; height: 22px;">
-          <div style="position: absolute; width: 22px; height: 22px; border-radius: 50%; background: #005ac1; opacity: 0.3; animation: pulseAnimation 2s infinite;"></div>
-          <div style="position: absolute; top: 4px; left: 4px; width: 14px; height: 14px; border-radius: 50%; background: #005ac1; border: 2.5px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.3);"></div>
-        </div>
-      `;
-
-      this.userMarker = new this.AdvancedMarkerElement({
-        map: this.map,
-        position: { lat, lng },
-        title: "Your Location",
-        content: pin
-      });
-    } else {
-      this.userMarker.position = { lat, lng };
-    }
-  }
-
-  /**
-   * Clear all stops, routes, and buses
-   */
-  clearAll() {
-    this.markers.forEach(m => m.map = null);
-    this.markers = [];
-    this.busMarkers.forEach(m => m.map = null);
-    this.busMarkers.clear();
-    if (this.polyline) {
-      this.polyline.setMap(null);
-      this.polyline = null;
-    }
-  }
-
-  /**
-   * Focus a specific stop
-   */
-  focusStop(lat, lng, title = 'Bus Stop') {
-    if (!this.map) return;
-    const pos = { lat: parseFloat(lat), lng: parseFloat(lng) };
-    this.map.panTo(pos);
-    this.map.setZoom(16);
-
-    if (this.AdvancedMarkerElement && this.PinElement) {
-      const pin = new this.PinElement({
-        background: '#005ac1',
-        borderColor: '#ffffff',
-        glyphColor: '#ffffff',
-        scale: 1.2
-      });
-
-      const marker = new this.AdvancedMarkerElement({
-        map: this.map,
-        position: pos,
-        title,
-        content: pin.element
-      });
-
-      this.markers.push(marker);
-    }
-  }
-
-  /**
-   * Display stops along a route
-   */
-  renderRouteStops(stops = []) {
-    if (!this.map || !this.AdvancedMarkerElement) return;
-
-    const bounds = new google.maps.LatLngBounds();
-
-    stops.forEach(s => {
-      const lat = parseFloat(s.StopLat);
-      const lng = parseFloat(s.StopLng);
-      if (isNaN(lat) || isNaN(lng)) return;
-
-      const pos = { lat, lng };
-      bounds.extend(pos);
-
-      const dot = document.createElement('div');
-      dot.style.width = '10px';
-      dot.style.height = '10px';
-      dot.style.borderRadius = '50%';
-      dot.style.backgroundColor = '#005ac1';
-      dot.style.border = '2px solid #ffffff';
-      dot.style.boxShadow = '0 1px 4px rgba(0,0,0,0.4)';
-      dot.title = s.StopDescr || `Στάση #${s.StopCode}`;
-
-      const marker = new this.AdvancedMarkerElement({
-        map: this.map,
-        position: pos,
-        title: s.StopDescr || `Στάση #${s.StopCode}`,
-        content: dot
-      });
-
-      marker.addListener('click', () => {
-        if (window.App) {
-          window.App.selectStop(s.StopCode, s.StopDescr || `Στάση #${s.StopCode}`);
-        }
-      });
-
-      this.markers.push(marker);
-    });
-
-    if (stops.length > 0) {
-      this.map.fitBounds(bounds, { top: 40, bottom: 40, left: 40, right: 40 });
-    }
-  }
-
-  /**
-   * Render route polyline
-   */
-  renderPolyline(details = []) {
-    if (!this.map) return;
-    if (this.polyline) {
-      this.polyline.setMap(null);
-    }
-
-    const path = details.map(pt => ({
-      lat: parseFloat(pt.lat),
-      lng: parseFloat(pt.lng)
-    })).filter(pt => !isNaN(pt.lat) && !isNaN(pt.lng));
-
-    if (path.length === 0) return;
-
-    this.polyline = new google.maps.Polyline({
-      path,
-      geodesic: true,
-      strokeColor: '#005ac1',
-      strokeOpacity: 0.8,
-      strokeWeight: 4,
-      map: this.map
-    });
-  }
-
-  /**
-   * Update live moving bus markers
-   */
-  updateBuses(buses = [], lineId = 'BUS') {
-    if (!this.map || !this.AdvancedMarkerElement) return;
-
-    const seenVehicles = new Set();
-
-    buses.forEach(b => {
-      const lat = parseFloat(b.CS_LAT);
-      const lng = parseFloat(b.CS_LNG);
-      if (isNaN(lat) || isNaN(lng)) return;
-
-      const vehNo = b.VEH_NO;
-      seenVehicles.add(vehNo);
-
-      let marker = this.busMarkers.get(vehNo);
-      if (!marker) {
-        // Create custom bus badge
-        const badge = document.createElement('div');
-        badge.style.display = 'flex';
-        badge.style.alignItems = 'center';
-        badge.style.gap = '4px';
-        badge.style.backgroundColor = '#ffb703';
-        badge.style.color = '#000000';
-        badge.style.padding = '4px 8px';
-        badge.style.borderRadius = '9999px';
-        badge.style.fontWeight = '900';
-        badge.style.fontSize = '12px';
-        badge.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
-        badge.style.border = '2px solid #ffffff';
-        badge.innerHTML = `BUS ${lineId}`;
-
-        marker = new this.AdvancedMarkerElement({
-          map: this.map,
-          position: { lat, lng },
-          title: `Bus ${lineId} (#${vehNo})`,
-          content: badge
-        });
-
-        this.busMarkers.set(vehNo, marker);
-      } else {
-        // Smoothly update position
-        marker.position = { lat, lng };
-      }
-    });
-
-    // Remove buses no longer active
-    for (const [vehNo, marker] of this.busMarkers.entries()) {
-      if (!seenVehicles.has(vehNo)) {
-        marker.map = null;
-        this.busMarkers.delete(vehNo);
-      }
-    }
-  }
-}
-
-window.GoogleMapManager = GoogleMapManager;
