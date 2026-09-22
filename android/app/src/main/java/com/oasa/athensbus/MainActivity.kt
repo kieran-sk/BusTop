@@ -18,7 +18,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.maps.MapsInitializer
@@ -28,7 +28,7 @@ import android.provider.Settings
 import android.net.Uri
 import org.json.JSONObject
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     private lateinit var webView: WebView
     private val PERMISSION_REQUEST_CODE = 1001

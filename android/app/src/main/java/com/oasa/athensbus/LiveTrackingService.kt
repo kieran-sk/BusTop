@@ -185,6 +185,7 @@ class LiveTrackingService : Service() {
 
                     updateNotification(remainingMins)
 
+                    var minsForDelay = remainingMins
                     if (thresholdMinutes > 0 && remainingMins <= thresholdMinutes && !isAlarmTriggered) {
                         isAlarmTriggered = true
                         triggerAlarmWakeup(remainingMins)
@@ -193,12 +194,19 @@ class LiveTrackingService : Service() {
                     e.printStackTrace()
                 }
 
+                val currentMins = (initialMinutes) // fallback
                 // Adaptive background polling delay: Save battery when far, increase frequency when close
+                val delayMins = try {
+                    fetchLiveArrivalMinutes() ?: initialMinutes
+                } catch (_: Exception) {
+                    initialMinutes
+                }
+
                 val pollDelayMs = when {
-                    remainingMins > 20 -> 45000L  // Far (>20m away): 45s (massive battery saving)
-                    remainingMins > 8  -> 25000L  // Approaching (8-20m away): 25s
-                    remainingMins > 3  -> 15000L  // Close (3-8m away): 15s
-                    else               -> 10000L  // Arriving now (<=3m away): 10s for high precision
+                    delayMins > 20 -> 45000L  // Far (>20m away): 45s (massive battery saving)
+                    delayMins > 8  -> 25000L  // Approaching (8-20m away): 25s
+                    delayMins > 3  -> 15000L  // Close (3-8m away): 15s
+                    else           -> 10000L  // Arriving now (<=3m away): 10s for high precision
                 }
                 delay(pollDelayMs)
             }
