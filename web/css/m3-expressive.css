@@ -538,24 +538,63 @@ body {
   }
 }
 
+/* Search Tab Responsive Layout (Mobile Single Column vs PC Dual-Pane) */
+.search-desktop-split {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  width: 100%;
+}
+
+.search-map-pane {
+  height: 320px;
+  margin-bottom: 1.25rem;
+}
+
+.search-cards-pane {
+  width: 100%;
+}
+
+/* PC / Desktop view: Map on left (narrower width, taller/extended vertically), cards on right (reduced width, independent scroll) */
+@media (min-width: 992px) {
+  .m3-container {
+    max-width: 1440px;
+    padding: 0.6rem 1.25rem 3rem;
+  }
+
+  .search-desktop-split {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 1.5rem;
+    height: calc(100vh - 150px);
+    overflow: hidden;
+  }
+
+  .search-map-pane {
+    flex: 1 1 0;
+    height: 100% !important;
+    min-height: 520px;
+    margin-bottom: 0 !important;
+    border-radius: 18px;
+    box-shadow: var(--md-sys-elevation-2);
+  }
+
+  .search-cards-pane {
+    flex: 0 0 440px;
+    width: 440px;
+    max-width: 440px;
+    height: 100%;
+    overflow-y: auto;
+    padding-right: 0.45rem;
+    overscroll-behavior: contain;
+  }
+}
+
 /* Responsive Grid for Split View */
 .m3-main-grid {
   display: grid;
   grid-template-columns: 1fr;
   gap: 1.25rem;
-}
-
-@media (min-width: 992px) {
-  .m3-main-grid {
-    grid-template-columns: 460px 1fr;
-    height: calc(100vh - 72px);
-    overflow: hidden;
-  }
-
-  .m3-sidebar-scroll {
-    overflow-y: auto;
-    padding-right: 0.5rem;
-  }
 }
 
 /* ================= METRO & TRAM TRANSIT STYLES ================= */

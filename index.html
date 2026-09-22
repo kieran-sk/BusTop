@@ -35,10 +35,10 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- Stylesheets (Relative paths with cache-busting for PWA updates) -->
-  <link rel="stylesheet" href="css/m3-expressive.css?v=20260922_2145">
-  <link rel="stylesheet" href="css/airport-ticker.css?v=20260922_2145">
-  <link id="theme-dot-matrix" rel="stylesheet" href="css/dot-matrix.css?v=20260922_2145" disabled>
-  <link id="theme-cloud" rel="stylesheet" href="css/cloud-theme.css?v=20260922_2145" disabled>
+  <link rel="stylesheet" href="css/m3-expressive.css?v=20260922_2150">
+  <link rel="stylesheet" href="css/airport-ticker.css?v=20260922_2150">
+  <link id="theme-dot-matrix" rel="stylesheet" href="css/dot-matrix.css?v=20260922_2150" disabled>
+  <link id="theme-cloud" rel="stylesheet" href="css/cloud-theme.css?v=20260922_2150" disabled>
 </head>
 <body>
 
@@ -164,37 +164,43 @@
     <!-- ================= 4. SEARCH, ROUTES, TIMETABLES & NEARBY TAB ================= -->
     <section id="section-search" class="app-section">
       
-      <!-- Interactive Stops Map -->
-      <div id="map-card-wrapper" class="m3-card" style="padding: 0; overflow: hidden; height: 320px; margin-bottom: 1.25rem; position: relative;">
-        <div id="map-container" style="width: 100%; height: 100%;"></div>
-        <!-- Fullscreen + Locate buttons — top right stack -->
-        <div style="position: absolute; top: 12px; right: 12px; z-index: 1000; display: flex; flex-direction: column; gap: 6px;">
-          <button id="map-fullscreen-btn" class="m3-icon-btn" onclick="window.App.mapManager.toggleFullscreen()" title="Πλήρης οθόνη χάρτη" aria-label="Πλήρης οθόνη χάρτη" style="background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); width: 34px; height: 34px; border-radius: 50%; box-shadow: var(--md-sys-elevation-2); display: flex; align-items: center; justify-content: center; color: var(--md-sys-color-on-surface); border: 1px solid var(--md-sys-color-outline-variant); cursor: pointer;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="15 3 21 3 21 9"></polyline>
-              <polyline points="9 21 3 21 3 15"></polyline>
-              <line x1="21" y1="3" x2="14" y2="10"></line>
-              <line x1="3" y1="21" x2="10" y2="14"></line>
-            </svg>
-          </button>
-          <button id="map-locate-btn" class="m3-icon-btn" title="Εντοπισμός στάσεων κοντά μου" aria-label="Εντοπισμός στάσεων κοντά μου" onclick="window.Search.findNearbyStops();" style="background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); width: 34px; height: 34px; border-radius: 50%; box-shadow: var(--md-sys-elevation-2); display: flex; align-items: center; justify-content: center; color: var(--md-sys-color-primary); border: 1px solid var(--md-sys-color-outline-variant); cursor: pointer;">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <circle cx="12" cy="12" r="3"></circle>
-              <line x1="12" y1="2" x2="12" y2="5"></line>
-              <line x1="12" y1="19" x2="12" y2="22"></line>
-              <line x1="2" y1="12" x2="5" y2="12"></line>
-              <line x1="19" y1="12" x2="22" y2="12"></line>
-            </svg>
-          </button>
+      <!-- PC Dual-Pane Layout (Map Left, Cards Right) / Mobile Single Column -->
+      <div class="search-desktop-split">
+        <!-- Interactive Stops Map Column -->
+        <div id="map-card-wrapper" class="m3-card search-map-pane" style="padding: 0; overflow: hidden; position: relative;">
+          <div id="map-container" style="width: 100%; height: 100%;"></div>
+          <!-- Fullscreen + Locate buttons — top right stack -->
+          <div style="position: absolute; top: 12px; right: 12px; z-index: 1000; display: flex; flex-direction: column; gap: 6px;">
+            <button id="map-fullscreen-btn" class="m3-icon-btn" onclick="window.App.mapManager.toggleFullscreen()" title="Πλήρης οθόνη χάρτη" aria-label="Πλήρης οθόνη χάρτη" style="background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); width: 34px; height: 34px; border-radius: 50%; box-shadow: var(--md-sys-elevation-2); display: flex; align-items: center; justify-content: center; color: var(--md-sys-color-on-surface); border: 1px solid var(--md-sys-color-outline-variant); cursor: pointer;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <polyline points="9 21 3 21 3 15"></polyline>
+                <line x1="21" y1="3" x2="14" y2="10"></line>
+                <line x1="3" y1="21" x2="10" y2="14"></line>
+              </svg>
+            </button>
+            <button id="map-locate-btn" class="m3-icon-btn" title="Εντοπισμός στάσεων κοντά μου" aria-label="Εντοπισμός στάσεων κοντά μου" onclick="window.Search.findNearbyStops();" style="background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); width: 34px; height: 34px; border-radius: 50%; box-shadow: var(--md-sys-elevation-2); display: flex; align-items: center; justify-content: center; color: var(--md-sys-color-primary); border: 1px solid var(--md-sys-color-outline-variant); cursor: pointer;">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <circle cx="12" cy="12" r="3"></circle>
+                <line x1="12" y1="2" x2="12" y2="5"></line>
+                <line x1="12" y1="19" x2="12" y2="22"></line>
+                <line x1="2" y1="12" x2="5" y2="12"></line>
+                <line x1="19" y1="12" x2="22" y2="12"></line>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Scrollable Cards Column on PC -->
+        <div class="search-cards-pane">
+          <!-- Nearby Stops Injected Container -->
+          <div id="nearby-stops-container" style="margin-bottom: 1.5rem;"></div>
+
+          <!-- Search Results Container -->
+          <div id="search-results"></div>
         </div>
       </div>
-
-      <!-- Nearby Stops Injected Container -->
-      <div id="nearby-stops-container" style="margin-bottom: 1.5rem;"></div>
-
-      <!-- Search Results Container -->
-      <div id="search-results"></div>
 
     </section>
 
@@ -506,14 +512,14 @@
   </nav>
 
   <!-- Scripts (Cache-busted with defer for non-blocking execution) -->
-  <script defer src="js/api.js?v=20260922_2145"></script>
-  <script defer src="js/map-manager.js?v=20260922_2145"></script>
-  <script defer src="js/ticker.js?v=20260922_2145"></script>
-  <script defer src="js/alarms.js?v=20260922_2145"></script>
-  <script defer src="js/pinned-trips.js?v=20260922_2145"></script>
-  <script defer src="js/timetable.js?v=20260922_2145"></script>
-  <script defer src="js/search.js?v=20260922_2145"></script>
-  <script defer src="js/favorites.js?v=20260922_2145"></script>
-  <script defer src="js/app.js?v=20260922_2145"></script>
+  <script defer src="js/api.js?v=20260922_2150"></script>
+  <script defer src="js/map-manager.js?v=20260922_2150"></script>
+  <script defer src="js/ticker.js?v=20260922_2150"></script>
+  <script defer src="js/alarms.js?v=20260922_2150"></script>
+  <script defer src="js/pinned-trips.js?v=20260922_2150"></script>
+  <script defer src="js/timetable.js?v=20260922_2150"></script>
+  <script defer src="js/search.js?v=20260922_2150"></script>
+  <script defer src="js/favorites.js?v=20260922_2150"></script>
+  <script defer src="js/app.js?v=20260922_2150"></script>
 </body>
 </html>
