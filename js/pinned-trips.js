@@ -40,9 +40,12 @@ class PinnedTripsManager {
     );
 
     if (existingIdx !== -1) {
-      this.pinnedItems.splice(existingIdx, 1);
+      const removed = this.pinnedItems.splice(existingIdx, 1)[0];
       this.save();
       this.showToast(`Ξεκαρφιτσώθηκε η γραμμή ${lineId}`);
+      if (window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
+        window.Alarms.removeAlarmByStopAndLine(stopCode, lineId);
+      }
       if (window.App && typeof window.App.triggerHaptic === 'function') {
         window.App.triggerHaptic('light');
       }
@@ -126,9 +129,18 @@ class PinnedTripsManager {
   }
 
   removePin(pinId) {
+    const item = this.pinnedItems.find(p => p.id === pinId);
     this.pinnedItems = this.pinnedItems.filter(p => p.id !== pinId);
     this.save();
     this.showToast('Το σκέλος αφαιρέθηκε');
+    if (item && window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
+      window.Alarms.removeAlarmByStopAndLine(item.stopCode, item.lineId);
+    }
+    if (this.pinnedItems.length === 0) {
+      if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
+        try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
+      }
+    }
     this.updateLiveAndroidNotification();
     if (window.App && window.App.ticker) {
       window.App.ticker.render();
@@ -142,6 +154,14 @@ class PinnedTripsManager {
     this.pinnedItems = this.pinnedItems.filter(p => !(String(p.stopCode).trim() === normStop && String(p.lineId).trim().toUpperCase() === normLine));
     if (this.pinnedItems.length !== initialCount) {
       this.save();
+      if (window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
+        window.Alarms.removeAlarmByStopAndLine(normStop, normLine);
+      }
+      if (this.pinnedItems.length === 0) {
+        if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
+          try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
+        }
+      }
       this.updateLiveAndroidNotification();
       if (window.App && window.App.ticker) {
         window.App.ticker.render();
@@ -152,8 +172,14 @@ class PinnedTripsManager {
   clearAll() {
     if (this.pinnedItems.length === 0) return;
     if (confirm('Θέλετε να αφαιρέσετε όλες τις καρφιτσωμένες αφίξεις;')) {
+      const removedItems = [...this.pinnedItems];
       this.pinnedItems = [];
       this.save();
+      if (window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
+        removedItems.forEach(item => {
+          window.Alarms.removeAlarmByStopAndLine(item.stopCode, item.lineId);
+        });
+      }
       if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
         try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
       }
@@ -161,6 +187,25 @@ class PinnedTripsManager {
       if (window.App && window.App.ticker) {
         window.App.ticker.render();
       }
+    }
+  }
+
+  clearAllSilently() {
+    if (this.pinnedItems.length === 0) return;
+    const removedItems = [...this.pinnedItems];
+    this.pinnedItems = [];
+    this.save();
+    if (window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
+      removedItems.forEach(item => {
+        window.Alarms.removeAlarmByStopAndLine(item.stopCode, item.lineId);
+      });
+    }
+    if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
+      try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
+    }
+    this.updateLiveAndroidNotification();
+    if (window.App && window.App.ticker) {
+      window.App.ticker.render();
     }
   }
 

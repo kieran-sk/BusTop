@@ -215,7 +215,20 @@ class ArrivalEstimator {
       });
     }
 
-    // 3. Select ONE primary route per line so NO lines are missed, and avoid variant duplicates
+    // Helper to prioritize active operational routes over defunct/school/variant lines
+    const routeScore = (r) => {
+      const descr = r.RouteDescr || '';
+      let score = 100;
+      if (descr.startsWith('***')) score -= 60;
+      if (/^[Α-ΩA-Z]\*|^\*/.test(descr)) score -= 40;
+      if (/σχολικ/i.test(descr)) score -= 30;
+      if (/νυχτεριν/i.test(descr)) score -= 10;
+      const lc = parseInt(r.LineCode, 10);
+      if (!isNaN(lc)) score += Math.min(20, lc / 100);
+      return score;
+    };
+
+    // 3. Select primary routes per line (up to 2 distinct LineCodes) so no active lines are missed
     const lineRoutesMap = new Map();
     for (const r of stopRoutes) {
       const lid = String(r.LineID || 'BUS').trim();
@@ -227,9 +240,17 @@ class ArrivalEstimator {
 
     const candidateRoutes = [];
     for (const [lid, routes] of lineRoutesMap.entries()) {
-      // Pick the main route (prefer non-variant not starting with ***)
-      const primary = routes.find(r => !((r.RouteDescr || '').startsWith('***')));
-      candidateRoutes.push(primary || routes[0]);
+      routes.sort((a, b) => routeScore(b) - routeScore(a));
+      const seenLineCodes = new Set();
+      let count = 0;
+      for (const r of routes) {
+        const lc = String(r.LineCode);
+        if (!seenLineCodes.has(lc) && count < 2) {
+          seenLineCodes.add(lc);
+          candidateRoutes.push(r);
+          count++;
+        }
+      }
     }
 
     await Promise.all(candidateRoutes.map(async (route) => {
@@ -250,7 +271,7 @@ class ArrivalEstimator {
         try {
           const routeStops = await oasa.getStops(routeCode);
           if (Array.isArray(routeStops)) {
-            const found = routeStops.find(s => String(s.StopCode) === String(stopCode));
+            const found = routeStops.find(s => String(s.StopCode) === String(stopCode) || String(s.StopID) === String(stopCode));
             if (found && found.RouteStopOrder) {
               stopOrder = parseInt(found.RouteStopOrder, 10);
             }

@@ -275,6 +275,35 @@ class AppController {
       }).catch(err => {
         console.warn('Service worker registration failed:', err);
       });
+
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        if (!event.data) return;
+        if (event.data.type === 'NOTIFICATION_DISMISSED_PIN') {
+          console.log('Pin dismissed from notification');
+          if (window.PinnedTrips && typeof window.PinnedTrips.clearAllSilently === 'function') {
+            window.PinnedTrips.clearAllSilently();
+          } else if (window.PinnedTrips) {
+            const removedItems = [...window.PinnedTrips.pinnedItems];
+            window.PinnedTrips.pinnedItems = [];
+            window.PinnedTrips.save();
+            if (window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
+              removedItems.forEach(item => {
+                window.Alarms.removeAlarmByStopAndLine(item.stopCode, item.lineId);
+              });
+            }
+            if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
+              try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
+            }
+            window.PinnedTrips.updateLiveAndroidNotification();
+            if (this.ticker) this.ticker.render();
+          }
+        } else if (event.data.type === 'NOTIFICATION_DISMISSED_ALARM') {
+          const alarmId = event.data.alarmId;
+          if (alarmId && window.Alarms) {
+            window.Alarms.removeAlarm(alarmId);
+          }
+        }
+      });
     }
 
     // Setup Android back gesture & browser popstate listener for phone navigation

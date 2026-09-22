@@ -107,6 +107,11 @@ class LiveTrackingService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            val stopToUnpin = intent.getStringExtra(EXTRA_STOP_CODE) ?: stopCode
+            val lineToUnpin = intent.getStringExtra(EXTRA_LINE_ID) ?: lineId
+            if (stopToUnpin.isNotBlank() && lineToUnpin.isNotBlank()) {
+                MainActivity.currentInstance?.unpinAndDismiss(stopToUnpin, lineToUnpin)
+            }
             releaseWakeLock()
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -282,6 +287,8 @@ class LiveTrackingService : Service() {
 
         val stopIntent = Intent(this, LiveTrackingService::class.java).apply {
             action = ACTION_STOP
+            putExtra(EXTRA_STOP_CODE, stopCode)
+            putExtra(EXTRA_LINE_ID, lineId)
         }
         val pStop = PendingIntent.getService(
             this,

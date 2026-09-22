@@ -3,7 +3,7 @@
  * Background alarm notification scheduler and offline caching
  */
 
-const CACHE_NAME = 'oasa-bus-v39';
+const CACHE_NAME = 'oasa-bus-v40';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -222,14 +222,45 @@ self.addEventListener('push', (event) => {
   event.waitUntil(self.registration.showNotification(title, options));
 });
 
+self.addEventListener('notificationclose', (event) => {
+  const tag = (event.notification && event.notification.tag) ? event.notification.tag : '';
+  if (tag === 'live-pinned-bus-tracker' || tag.startsWith('live_pinned_')) {
+    // Notify window clients to remove all pinned trips
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        client.postMessage({ type: 'NOTIFICATION_DISMISSED_PIN' });
+      }
+    });
+  } else if (tag.startsWith('live_alarm_')) {
+    const alarmId = tag.replace('live_alarm_', '');
+    activeAlarms.delete(alarmId);
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        client.postMessage({ type: 'NOTIFICATION_DISMISSED_ALARM', alarmId });
+      }
+    });
+  }
+});
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  if (event.action === 'cancel') {
+  if (event.action === 'cancel' || event.action === 'dismiss') {
     const tag = event.notification.tag || '';
     if (tag.startsWith('live_alarm_')) {
       const alarmId = tag.replace('live_alarm_', '');
       activeAlarms.delete(alarmId);
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        for (const client of clientList) {
+          client.postMessage({ type: 'NOTIFICATION_DISMISSED_ALARM', alarmId });
+        }
+      });
+    } else if (tag === 'live-pinned-bus-tracker' || tag.startsWith('live_pinned_')) {
+      clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        for (const client of clientList) {
+          client.postMessage({ type: 'NOTIFICATION_DISMISSED_PIN' });
+        }
+      });
     }
     return;
   }

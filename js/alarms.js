@@ -447,6 +447,18 @@ class AlarmManager {
     }
   }
 
+  removeAlarmByStopAndLine(stopCode, lineId) {
+    const sCode = String(stopCode || '').trim();
+    const lId = String(lineId || '').trim().toUpperCase();
+    const matching = this.alarms.filter(a =>
+      String(a.stopCode || '').trim() === sCode &&
+      String(a.lineId || '').trim().toUpperCase() === lId
+    );
+    matching.forEach(a => {
+      this.removeAlarm(a.id);
+    });
+  }
+
   formatMinutesHuman(mins) {
     if (typeof mins !== 'number' || isNaN(mins)) return '--';
     if (mins < 60) return `${mins}λ`;

@@ -132,6 +132,19 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
     }
   }
 
+  // Helper to prioritize active operational routes over defunct/school/variant lines
+  const routeScore = (r) => {
+    const descr = r.RouteDescr || '';
+    let score = 100;
+    if (descr.startsWith('***')) score -= 60;
+    if (/^[Α-ΩA-Z]\*|^\*/.test(descr)) score -= 40;
+    if (/σχολικ/i.test(descr)) score -= 30;
+    if (/νυχτεριν/i.test(descr)) score -= 10;
+    const lc = parseInt(r.LineCode, 10);
+    if (!isNaN(lc)) score += Math.min(20, lc / 100);
+    return score;
+  };
+
   // Group candidate routes by line_id so every line is represented
   const lineRoutesMap = new Map();
   for (const r of stopRoutes) {
@@ -141,8 +154,17 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
   }
   const candidateRoutes = [];
   for (const [lid, routes] of lineRoutesMap.entries()) {
-    const primary = routes.find(r => !((r.RouteDescr || '').startsWith('***')));
-    candidateRoutes.push(primary || routes[0]);
+    routes.sort((a, b) => routeScore(b) - routeScore(a));
+    const seenLineCodes = new Set();
+    let count = 0;
+    for (const r of routes) {
+      const lc = String(r.LineCode);
+      if (!seenLineCodes.has(lc) && count < 2) {
+        seenLineCodes.add(lc);
+        candidateRoutes.push(r);
+        count++;
+      }
+    }
   }
 
   await Promise.all(candidateRoutes.map(async (route) => {
@@ -160,7 +182,7 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
       try {
         const rs = await oasaRequest('webGetStops', { p1: rc }, 1800);
         if (Array.isArray(rs)) {
-          const f = rs.find(s => String(s.StopCode) === String(stopCode));
+          const f = rs.find(s => String(s.StopCode) === String(stopCode) || String(s.StopID) === String(stopCode));
           if (f && f.RouteStopOrder) stopOrder = parseInt(f.RouteStopOrder, 10);
         }
       } catch(e) {}

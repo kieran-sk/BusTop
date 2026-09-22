@@ -35,6 +35,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        currentInstance = this
 
         try {
             MapsInitializer.initialize(applicationContext, MapsInitializer.Renderer.LATEST) { renderer ->
@@ -165,9 +166,31 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    fun unpinAndDismiss(stopCode: String, lineId: String) {
+        runOnUiThread {
+            if (this::webView.isInitialized) {
+                val cleanStop = stopCode.replace("'", "\\'")
+                val cleanLine = lineId.replace("'", "\\'")
+                val js = """
+                    (function() {
+                        if (window.PinnedTrips && typeof window.PinnedTrips.removePinByStopAndLine === 'function') {
+                            window.PinnedTrips.removePinByStopAndLine('$cleanStop', '$cleanLine');
+                        }
+                        if (window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
+                            window.Alarms.removeAlarmByStopAndLine('$cleanStop', '$cleanLine');
+                        }
+                    })();
+                """.trimIndent()
+                webView.evaluateJavascript(js, null)
+            }
+        }
+    }
+
     companion object {
         const val EXTRA_STOP_CODE = "EXTRA_STOP_CODE"
         const val EXTRA_STOP_NAME = "EXTRA_STOP_NAME"
+        @Volatile
+        var currentInstance: MainActivity? = null
     }
 
     inner class WebAppInterface(private val context: Context) {
@@ -487,6 +510,9 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        if (currentInstance === this) {
+            currentInstance = null
+        }
         if (this::webView.isInitialized) {
             webView.destroy()
         }
