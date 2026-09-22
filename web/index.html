@@ -109,14 +109,21 @@
 
       <!-- Selected Stop Header Card -->
       <div id="selected-stop-banner" class="m3-card" style="display: none; flex-direction: column; gap: 0.4rem; padding: 0.65rem 1rem; margin-bottom: 0.75rem; border: 1px solid var(--md-sys-color-outline-variant); border-left: 4px solid var(--md-sys-color-primary); background: #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
-        <!-- Stop Name + Star on same line -->
+        <!-- Stop Name + Star + Navigate on same line -->
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
           <h2 id="selected-stop-title" style="font-size: 1.15rem; font-weight: 900; color: #0f172a; line-height: 1.2; margin: 0; letter-spacing: -0.01em; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Αφίξεις Στάσης</h2>
-          <button id="selected-stop-star" class="m3-icon-btn" style="width: 32px; height: 32px; flex-shrink: 0;" title="Αποθήκευση στάσης στα αγαπημένα" aria-label="Αποθήκευση στα αγαπημένα">
-            <svg id="star-icon-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-            </svg>
-          </button>
+          <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+            <button id="selected-stop-nav-btn" class="m3-icon-btn" style="width: 32px; height: 32px; color: var(--md-sys-color-primary);" title="Πλοήγηση στη στάση με Google Maps" aria-label="Πλοήγηση με Google Maps" onclick="window.App.navigateCurrentStopToGoogleMaps()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="3 11 22 2 13 21 11 13 3 11"></polygon>
+              </svg>
+            </button>
+            <button id="selected-stop-star" class="m3-icon-btn" style="width: 32px; height: 32px;" title="Αποθήκευση στάσης στα αγαπημένα" aria-label="Αποθήκευση στα αγαπημένα">
+              <svg id="star-icon-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+              </svg>
+            </button>
+          </div>
         </div>
         <!-- Code, walk, street on second compact line -->
         <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
@@ -353,7 +360,13 @@
           <span>Εστίαση στον Χάρτη</span>
         </button>
 
-        <!-- Option 3: View Arrivals -->
+        <!-- Option 3: Navigate via Google Maps -->
+        <button id="stop-action-nav-btn" class="m3-btn m3-btn-tonal" style="width: 100%; justify-content: flex-start; padding: 0.75rem 1rem; border-radius: 12px; font-weight: 700; gap: 10px; font-size: 0.9rem;">
+          <span style="font-size: 1.15rem;">🧭</span>
+          <span>Πλοήγηση με Google Maps</span>
+        </button>
+
+        <!-- Option 4: View Arrivals -->
         <button id="stop-action-arrivals-btn" class="m3-btn m3-btn-primary" style="width: 100%; justify-content: flex-start; padding: 0.75rem 1rem; border-radius: 12px; font-weight: 700; gap: 10px; font-size: 0.9rem;">
           <span style="font-size: 1.15rem;">🚍</span>
           <span>Προβολή Αφίξεων Στάσης</span>
@@ -512,14 +525,14 @@
   </nav>
 
   <!-- Scripts (Cache-busted with defer for non-blocking execution) -->
-  <script defer src="js/api.js?v=20260922_2150"></script>
-  <script defer src="js/map-manager.js?v=20260922_2150"></script>
-  <script defer src="js/ticker.js?v=20260922_2150"></script>
-  <script defer src="js/alarms.js?v=20260922_2150"></script>
-  <script defer src="js/pinned-trips.js?v=20260922_2150"></script>
-  <script defer src="js/timetable.js?v=20260922_2150"></script>
-  <script defer src="js/search.js?v=20260922_2150"></script>
-  <script defer src="js/favorites.js?v=20260922_2150"></script>
-  <script defer src="js/app.js?v=20260922_2150"></script>
+  <script defer src="js/api.js?v=20260922_2158"></script>
+  <script defer src="js/map-manager.js?v=20260922_2158"></script>
+  <script defer src="js/ticker.js?v=20260922_2158"></script>
+  <script defer src="js/alarms.js?v=20260922_2158"></script>
+  <script defer src="js/pinned-trips.js?v=20260922_2158"></script>
+  <script defer src="js/timetable.js?v=20260922_2158"></script>
+  <script defer src="js/search.js?v=20260922_2158"></script>
+  <script defer src="js/favorites.js?v=20260922_2158"></script>
+  <script defer src="js/app.js?v=20260922_2158"></script>
 </body>
 </html>

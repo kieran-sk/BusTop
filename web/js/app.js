@@ -1107,7 +1107,17 @@ class AppController {
       };
     }
 
-    // 3. Arrivals button setup
+    // 3. Navigation via Google Maps button setup
+    const navBtn = modal.querySelector('#stop-action-nav-btn');
+    if (navBtn) {
+      navBtn.onclick = () => {
+        this.closeModal('stop-actions-modal');
+        this.triggerHaptic('light');
+        this.navigateToGoogleMaps(sLat, sLng, sName);
+      };
+    }
+
+    // 4. Arrivals button setup
     const arrBtn = modal.querySelector('#stop-action-arrivals-btn');
     if (arrBtn) {
       arrBtn.onclick = () => {
@@ -1119,6 +1129,54 @@ class AppController {
 
     modal.classList.add('open');
     this.updateBackButtonsVisibility();
+  }
+
+  /**
+   * Launch external Google Maps turn-by-turn navigation / directions to the selected stop coordinates
+   */
+  navigateToGoogleMaps(lat, lng, label = 'Στάση') {
+    let pLat = parseFloat(lat);
+    let pLng = parseFloat(lng);
+
+    if (isNaN(pLat) || isNaN(pLng)) {
+      if (this.currentStop) {
+        pLat = parseFloat(this.currentStop.StopLat);
+        pLng = parseFloat(this.currentStop.StopLng);
+      }
+    }
+
+    if (isNaN(pLat) || isNaN(pLng)) {
+      if (window.PinnedTrips && typeof window.PinnedTrips.showToast === 'function') {
+        window.PinnedTrips.showToast('⚠️ Δεν βρέθηκαν συντεταγμένες για τη στάση');
+      } else {
+        alert('Δεν βρέθηκαν συντεταγμένες GPS για τη στάση');
+      }
+      return;
+    }
+
+    // Universal Google Maps directions URL for walking/transit
+    const encodedLabel = encodeURIComponent(label || 'Στάση ΟΑΣΑ');
+    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${pLat},${pLng}&travelmode=walking`;
+
+    // If running inside Android WebView bridge
+    if (window.AndroidBridge && typeof window.AndroidBridge.openExternalUrl === 'function') {
+      try {
+        window.AndroidBridge.openExternalUrl(mapsUrl);
+        return;
+      } catch (e) {}
+    }
+
+    // Standard web browser fallback
+    window.open(mapsUrl, '_blank', 'noopener,noreferrer');
+  }
+
+  /**
+   * Direct navigation handler from top stop banner
+   */
+  navigateCurrentStopToGoogleMaps() {
+    if (!this.currentStop) return;
+    const sName = this.currentStop.StopDescr || `Στάση #${this.currentStop.StopCode}`;
+    this.navigateToGoogleMaps(this.currentStop.StopLat, this.currentStop.StopLng, sName);
   }
 
   setupStopLongPressListener() {
