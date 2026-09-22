@@ -360,21 +360,21 @@ button[aria-label="Εντοπισμός στάσεων κοντά μου"] {
   border: 1px solid #ffffff;
 }
 
-/* Favourite stop banner in dot-matrix mode — yellow and black border */
+/* Favourite stop banner in arcade / dot-matrix mode — arcade tactile drop shadow */
 body #selected-stop-banner.is-favourite {
-  border: 2px solid #0f172a !important;
-  outline: 2.5px solid #d97706 !important;
-  outline-offset: -4px !important;
-  box-shadow: 4px 4px 0 #d97706, 6px 6px 0 #0f172a !important;
+  border: 2px solid var(--matrix-border) !important;
+  outline: none !important;
+  box-shadow: 4px 4px 0 #f59e0b, 6px 6px 0 var(--matrix-border) !important;
+  background: #fffdf5 !important;
 }
 
-/* Favourite stop cards globally across lists */
+/* Favourite stop cards globally across lists in arcade theme */
 body .m3-card.is-favourite,
 body .m3-card.is-favourite-stop {
-  border: 2px solid #0f172a !important;
-  outline: 2.5px solid #d97706 !important;
-  outline-offset: -4px !important;
-  box-shadow: 3px 3px 0 #d97706, 5px 5px 0 #0f172a !important;
+  border: 2px solid var(--matrix-border) !important;
+  outline: none !important;
+  box-shadow: 3px 3px 0 #f59e0b, 5px 5px 0 var(--matrix-border) !important;
+  background: #fffdf5 !important;
 }
 
 /* Polished Dot-Matrix Route Stop Items */

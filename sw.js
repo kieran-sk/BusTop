@@ -3,7 +3,7 @@
  * Background alarm notification scheduler and offline caching
  */
 
-const CACHE_NAME = 'oasa-bus-v43';
+const CACHE_NAME = 'oasa-bus-v44';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -50,10 +50,10 @@ self.addEventListener('activate', (event) => {
 
 function formatMinutesHuman(mins) {
   if (typeof mins !== 'number' || isNaN(mins)) return '--';
-  if (mins < 60) return `${mins}λ`;
+  if (mins < 60) return `${mins}'`;
   const hours = Math.floor(mins / 60);
   const remMins = mins % 60;
-  return remMins > 0 ? `${hours}ω ${remMins}λ` : `${hours}ω`;
+  return remMins > 0 ? `${hours}ʰ ${remMins}'` : `${hours}ʰ`;
 }
 
 // Active Alarms Map for background countdown

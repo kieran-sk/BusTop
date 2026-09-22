@@ -180,11 +180,11 @@ class FavoritesManager {
     }
     const m = next.btime2;
     if (m <= 3) {
-      return `<span class="m3-badge urgency-now" style="background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-size: 0.74rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;"><span class="m3-pulse-dot" style="width: 5px; height: 5px; background: #dc2626;"></span>${next.lineId} σε ${m}λ</span>`;
+      return `<span class="m3-badge urgency-now" style="background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; font-size: 0.74rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;"><span class="m3-pulse-dot" style="width: 5px; height: 5px; background: #dc2626;"></span>${next.lineId} σε ${m}'</span>`;
     } else if (m <= 10) {
-      return `<span class="m3-badge urgency-soon" style="background: #fffbeb; color: #b45309; border: 1px solid #fde68a; font-size: 0.74rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;"><span class="m3-pulse-dot" style="width: 5px; height: 5px; background: #b45309;"></span>${next.lineId} σε ${m}λ</span>`;
+      return `<span class="m3-badge urgency-soon" style="background: #fffbeb; color: #b45309; border: 1px solid #fde68a; font-size: 0.74rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;"><span class="m3-pulse-dot" style="width: 5px; height: 5px; background: #b45309;"></span>${next.lineId} σε ${m}'</span>`;
     } else {
-      return `<span class="m3-badge" style="background: #eff6ff; color: #005ac1; border: 1px solid #bfdbfe; font-size: 0.74rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;">🚍 ${next.lineId} σε ${m}λ</span>`;
+      return `<span class="m3-badge" style="background: #eff6ff; color: #005ac1; border: 1px solid #bfdbfe; font-size: 0.74rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;">🚍 ${next.lineId} σε ${m}'</span>`;
     }
   }
 
@@ -283,7 +283,7 @@ class FavoritesManager {
           ${this.favStops.map(s => {
             const safeName = (s.name || '').replace(/'/g, "\\'");
             return `
-              <div class="m3-card stop-interactive-card is-favourite-stop" data-stop-code="${s.code}" data-stop-title="${safeName}" data-stop-lat="${s.lat || ''}" data-stop-lng="${s.lng || ''}" style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.85rem 1rem; margin-bottom: 0; cursor: pointer; background: #fffdf5; border: 2px solid #0f172a; outline: 2px solid #eab308; outline-offset: -3px;" onclick="window.App.selectStop('${s.code}', '${safeName}', '${s.lat || ''}', '${s.lng || ''}')">
+              <div class="m3-card stop-interactive-card is-favourite-stop" data-stop-code="${s.code}" data-stop-title="${safeName}" data-stop-lat="${s.lat || ''}" data-stop-lng="${s.lng || ''}" style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.85rem 1rem; margin-bottom: 0; cursor: pointer; background: #fffdf5;" onclick="window.App.selectStop('${s.code}', '${safeName}', '${s.lat || ''}', '${s.lng || ''}')">
                 <div style="display: flex; align-items: center; gap: 0.75rem; min-width: 0; flex: 1;">
                   <div class="m3-icon-btn" style="width: 36px; height: 36px; background: #eff6ff; color: var(--md-sys-color-primary); border: 1.5px solid #bfdbfe; flex-shrink: 0;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"></path><circle cx="12" cy="9" r="2.5"></circle></svg>

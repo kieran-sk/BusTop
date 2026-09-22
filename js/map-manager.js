@@ -274,7 +274,7 @@ class MapManager {
       className: 'map-bus-stop-icon',
       html: `
         <div style="display: flex; flex-direction: column; align-items: center; width: 120px; margin-left: -48px; pointer-events: auto; cursor: pointer;">
-          <div style="background: ${pinColor}; width: 24px; height: 24px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; box-shadow: ${isFav ? '0 0 0 2px #d97706, 0 0 0 4px #0f172a, 0 3px 6px rgba(0,0,0,0.35)' : '0 2px 5px rgba(0,0,0,0.28)'}; border: ${isFav ? '2.5px solid #fbbf24' : '2px solid #ffffff'};">
+          <div style="background: ${pinColor}; width: 24px; height: 24px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; box-shadow: ${isFav ? '0 2px 8px rgba(217,119,6,0.45)' : '0 2px 5px rgba(0,0,0,0.28)'}; border: 2px solid #ffffff;">
             ${isFav ? `
               <span style="transform: rotate(45deg); font-size: 11px; line-height: 1;">⭐</span>
             ` : `
@@ -285,7 +285,7 @@ class MapManager {
               </svg>
             `}
           </div>
-          <div style="margin-top: 3px; font-size: 0.65rem; font-weight: 800; color: #0f172a; background: ${isFav ? '#fef9c3' : 'rgba(255,255,255,0.95)'}; padding: 1px 6px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 115px; border: ${isFav ? '2px solid #0f172a; outline: 1.5px solid #fbbf24' : '1px solid rgba(0,0,0,0.1)'}; text-align: center; line-height: 1.25;">
+          <div style="margin-top: 3px; font-size: 0.65rem; font-weight: 800; color: #0f172a; background: ${isFav ? '#fef9c3' : 'rgba(255,255,255,0.95)'}; padding: 1px 6px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 115px; border: ${isFav ? '1px solid #d97706' : '1px solid rgba(0,0,0,0.1)'}; text-align: center; line-height: 1.25;">
             ${isFav ? '⭐ ' : ''}${stopTitle}
           </div>
         </div>
@@ -529,8 +529,8 @@ class MapManager {
       this.vehicleHistoryMap.set(vehNo, { lat, lng, heading });
 
       const headingHtml = (heading !== null && heading !== undefined) ? `
-        <div style="width: 18px; height: 18px; border-radius: 50%; background: #0f172a; border: 1.5px solid #ffffff; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.3); margin-top: -5px; transform: rotate(${heading}deg); transition: transform 0.4s ease;" title="Κατεύθυνση: ${heading}°">
-          <svg width="10" height="10" viewBox="0 0 24 24" fill="#fbbf24">
+        <div style="position: absolute; top: -5px; right: -5px; width: 14px; height: 14px; border-radius: 50%; background: #0f172a; border: 1.5px solid #ffffff; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transform: rotate(${heading}deg); transition: transform 0.4s ease;" title="Κατεύθυνση: ${heading}°">
+          <svg width="8" height="8" viewBox="0 0 24 24" fill="#fbbf24">
             <polygon points="12,2 22,21 12,17 2,21" />
           </svg>
         </div>
@@ -540,26 +540,22 @@ class MapManager {
         className: 'map-live-bus-icon',
         html: `
           <div style="display: flex; flex-direction: column; align-items: center; pointer-events: auto; cursor: pointer; transform: translateZ(0);">
-            <div style="background: linear-gradient(135deg, #16a34a, #15803d); color: #ffffff; padding: 2.5px 8px; border-radius: 9999px; font-weight: 900; font-size: 0.78rem; box-shadow: 0 3px 8px rgba(0,0,0,0.35); border: 2px solid #ffffff; display: flex; align-items: center; gap: 4px; letter-spacing: 0.02em;">
-              <span class="m3-pulse-dot" style="background: #ffffff; width: 6px; height: 6px; box-shadow: 0 0 5px #ffffff;"></span>
-              <span style="font-size: 0.88rem; line-height: 1;">🚌</span>
-              <span>${lineId}</span>
+            <div style="position: relative; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));">
+              <span style="font-size: 1.5rem; line-height: 1;">🚌</span>
+              ${headingHtml}
             </div>
-            ${headingHtml}
-            ${vehNo ? `
-              <div style="margin-top: 1px; font-size: 0.62rem; font-weight: 800; color: #166534; background: rgba(240,253,244,0.96); padding: 0 4px; border-radius: 3px; border: 1px solid #bbf7d0; box-shadow: 0 1px 2px rgba(0,0,0,0.15);">
-                #${vehNo}
-              </div>
-            ` : ''}
+            <div style="margin-top: 1px; font-size: 0.68rem; font-weight: 900; color: #0f172a; background: rgba(255,255,255,0.96); padding: 1px 5px; border-radius: 4px; border: 1px solid rgba(15,23,42,0.2); box-shadow: 0 1px 3px rgba(0,0,0,0.18); letter-spacing: 0.02em; white-space: nowrap; line-height: 1.2;">
+              ${lineId}
+            </div>
           </div>
         `,
-        iconSize: [60, 48],
-        iconAnchor: [30, 24]
+        iconSize: [36, 46],
+        iconAnchor: [18, 23]
       });
 
       const headingTxt = (heading !== null && heading !== undefined) ? ` | Κατεύθυνση: ${heading}°` : '';
       L.marker([lat, lng], { icon: busIcon }).addTo(this.busLayer)
-        .bindTooltip(`🚍 Λεωφορείο ${lineId} (Όχημα #${vehNo})${headingTxt}`, { direction: 'top' });
+        .bindTooltip(`🚍 Λεωφορείο ${lineId}${headingTxt}`, { direction: 'top' });
     });
 
     // Prune offline vehicles from history cache

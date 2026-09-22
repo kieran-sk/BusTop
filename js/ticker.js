@@ -246,10 +246,10 @@ class AirportTicker {
    */
   formatMinutesHuman(mins) {
     if (typeof mins !== 'number' || isNaN(mins)) return '--';
-    if (mins < 60) return `${mins}λ`;
+    if (mins < 60) return `${mins}'`;
     const hours = Math.floor(mins / 60);
     const remMins = mins % 60;
-    return remMins > 0 ? `${hours}ω ${remMins}λ` : `${hours}ω`;
+    return remMins > 0 ? `${hours}ʰ ${remMins}'` : `${hours}ʰ`;
   }
 
   renderSplitFlapDigits(key, text, urgencyClass = '') {
@@ -770,7 +770,7 @@ class AirportTicker {
               }
 
               return `
-                <div class="m3-card stop-interactive-card ${isFav ? 'is-favourite-stop' : ''}" data-stop-code="${sCode}" data-stop-title="${safeTitle}" data-stop-lat="${s.StopLat}" data-stop-lng="${s.StopLng}" style="padding: 0.9rem; display: flex; flex-direction: column; justify-content: space-between; gap: 0.65rem; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; border: ${isFav ? '2px solid #0f172a; outline: 2px solid #eab308; outline-offset: -3px; background: #fffdf5;' : (hasRoutes ? '1px solid var(--md-sys-color-outline-variant); background: #ffffff;' : '1px solid var(--md-sys-color-outline-variant); background: #ffffff;')}" onclick="window.App.selectStop('${sCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})" onmouseover="this.style.borderColor='var(--md-sys-color-primary)'" onmouseout="this.style.borderColor='${isFav ? '#0f172a' : 'var(--md-sys-color-outline-variant)'}'">
+                <div class="m3-card stop-interactive-card ${isFav ? 'is-favourite-stop' : ''}" data-stop-code="${sCode}" data-stop-title="${safeTitle}" data-stop-lat="${s.StopLat}" data-stop-lng="${s.StopLng}" style="padding: 0.9rem; display: flex; flex-direction: column; justify-content: space-between; gap: 0.65rem; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; ${isFav ? 'background: #fffdf5;' : 'background: #ffffff;'}" onclick="window.App.selectStop('${sCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})">
                   <div>
                     <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem;">
                       <div style="font-weight: 800; font-size: 0.98rem; color: #0f172a; line-height: 1.25;">

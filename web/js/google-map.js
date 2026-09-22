@@ -274,18 +274,21 @@ class MapManager {
       const busIcon = L.divIcon({
         className: 'map-live-bus-icon',
         html: `
-          <div style="background: #16a34a; color: #ffffff; padding: 2px 7px; border-radius: 9999px; font-weight: 800; font-size: 0.75rem; box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 2px solid #ffffff; display: flex; align-items: center; gap: 4px;">
-            <span class="m3-pulse-dot" style="background: #ffffff; width: 6px; height: 6px;"></span>
-            <span style="font-size: 0.82rem; line-height: 1;">🚌</span>
-            ${lineId}
+          <div style="display: flex; flex-direction: column; align-items: center; pointer-events: auto; cursor: pointer; transform: translateZ(0);">
+            <div style="width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));">
+              <span style="font-size: 1.5rem; line-height: 1;">🚌</span>
+            </div>
+            <div style="margin-top: 1px; font-size: 0.68rem; font-weight: 900; color: #0f172a; background: rgba(255,255,255,0.96); padding: 1px 5px; border-radius: 4px; border: 1px solid rgba(15,23,42,0.2); box-shadow: 0 1px 3px rgba(0,0,0,0.18); letter-spacing: 0.02em; white-space: nowrap; line-height: 1.2;">
+              ${lineId}
+            </div>
           </div>
         `,
-        iconSize: [48, 24],
-        iconAnchor: [24, 12]
+        iconSize: [36, 46],
+        iconAnchor: [18, 23]
       });
 
       L.marker([lat, lng], { icon: busIcon }).addTo(this.busLayer)
-        .bindTooltip(`Live Bus #${b.VEH_NO || ''}`, { direction: 'top' });
+        .bindTooltip(`🚍 Λεωφορείο ${lineId}`, { direction: 'top' });
     });
   }
 

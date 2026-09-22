@@ -35,9 +35,9 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- Stylesheets (Relative paths with cache-busting for PWA updates) -->
-  <link rel="stylesheet" href="css/m3-expressive.css?v=20260922_2120">
-  <link rel="stylesheet" href="css/airport-ticker.css?v=20260922_2120">
-  <link id="theme-dot-matrix" rel="stylesheet" href="css/dot-matrix.css?v=20260922_2120" disabled>
+  <link rel="stylesheet" href="css/m3-expressive.css?v=20260922_2135">
+  <link rel="stylesheet" href="css/airport-ticker.css?v=20260922_2135">
+  <link id="theme-dot-matrix" rel="stylesheet" href="css/dot-matrix.css?v=20260922_2135" disabled>
 </head>
 <body>
 
@@ -116,7 +116,7 @@
         <!-- Code, walk, street on second compact line -->
         <div style="display: flex; align-items: center; gap: 0.4rem; flex-wrap: wrap;">
           <span id="selected-stop-code" class="m3-badge" style="background: #f1f5f9; color: #475569; font-size: 0.72rem; font-weight: 800; border: 1px solid #e2e8f0;"></span>
-          <span id="selected-stop-walk-pill" class="m3-badge" style="background: #eff6ff; color: #005ac1; font-size: 0.72rem; font-weight: 800; border: 1px solid #bfdbfe; display: none;">🚶 --λ</span>
+          <span id="selected-stop-walk-pill" class="m3-badge" style="background: #eff6ff; color: #005ac1; font-size: 0.72rem; font-weight: 800; border: 1px solid #bfdbfe; display: none;">🚶 --'</span>
           <span id="selected-stop-street" style="font-size: 0.75rem; color: #64748b; font-weight: 600;"></span>
         </div>
         <div style="display: none;"><div id="selected-stop-routes-list"></div></div>
@@ -379,15 +379,15 @@
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
             <div>
               <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface);">Στυλ Εμφάνισης</div>
-              <div style="font-size: 0.75rem; color: var(--md-sys-color-outline);">Επιλέξτε ανάμεσα σε Material 3 ή Ρετρό Τηλεματική</div>
+              <div style="font-size: 0.75rem; color: var(--md-sys-color-outline);">Επιλέξτε ανάμεσα σε Clean ή Arcade</div>
             </div>
           </div>
           <div style="display: flex; gap: 0.5rem; margin-top: 0.6rem;">
             <button id="theme-btn-m3" class="m3-btn m3-btn-primary" style="flex: 1; padding: 0.45rem 0.6rem; font-size: 0.82rem; border-radius: 8px;" onclick="window.App.setThemeMode('m3')">
-              🎨 Material 3
+              Clean
             </button>
             <button id="theme-btn-matrix" class="m3-btn m3-btn-tonal" style="flex: 1; padding: 0.45rem 0.6rem; font-size: 0.82rem; border-radius: 8px;" onclick="window.App.setThemeMode('matrix')">
-              👾 Dot-Matrix
+              Arcade
             </button>
           </div>
         </div>
@@ -498,14 +498,14 @@
   </nav>
 
   <!-- Scripts (Cache-busted with defer for non-blocking execution) -->
-  <script defer src="js/api.js?v=20260922_2120"></script>
-  <script defer src="js/map-manager.js?v=20260922_2120"></script>
-  <script defer src="js/ticker.js?v=20260922_2120"></script>
-  <script defer src="js/alarms.js?v=20260922_2120"></script>
-  <script defer src="js/pinned-trips.js?v=20260922_2120"></script>
-  <script defer src="js/timetable.js?v=20260922_2120"></script>
-  <script defer src="js/search.js?v=20260922_2120"></script>
-  <script defer src="js/favorites.js?v=20260922_2120"></script>
-  <script defer src="js/app.js?v=20260922_2120"></script>
+  <script defer src="js/api.js?v=20260922_2135"></script>
+  <script defer src="js/map-manager.js?v=20260922_2135"></script>
+  <script defer src="js/ticker.js?v=20260922_2135"></script>
+  <script defer src="js/alarms.js?v=20260922_2135"></script>
+  <script defer src="js/pinned-trips.js?v=20260922_2135"></script>
+  <script defer src="js/timetable.js?v=20260922_2135"></script>
+  <script defer src="js/search.js?v=20260922_2135"></script>
+  <script defer src="js/favorites.js?v=20260922_2135"></script>
+  <script defer src="js/app.js?v=20260922_2135"></script>
 </body>
 </html>

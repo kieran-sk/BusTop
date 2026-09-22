@@ -461,10 +461,10 @@ class AlarmManager {
 
   formatMinutesHuman(mins) {
     if (typeof mins !== 'number' || isNaN(mins)) return '--';
-    if (mins < 60) return `${mins}λ`;
+    if (mins < 60) return `${mins}'`;
     const hours = Math.floor(mins / 60);
     const remMins = mins % 60;
-    return remMins > 0 ? `${hours}ω ${remMins}λ` : `${hours}ω`;
+    return remMins > 0 ? `${hours}ʰ ${remMins}'` : `${hours}ʰ`;
   }
 
   startWatcher() {
@@ -677,7 +677,7 @@ class AlarmManager {
             if (a.triggered && a.triggeredAt) {
               const minsSince = Math.floor((Date.now() - a.triggeredAt) / 60000);
               const remainingBeforeDismiss = Math.max(1, 10 - minsSince);
-              triggeredNote = ` • Αυτόματη αφαίρεση σε ${remainingBeforeDismiss}λ`;
+              triggeredNote = ` • Αυτόματη αφαίρεση σε ${remainingBeforeDismiss}'`;
             }
 
             const cleanStopName = (a.stopName || '').replace(/'/g, "\\'");

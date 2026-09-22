@@ -359,7 +359,7 @@ class AppController {
       if (walkPill) {
         if (walk && typeof walk.minutes === 'number') {
           walkPill.style.display = 'inline-flex';
-          walkPill.innerText = `🚶 ${walk.minutes}λ (${walk.meters}μ)`;
+          walkPill.innerText = `🚶 ${walk.minutes}' (${walk.meters}μ)`;
         } else {
           walkPill.style.display = 'none';
         }
@@ -665,7 +665,7 @@ class AppController {
         if (walkInfo && typeof walkInfo.minutes === 'number') {
           this.currentStop.distanceMeters = walkInfo.meters;
           walkPill.style.display = 'inline-flex';
-          walkPill.innerText = `🚶 ${walkInfo.minutes}λ (${walkInfo.meters}μ)`;
+          walkPill.innerText = `🚶 ${walkInfo.minutes}' (${walkInfo.meters}μ)`;
         } else {
           walkPill.style.display = 'none';
         }
@@ -841,7 +841,7 @@ class AppController {
             const walkPill = document.getElementById('selected-stop-walk-pill');
             if (walkPill) {
               walkPill.style.display = 'inline-flex';
-              walkPill.innerText = `🚶 ${walk.minutes}λ (${walk.meters}μ)`;
+              walkPill.innerText = `🚶 ${walk.minutes}' (${walk.meters}μ)`;
             }
           }
         }

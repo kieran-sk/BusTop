@@ -330,18 +330,23 @@ class TimetableManager {
           const busIcon = L.divIcon({
             className: 'route-live-bus',
             html: `
-              <div style="background: #e11d48; color: #ffffff; border-radius: 8px; padding: 2px 6px; font-size: 0.7rem; font-weight: 800; box-shadow: 0 2px 6px rgba(0,0,0,0.3); border: 2px solid #ffffff; display: flex; align-items: center; gap: 4px;">
-                <span>🚌 #${b.VEH_NO || ''}</span>
+              <div style="display: flex; flex-direction: column; align-items: center; pointer-events: auto; cursor: pointer; transform: translateZ(0);">
+                <div style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));">
+                  <span style="font-size: 1.4rem; line-height: 1;">🚌</span>
+                </div>
+                <div style="margin-top: 1px; font-size: 0.65rem; font-weight: 900; color: #0f172a; background: rgba(255,255,255,0.96); padding: 1px 5px; border-radius: 4px; border: 1px solid rgba(15,23,42,0.2); box-shadow: 0 1px 3px rgba(0,0,0,0.18); letter-spacing: 0.02em; white-space: nowrap; line-height: 1.2;">
+                  ${this.currentLine.lineId || 'BUS'}
+                </div>
               </div>
             `,
-            iconSize: [60, 24],
-            iconAnchor: [30, 12]
+            iconSize: [36, 44],
+            iconAnchor: [18, 22]
           });
 
           const bm = L.marker([bLat, bLng], { icon: busIcon }).addTo(this.routeMap);
           bm.bindPopup(`
             <div style="font-family: inherit; font-size: 0.85rem;">
-              <strong>Λεωφορείο #${b.VEH_NO}</strong><br>
+              <strong>Λεωφορείο ${this.currentLine.lineId || ''}</strong><br>
               Στίγμα: ${b.report_age_gr || 'ζωντανά'}
             </div>
           `);
@@ -497,7 +502,7 @@ class TimetableManager {
                 </span>
               ` : ''}
               <span style="display: inline-flex; align-items: center; gap: 4px;">
-                <span style="display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: #e11d48;"></span>
+                <span>🚌</span>
                 Ζωντανά Λεωφορεία
               </span>
             </div>
