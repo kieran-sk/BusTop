@@ -473,7 +473,7 @@ class PinnedTripsManager {
           </div>
           <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px dashed var(--md-sys-color-outline-variant); padding-top: 0.5rem; font-size: 0.8rem; color: var(--md-sys-color-outline);">
             <div>
-              🚶 <strong style="color: var(--md-sys-color-on-surface);">${walkMins}λ</strong> (${walkDistanceM}μ. περπάτημα)
+              🚶 <strong style="color: var(--md-sys-color-on-surface);">${walkMins}'</strong> (${walkDistanceM}μ. περπάτημα)
             </div>
             <div style="display: flex; gap: 0.5rem;">
               <button class="m3-btn m3-btn-tonal" onclick="event.stopPropagation(); window.PinnedTrips.removePin('${item.id}')" style="padding: 0.3rem 0.75rem; font-size: 0.78rem; border-radius: 9999px;">

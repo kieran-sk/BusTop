@@ -144,8 +144,8 @@ self.addEventListener('message', (event) => {
     }
 
     // Show initial live notification immediately
-    self.registration.showNotification(`🚍 ${lineId} σε ${initialMinutes || 10}λ`, {
-      body: `Στάση: ${stopName} • Ειδοποίηση στα ${thresholdMinutes || 5}λ`,
+    self.registration.showNotification(`🚍 ${lineId} σε ${initialMinutes || 10}'`, {
+      body: `Στάση: ${stopName} • Ειδοποίηση στα ${thresholdMinutes || 5}'`,
       tag: `live_alarm_${id}`,
       icon: '/assets/icon-192.png',
       badge: '/assets/icon-192.png',

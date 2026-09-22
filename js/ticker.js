@@ -837,7 +837,7 @@ class AirportTicker {
     if (walkPill) {
       if (walk && typeof walk.minutes === 'number') {
         walkPill.style.display = 'inline-flex';
-        walkPill.innerText = `🚶 ${walk.minutes}λ (${walk.meters}μ)`;
+        walkPill.innerText = `🚶 ${walk.minutes}' (${walk.meters}μ)`;
       } else {
         walkPill.style.display = 'none';
       }

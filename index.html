@@ -42,19 +42,23 @@
 <body>
 
   <!-- Top App Bar -->
-  <header class="m3-top-app-bar">
-    <button id="global-back-btn" class="m3-back-btn" onclick="this.blur(); window.App.goBack()" onpointerup="this.blur()" style="display: none;" title="Επιστροφή (Πίσω)" aria-label="Πίσω">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="19" y1="12" x2="5" y2="12"></line>
-        <polyline points="12 19 5 12 12 5"></polyline>
-      </svg>
-      <span>Πίσω</span>
-    </button>
-    <!-- Centered clock in header — absolute dead-center at all times regardless of back button -->
-    <div class="m3-top-app-bar-center" style="position: absolute; left: 50%; transform: translateX(-50%); display: flex; justify-content: center; align-items: center; pointer-events: none; z-index: 1;">
-      <div class="ticker-clock" id="ticker-live-clock" title="Τρέχουσα ώρα Αθήνας" style="pointer-events: auto;">--:--:--</div>
+  <header class="m3-top-app-bar" style="position: relative; display: flex; align-items: center; justify-content: space-between;">
+    <!-- Left slot: back button (fixed basis so it doesn't push center) -->
+    <div style="flex: 1 0 0; display: flex; align-items: center; justify-content: flex-start; min-width: 0;">
+      <button id="global-back-btn" class="m3-back-btn" onclick="this.blur(); window.App.goBack()" onpointerup="this.blur()" style="display: none;" title="Επιστροφή (Πίσω)" aria-label="Πίσω">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+        <span>Πίσω</span>
+      </button>
     </div>
-    <div style="display: flex; align-items: center; gap: 0.5rem;">
+    <!-- Center slot: clock -->
+    <div class="m3-top-app-bar-center" style="display: flex; justify-content: center; align-items: center; flex-shrink: 0;">
+      <div class="ticker-clock" id="ticker-live-clock" title="Τρέχουσα ώρα Αθήνας">--:--:--</div>
+    </div>
+    <!-- Right slot: live dot, EXP chip, settings button (aligned to right) -->
+    <div style="flex: 1 0 0; display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem; min-width: 0;">
       <span title="Τηλεματική Ενεργή" style="display:inline-flex;align-items:center;">
         <span class="m3-pulse-dot" style="width:10px;height:10px;background:#059669;"></span>
       </span>
