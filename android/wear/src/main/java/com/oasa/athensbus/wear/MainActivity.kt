@@ -13,6 +13,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -20,8 +21,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.input.rotary.onRotaryScrollEvent
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -31,6 +35,7 @@ import androidx.core.content.ContextCompat
 import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
+import androidx.wear.compose.foundation.lazy.ScalingLazyListState
 import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material.*
@@ -38,6 +43,7 @@ import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
+import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 
@@ -56,7 +62,9 @@ class MainActivity : ComponentActivity() {
             WearBusTopApp(
                 onFetchNearbyStops = { fetchNearbyStopsList() },
                 onFetchArrivals = { code -> queryStopArrivals(code) },
-                onNavigateToStop = { lat, lng, name -> navigateToStop(lat, lng, name) }
+                onNavigateToStop = { lat, lng, name -> navigateToStop(lat, lng, name) },
+                onTogglePin = { stop, lineId, mins -> togglePin(stop, lineId, mins) },
+                onLoadPins = { loadPinnedItems() }
             )
         }
     }
@@ -131,6 +139,64 @@ class MainActivity : ComponentActivity() {
         return favs
     }
 
+    private fun loadPinnedItems(): List<PinnedItem> {
+        val list = mutableListOf<PinnedItem>()
+        val prefsList = listOf(
+            getSharedPreferences("OASA_PERSISTENT_DATA", Context.MODE_PRIVATE),
+            getSharedPreferences("BusTopWatch", Context.MODE_PRIVATE)
+        )
+        for (p in prefsList) {
+            val raw = p.getString("OASA_PINNED_ARRIVALS", null) ?: p.getString("pinned_trips", null)
+            if (!raw.isNullOrBlank() && raw != "[]" && raw != "null") {
+                try {
+                    val arr = JSONArray(raw)
+                    for (i in 0 until arr.length()) {
+                        val obj = arr.getJSONObject(i)
+                        val stopCode = obj.optString("stopCode", obj.optString("code", ""))
+                        val lineId = obj.optString("lineId", obj.optString("line", "BUS"))
+                        val stopName = obj.optString("stopName", "Στάση $stopCode")
+                        if (stopCode.isNotEmpty() && lineId.isNotEmpty() && list.none { it.stopCode == stopCode && it.lineId == lineId }) {
+                            list.add(PinnedItem(stopCode = stopCode, stopName = stopName, lineId = lineId))
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+        return list
+    }
+
+    private fun togglePin(stop: WearStopItem, lineId: String, currentMinutes: Int): Boolean {
+        val currentPins = loadPinnedItems().toMutableList()
+        val exists = currentPins.any { it.stopCode == stop.code && it.lineId.equals(lineId, ignoreCase = true) }
+        val prefs = getSharedPreferences("BusTopWatch", Context.MODE_PRIVATE)
+
+        if (exists) {
+            currentPins.removeAll { it.stopCode == stop.code && it.lineId.equals(lineId, ignoreCase = true) }
+        } else {
+            currentPins.add(PinnedItem(stopCode = stop.code, stopName = stop.name, lineId = lineId))
+        }
+
+        val jsonArr = JSONArray()
+        currentPins.forEach { pin ->
+            val obj = JSONObject()
+            obj.put("stopCode", pin.stopCode)
+            obj.put("stopName", pin.stopName)
+            obj.put("lineId", pin.lineId)
+            jsonArr.put(obj)
+        }
+        prefs.edit().putString("pinned_trips", jsonArr.toString()).apply()
+
+        // Sync with primary preferences if available
+        try {
+            getSharedPreferences("OASA_PERSISTENT_DATA", Context.MODE_PRIVATE)
+                .edit()
+                .putString("OASA_PINNED_ARRIVALS", jsonArr.toString())
+                .apply()
+        } catch (_: Exception) {}
+
+        return !exists
+    }
+
     private suspend fun fetchNearbyStopsList(): List<WearStopItem> = withContext(Dispatchers.IO) {
         val (lat, lng) = getLastKnownLocation()
         val list = mutableListOf<WearStopItem>()
@@ -157,7 +223,7 @@ class MainActivity : ComponentActivity() {
             val body = resp.body?.string() ?: ""
             if (body.isNotEmpty() && body != "null") {
                 val arr = JSONArray(body)
-                for (i in 0 until minOf(arr.length(), 20)) {
+                for (i in 0 until minOf(arr.length(), 25)) {
                     val obj = arr.getJSONObject(i)
                     val sCode = obj.optString("StopCode")
                     val sName = obj.optString("StopDescr", "Στάση $sCode")
@@ -236,7 +302,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// ─── Data classes ─────────────────────────────────────────────────────────────
+// ─── Data models ──────────────────────────────────────────────────────────────
 
 data class WearStopItem(
     val code: String,
@@ -252,19 +318,28 @@ data class ArrivalItem(
     val minutes: Int
 )
 
-// ─── Clean Expressive Theme Palette ──────────────────────────────────────────
+data class PinnedItem(
+    val stopCode: String,
+    val stopName: String,
+    val lineId: String
+)
 
-private val BgDeep          = Color(0xFF0B132B) // Clean Midnight Slate
-private val BgCard          = Color(0xFF1C2541) // Elevated Slate Surface
-private val PrimaryBlue     = Color(0xFF005AC1) // Clean Primary Blue
-private val PrimaryPill     = Color(0xFFE0F2FE) // High contrast Light Blue badge
-private val PrimaryText     = Color(0xFF0369A1) // Deep text on Light Blue badge
-private val AmberGold       = Color(0xFFF59E0B) // Favorite accent
-private val LiveGreen       = Color(0xFF10B981) // Imminent arrival
-private val SkyBlue         = Color(0xFF38BDF8) // Normal arrival
-private val TextPrimary     = Color(0xFFF8FAFC) // Clean Crisp White
-private val TextSecondary   = Color(0xFF94A3B8) // Muted Info
-private val BorderSubtle    = Color(0xFF334155) // Card border line
+// ─── Clean Expressive Theme Palette (Matching Phone App Exactly) ──────────────
+
+private val PhoneSurfaceBg      = Color(0xFFF8FAFC) // Crisp M3 Slate Canvas
+private val PhoneCardBg         = Color(0xFFFFFFFF) // Pure 100% Solid Card
+private val PhonePrimaryBlue    = Color(0xFF005AC1) // Clean Primary Blue
+private val PhonePrimaryPill    = Color(0xFFD8E2FF) // Clean Light Blue Pill
+private val PhonePrimaryText    = Color(0xFF001A41) // High contrast Deep Blue
+private val PhoneTextPrimary    = Color(0xFF0F172A) // Bold dark slate on cards
+private val PhoneTextMuted      = Color(0xFF64748B) // Subtle secondary text
+private val PhoneBorderSubtle   = Color(0xFFE2E8F0) // Crisp card outline
+private val PhoneLiveGreen      = Color(0xFF10B981) // Phosphor Emerald
+private val PhoneGreenContainer = Color(0xFFECFDF5) // Green subtle pill
+private val PhoneGreenText      = Color(0xFF065F46) // Deep Green text
+private val PhoneAmber          = Color(0xFFF59E0B) // Favorite / Pin Gold
+private val PhoneAmberContainer = Color(0xFFFFFBEB) // Amber subtle container
+private val PhoneAmberText      = Color(0xFF92400E) // Deep Amber text
 
 // ─── Root app composable ──────────────────────────────────────────────────────
 
@@ -272,16 +347,20 @@ private val BorderSubtle    = Color(0xFF334155) // Card border line
 fun WearBusTopApp(
     onFetchNearbyStops: suspend () -> List<WearStopItem>,
     onFetchArrivals: suspend (String) -> List<ArrivalItem>,
-    onNavigateToStop: (Double, Double, String) -> Unit
+    onNavigateToStop: (Double, Double, String) -> Unit,
+    onTogglePin: (WearStopItem, String, Int) -> Boolean,
+    onLoadPins: () -> List<PinnedItem>
 ) {
     val arrivalsMap = remember { mutableStateMapOf<String, List<ArrivalItem>>() }
     var stops by remember { mutableStateOf<List<WearStopItem>>(emptyList()) }
+    var pinnedList by remember { mutableStateOf<List<PinnedItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var selectedStop by remember { mutableStateOf<WearStopItem?>(null) }
     val scope = rememberCoroutineScope()
 
     suspend fun loadAll() {
         isLoading = true
+        pinnedList = onLoadPins()
         val fetched = onFetchNearbyStops()
         stops = fetched
         isLoading = false
@@ -292,7 +371,7 @@ fun WearBusTopApp(
         }
     }
 
-    // Initial load
+    // Initial load: Starts immediately with nearby stops
     LaunchedEffect(Unit) {
         loadAll()
     }
@@ -313,6 +392,7 @@ fun WearBusTopApp(
         ArrivalsScreen(
             stop = selectedStop!!,
             arrivals = arrivalsMap[selectedStop!!.code],
+            pinnedList = pinnedList,
             onBack = { selectedStop = null },
             onRefresh = {
                 scope.launch {
@@ -321,12 +401,17 @@ fun WearBusTopApp(
             },
             onNavigate = {
                 onNavigateToStop(selectedStop!!.lat, selectedStop!!.lng, selectedStop!!.name)
+            },
+            onTogglePin = { line, mins ->
+                onTogglePin(selectedStop!!, line, mins)
+                pinnedList = onLoadPins()
             }
         )
     } else {
-        StopPagerScreen(
+        NearbyStopsListScreen(
             stops = stops,
             arrivalsMap = arrivalsMap,
+            pinnedList = pinnedList,
             isLoading = isLoading,
             onStopTap = { stop -> selectedStop = stop },
             onRefresh = { scope.launch { loadAll() } }
@@ -334,12 +419,13 @@ fun WearBusTopApp(
     }
 }
 
-// ─── Stop pager ───────────────────────────────────────────────────────────────
+// ─── Nearby Stops Feed (Immediate default screen with Crown Scrolling) ───────
 
 @Composable
-fun StopPagerScreen(
+fun NearbyStopsListScreen(
     stops: List<WearStopItem>,
     arrivalsMap: Map<String, List<ArrivalItem>>,
+    pinnedList: List<PinnedItem>,
     isLoading: Boolean,
     onStopTap: (WearStopItem) -> Unit,
     onRefresh: () -> Unit
@@ -348,13 +434,18 @@ fun StopPagerScreen(
     if (stops.isEmpty()) { EmptyScreen(onRefresh); return }
 
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
-    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
+    val focusRequester = remember { FocusRequester() }
+    val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
 
     Scaffold(
         timeText = {
             TimeText(
                 modifier = Modifier.fillMaxWidth(),
-                timeTextStyle = TimeTextDefaults.timeTextStyle(fontSize = 11.sp, color = TextSecondary)
+                timeTextStyle = TimeTextDefaults.timeTextStyle(fontSize = 10.sp, color = PhoneTextMuted)
             )
         },
         positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
@@ -362,183 +453,249 @@ fun StopPagerScreen(
         ScalingLazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .background(BgDeep),
+                .background(PhoneSurfaceBg)
+                .onRotaryScrollEvent {
+                    coroutineScope.launch {
+                        listState.scrollBy(it.verticalScrollPixels)
+                    }
+                    true
+                }
+                .focusRequester(focusRequester)
+                .focusable(),
             state = listState,
             autoCentering = AutoCenteringParams(itemIndex = 0),
-            contentPadding = PaddingValues(0.dp),
+            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             scalingParams = ScalingLazyColumnDefaults.scalingParams(
                 edgeScale = 0.88f,
-                edgeAlpha = 0.6f,
+                edgeAlpha = 0.65f,
                 minTransitionArea = 0.2f,
                 maxTransitionArea = 0.6f
             )
         ) {
-            items(stops) { stop ->
-                StopPageTile(
-                    stop = stop,
-                    arrivals = arrivalsMap[stop.code],
-                    tileHeight = screenHeight,
-                    onClick = { onStopTap(stop) }
-                )
-            }
-        }
-    }
-}
-
-// ─── Full-screen stop tile ────────────────────────────────────────────────────
-
-@Composable
-fun StopPageTile(
-    stop: WearStopItem,
-    arrivals: List<ArrivalItem>?,
-    tileHeight: androidx.compose.ui.unit.Dp,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(tileHeight)
-            .padding(horizontal = 8.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(BgCard)
-            .clickable { onClick() },
-        contentAlignment = Alignment.TopCenter
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 12.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Header: Stop Name + Favorite / Distance tag
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (stop.isFavorite) {
-                    Text(text = "⭐ ", fontSize = 11.sp)
-                }
-                Text(
-                    text = stop.name,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary,
-                    textAlign = TextAlign.Center,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-
-            if (stop.distanceMeters > 0) {
-                Text(
-                    text = "${stop.distanceMeters}μ μακριά",
-                    fontSize = 10.sp,
-                    color = TextSecondary,
-                    modifier = Modifier.padding(top = 1.dp, bottom = 4.dp)
-                )
-            } else {
-                Spacer(modifier = Modifier.height(4.dp))
-            }
-
-            when {
-                arrivals == null -> {
-                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(22.dp),
-                            indicatorColor = SkyBlue
-                        )
-                    }
-                }
-                arrivals.isEmpty() -> {
-                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+            // Header Bar
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth(0.92f)
+                        .padding(bottom = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "Δεν υπάρχουν\nδρομολόγια",
+                            text = "📍",
                             fontSize = 11.sp,
-                            color = TextSecondary,
-                            textAlign = TextAlign.Center,
-                            lineHeight = 16.sp
+                            modifier = Modifier.padding(end = 4.dp)
+                        )
+                        Text(
+                            text = "Κοντινές Στάσεις",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = PhonePrimaryBlue
                         )
                     }
-                }
-                else -> {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        arrivals.take(4).forEach { arr ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(Color(0xFF0F172A))
-                                    .padding(horizontal = 8.dp, vertical = 3.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(5.dp))
-                                        .background(PrimaryPill)
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = arr.line,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = PrimaryText
-                                    )
-                                }
-                                Text(
-                                    text = if (arr.minutes == 0) "Τώρα" else "${arr.minutes}'",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = if (arr.minutes <= 3) LiveGreen else SkyBlue
-                                )
-                            }
-                        }
-                        if (arrivals.size > 4) {
+                    if (pinnedList.isNotEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(PhoneAmberContainer)
+                                .padding(horizontal = 5.dp, vertical = 1.dp)
+                        ) {
                             Text(
-                                text = "+${arrivals.size - 4} ακόμη →",
-                                fontSize = 10.sp,
-                                color = TextSecondary,
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.End
+                                text = "📌 ${pinnedList.size}",
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = PhoneAmberText
                             )
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = "πατήστε για λεπτομέρειες",
-                fontSize = 9.sp,
-                color = TextSecondary,
-                textAlign = TextAlign.Center
-            )
+            // Cards Feed
+            items(stops) { stop ->
+                CleanStopCard(
+                    stop = stop,
+                    arrivals = arrivalsMap[stop.code],
+                    isPinned = pinnedList.any { it.stopCode == stop.code },
+                    onClick = { onStopTap(stop) }
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+
+            // Refresh chip at the bottom
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+                CompactChip(
+                    onClick = onRefresh,
+                    label = { Text("Ανανέωση 🔄", fontSize = 11.sp, color = PhoneTextPrimary, fontWeight = FontWeight.Bold) },
+                    colors = ChipDefaults.chipColors(backgroundColor = PhoneCardBg),
+                    modifier = Modifier.padding(bottom = 20.dp)
+                )
+            }
         }
     }
 }
 
-// ─── Arrivals detail screen ───────────────────────────────────────────────────
+// ─── Clean Phone-Style Stop Card (Solid White, high-contrast, blue badge) ────
+
+@Composable
+fun CleanStopCard(
+    stop: WearStopItem,
+    arrivals: List<ArrivalItem>?,
+    isPinned: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth(0.94f)
+            .clip(RoundedCornerShape(14.dp))
+            .background(PhoneCardBg)
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp, vertical = 9.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Stop title row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (stop.isFavorite) {
+                        Text(text = "⭐ ", fontSize = 10.sp)
+                    } else if (isPinned) {
+                        Text(text = "📌 ", fontSize = 10.sp)
+                    }
+                    Text(
+                        text = stop.name,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PhoneTextPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                if (stop.distanceMeters > 0) {
+                    Text(
+                        text = "${stop.distanceMeters}μ",
+                        fontSize = 9.sp,
+                        color = PhoneTextMuted,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Arrivals preview rows
+            when {
+                arrivals == null -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(28.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            indicatorColor = PhonePrimaryBlue,
+                            strokeWidth = 2.dp
+                        )
+                    }
+                }
+                arrivals.isEmpty() -> {
+                    Text(
+                        text = "Χωρίς άμεσα δρομολόγια",
+                        fontSize = 10.sp,
+                        color = PhoneTextMuted,
+                        textAlign = TextAlign.Start
+                    )
+                }
+                else -> {
+                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        arrivals.take(2).forEach { arr ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(PhoneSurfaceBg)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                // Route badge
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(PhonePrimaryPill)
+                                        .padding(horizontal = 5.dp, vertical = 1.dp)
+                                ) {
+                                    Text(
+                                        text = arr.line,
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = PhonePrimaryText
+                                    )
+                                }
+
+                                // Minutes remaining
+                                Text(
+                                    text = if (arr.minutes == 0) "Τώρα" else "${arr.minutes}'",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = if (arr.minutes <= 3) PhoneLiveGreen else PhonePrimaryBlue
+                                )
+                            }
+                        }
+
+                        if (arrivals.size > 2) {
+                            Text(
+                                text = "+${arrivals.size - 2} ακόμη →",
+                                fontSize = 9.sp,
+                                color = PhoneTextMuted,
+                                textAlign = TextAlign.End,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ─── Stop Detail / Arrivals Screen with Crown Scroll & Pinning ────────────────
 
 @Composable
 fun ArrivalsScreen(
     stop: WearStopItem,
     arrivals: List<ArrivalItem>?,
+    pinnedList: List<PinnedItem>,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
-    onNavigate: () -> Unit
+    onNavigate: () -> Unit,
+    onTogglePin: (String, Int) -> Unit
 ) {
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
+    val focusRequester = remember { FocusRequester() }
+    val coroutineScope = rememberCoroutineScope()
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
 
     Scaffold(
         timeText = {
             TimeText(
                 modifier = Modifier.fillMaxWidth(),
-                timeTextStyle = TimeTextDefaults.timeTextStyle(fontSize = 11.sp, color = TextSecondary)
+                timeTextStyle = TimeTextDefaults.timeTextStyle(fontSize = 10.sp, color = PhoneTextMuted)
             )
         },
         positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
@@ -546,33 +703,42 @@ fun ArrivalsScreen(
         ScalingLazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .background(BgDeep),
+                .background(PhoneSurfaceBg)
+                .onRotaryScrollEvent {
+                    coroutineScope.launch {
+                        listState.scrollBy(it.verticalScrollPixels)
+                    }
+                    true
+                }
+                .focusRequester(focusRequester)
+                .focusable(),
             state = listState,
             autoCentering = AutoCenteringParams(itemIndex = 0),
+            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 18.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header Stop Title
+            // Header Bar: Stop Name & Quick Back
             item {
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 22.dp, bottom = 6.dp, start = 12.dp, end = 12.dp),
+                        .fillMaxWidth(0.94f)
+                        .padding(bottom = 6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
                         text = stop.name,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = PhoneTextPrimary,
                         textAlign = TextAlign.Center,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "Αφίξεις σε πραγματικό χρόνο",
+                        text = "Αφίξεις • ${stop.code}",
                         fontSize = 10.sp,
-                        color = SkyBlue,
-                        fontWeight = FontWeight.Medium
+                        color = PhonePrimaryBlue,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
@@ -581,12 +747,15 @@ fun ArrivalsScreen(
                 arrivals == null -> {
                     item {
                         Box(
-                            modifier = Modifier.fillMaxWidth().height(80.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(70.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                indicatorColor = SkyBlue
+                                modifier = Modifier.size(22.dp),
+                                indicatorColor = PhonePrimaryBlue,
+                                strokeWidth = 2.5.dp
                             )
                         }
                     }
@@ -595,99 +764,132 @@ fun ArrivalsScreen(
                     item {
                         Text(
                             text = "Δεν υπάρχουν\nπρογραμματισμένες αφίξεις",
-                            fontSize = 12.sp,
-                            color = TextSecondary,
+                            fontSize = 11.sp,
+                            color = PhoneTextMuted,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(20.dp),
-                            lineHeight = 18.sp
+                            modifier = Modifier.padding(16.dp),
+                            lineHeight = 16.sp
                         )
                     }
                 }
                 else -> {
                     items(arrivals) { arr ->
+                        val isThisPinned = pinnedList.any { it.stopCode == stop.code && it.lineId.equals(arr.line, ignoreCase = true) }
+
                         Row(
                             modifier = Modifier
-                                .fillMaxWidth(0.92f)
-                                .padding(vertical = 2.5.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(BgCard)
-                                .padding(horizontal = 10.dp, vertical = 7.dp),
+                                .fillMaxWidth(0.94f)
+                                .padding(vertical = 2.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(PhoneCardBg)
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(PrimaryPill)
-                                    .padding(horizontal = 7.dp, vertical = 3.dp)
-                            ) {
-                                Text(
-                                    text = arr.line,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = PrimaryText
-                                )
+                            // Left: Badge + Line
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(6.dp))
+                                        .background(PhonePrimaryPill)
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = arr.line,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = PhonePrimaryText
+                                    )
+                                }
                             }
-                            Text(
-                                text = when {
-                                    arr.minutes == 0 -> "Τώρα"
-                                    arr.minutes == 1 -> "1 λεπτό"
-                                    else -> "${arr.minutes}'"
-                                },
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Black,
-                                color = if (arr.minutes <= 3) LiveGreen else SkyBlue
-                            )
+
+                            // Right: Time + Pin Button
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = if (arr.minutes == 0) "Τώρα" else "${arr.minutes}'",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = if (arr.minutes <= 3) PhoneLiveGreen else PhonePrimaryBlue,
+                                    modifier = Modifier.padding(end = 6.dp)
+                                )
+
+                                // Pin toggle button
+                                Box(
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isThisPinned) PhoneAmberContainer else PhoneSurfaceBg)
+                                        .clickable { onTogglePin(arr.line, arr.minutes) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "📌",
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
 
-            // Quick Actions: Direct Google Maps Navigation, Back, and Refresh
+            // Quick Actions: Google Maps Navigation, Back, and Refresh
             item {
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Column(
-                    modifier = Modifier.padding(bottom = 22.dp),
+                    modifier = Modifier.padding(bottom = 20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    // Navigation Chip
+                    // Direct Walking Navigation
                     CompactChip(
                         onClick = onNavigate,
                         label = {
                             Text(
                                 "🧭 Πλοήγηση στη στάση",
                                 fontSize = 11.sp,
-                                color = TextPrimary,
+                                color = Color.White,
                                 fontWeight = FontWeight.Bold
                             )
                         },
-                        colors = ChipDefaults.chipColors(backgroundColor = PrimaryBlue),
-                        modifier = Modifier.fillMaxWidth(0.85f)
+                        colors = ChipDefaults.chipColors(backgroundColor = PhonePrimaryBlue),
+                        modifier = Modifier.fillMaxWidth(0.9f)
                     )
 
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        // Back Button
-                        CompactChip(
-                            onClick = onBack,
-                            label = {
-                                Text(
-                                    "← Πίσω",
-                                    fontSize = 11.sp,
-                                    color = TextPrimary,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            },
-                            colors = ChipDefaults.chipColors(backgroundColor = BorderSubtle)
-                        )
-                        // Refresh Button
-                        CompactChip(
-                            onClick = onRefresh,
-                            label = { Text("🔄", fontSize = 13.sp) },
-                            colors = ChipDefaults.chipColors(backgroundColor = BorderSubtle)
-                        )
+                        // Minimal Circular Back Button (Same as Phone App)
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .background(PhoneCardBg)
+                                .clickable { onBack() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "←",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = PhoneTextPrimary
+                            )
+                        }
+
+                        // Refresh button
+                        Box(
+                            modifier = Modifier
+                                .size(34.dp)
+                                .clip(CircleShape)
+                                .background(PhoneCardBg)
+                                .clickable { onRefresh() },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "🔄",
+                                fontSize = 13.sp
+                            )
+                        }
                     }
                 }
             }
@@ -702,13 +904,13 @@ fun LoadingScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgDeep),
+            .background(PhoneSurfaceBg),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator(modifier = Modifier.size(32.dp), indicatorColor = SkyBlue)
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(text = "Φόρτωση στάσεων…", fontSize = 12.sp, color = TextSecondary)
+            CircularProgressIndicator(modifier = Modifier.size(28.dp), indicatorColor = PhonePrimaryBlue)
+            Spacer(modifier = Modifier.height(10.dp))
+            Text(text = "Φόρτωση στάσεων…", fontSize = 11.sp, color = PhoneTextMuted, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -718,23 +920,24 @@ fun EmptyScreen(onRefresh: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(BgDeep),
+            .background(PhoneSurfaceBg),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "Δεν βρέθηκαν στάσεις",
-                fontSize = 12.sp,
-                color = TextSecondary,
+                text = "Δεν βρέθηκαν κοντινές στάσεις",
+                fontSize = 11.sp,
+                color = PhoneTextMuted,
                 textAlign = TextAlign.Center
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
             CompactChip(
                 onClick = onRefresh,
-                label = { Text("Ανανέωση 🔄", fontSize = 11.sp, color = TextPrimary) },
-                colors = ChipDefaults.chipColors(backgroundColor = BorderSubtle)
+                label = { Text("Ανανέωση 🔄", fontSize = 11.sp, color = PhoneTextPrimary, fontWeight = FontWeight.Bold) },
+                colors = ChipDefaults.chipColors(backgroundColor = PhoneCardBg)
             )
         }
     }
 }
+
 
