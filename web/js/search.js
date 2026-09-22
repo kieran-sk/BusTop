@@ -544,7 +544,7 @@ class SearchManager {
           const isFav = window.Favorites && window.Favorites.isStopFav(s.StopCode);
 
           return `
-            <div class="m3-card stop-interactive-card" data-stop-code="${s.StopCode}" data-stop-title="${safeTitle}" data-stop-lat="${s.StopLat}" data-stop-lng="${s.StopLng}" style="display: flex; flex-direction: column; padding: 0.9rem 1.1rem; cursor: pointer; background: ${isFav ? '#fffdf5' : (hasRoutes ? 'var(--md-sys-color-surface-container)' : '#f8fafc')}; margin-bottom: 0; border: ${isFav ? '2px solid #eab308' : (hasRoutes ? '1px solid var(--md-sys-color-outline-variant)' : '1px dashed #cbd5e1')}; opacity: ${hasRoutes ? '1' : '0.8'};" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', '${s.StopLat}', '${s.StopLng}')">
+            <div class="m3-card stop-interactive-card ${isFav ? 'is-favourite-stop' : ''}" data-stop-code="${s.StopCode}" data-stop-title="${safeTitle}" data-stop-lat="${s.StopLat}" data-stop-lng="${s.StopLng}" style="display: flex; flex-direction: column; padding: 0.9rem 1.1rem; cursor: pointer; background: ${isFav ? '#fffdf5' : (hasRoutes ? 'var(--md-sys-color-surface-container)' : '#f8fafc')}; margin-bottom: 0; border: ${isFav ? '2px solid #0f172a; outline: 2px solid #eab308; outline-offset: -3px;' : (hasRoutes ? '1px solid var(--md-sys-color-outline-variant)' : '1px dashed #cbd5e1')}; opacity: ${hasRoutes ? '1' : '0.8'};" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', '${s.StopLat}', '${s.StopLng}')">
               <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
                 <div style="min-width: 0; flex: 1;">
                   <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">

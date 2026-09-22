@@ -360,8 +360,20 @@ button[aria-label="Εντοπισμός στάσεων κοντά μου"] {
   border: 1px solid #ffffff;
 }
 
-/* Favourite stop banner in dot-matrix mode — amber left accent */
+/* Favourite stop banner in dot-matrix mode — yellow and black border */
 body #selected-stop-banner.is-favourite {
-  border-left: 5px solid #d97706 !important;
-  box-shadow: 5px 3px 0 #d97706 !important;
+  border: 2px solid #0f172a !important;
+  outline: 2.5px solid #d97706 !important;
+  outline-offset: -4px !important;
+  box-shadow: 4px 4px 0 #d97706, 6px 6px 0 #0f172a !important;
 }
+
+/* Favourite stop cards globally across lists */
+body .m3-card.is-favourite,
+body .m3-card.is-favourite-stop {
+  border: 2px solid #0f172a !important;
+  outline: 2.5px solid #d97706 !important;
+  outline-offset: -4px !important;
+  box-shadow: 3px 3px 0 #d97706, 5px 5px 0 #0f172a !important;
+}
+

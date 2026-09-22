@@ -276,6 +276,7 @@ class MapManager {
         html: `
           <div style="background: #16a34a; color: #ffffff; padding: 2px 7px; border-radius: 9999px; font-weight: 800; font-size: 0.75rem; box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: 2px solid #ffffff; display: flex; align-items: center; gap: 4px;">
             <span class="m3-pulse-dot" style="background: #ffffff; width: 6px; height: 6px;"></span>
+            <span style="font-size: 0.82rem; line-height: 1;">🚌</span>
             ${lineId}
           </div>
         `,
