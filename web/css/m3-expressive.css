@@ -555,7 +555,7 @@ body {
   width: 100%;
 }
 
-/* PC / Desktop view: Map on left (narrower width, taller/extended vertically), cards on right (reduced width, independent scroll) */
+/* PC / Desktop view: Map on left (slightly reduced height and width), cards on right (expanded width, independent scroll) */
 @media (min-width: 992px) {
   .m3-container {
     max-width: 1440px;
@@ -566,26 +566,27 @@ body {
     flex-direction: row;
     align-items: flex-start;
     gap: 1.5rem;
-    height: calc(100vh - 150px);
+    height: calc(100vh - 165px);
     overflow: hidden;
   }
 
   .search-map-pane {
     flex: 1 1 0;
-    height: 100% !important;
-    min-height: 520px;
+    max-width: 58%;
+    height: 94% !important;
+    min-height: 460px;
     margin-bottom: 0 !important;
     border-radius: 18px;
     box-shadow: var(--md-sys-elevation-2);
   }
 
   .search-cards-pane {
-    flex: 0 0 440px;
-    width: 440px;
-    max-width: 440px;
+    flex: 1 1 480px;
+    width: auto;
+    max-width: 560px;
     height: 100%;
     overflow-y: auto;
-    padding-right: 0.45rem;
+    padding-right: 0.5rem;
     overscroll-behavior: contain;
   }
 }
