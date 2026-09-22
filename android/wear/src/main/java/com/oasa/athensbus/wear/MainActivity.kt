@@ -3,15 +3,18 @@ package com.oasa.athensbus.wear
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -52,8 +55,25 @@ class MainActivity : ComponentActivity() {
         setContent {
             WearBusTopApp(
                 onFetchNearbyStops = { fetchNearbyStopsList() },
-                onFetchArrivals = { code -> queryStopArrivals(code) }
+                onFetchArrivals = { code -> queryStopArrivals(code) },
+                onNavigateToStop = { lat, lng, name -> navigateToStop(lat, lng, name) }
             )
+        }
+    }
+
+    private fun navigateToStop(lat: Double, lng: Double, name: String) {
+        try {
+            val uri = Uri.parse("geo:$lat,$lng?q=$lat,$lng(${Uri.encode(name)})")
+            val mapIntent = Intent(Intent.ACTION_VIEW, uri)
+            mapIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            startActivity(mapIntent)
+        } catch (_: Exception) {
+            try {
+                val webUri = Uri.parse("https://www.google.com/maps/dir/?api=1&destination=$lat,$lng")
+                val webIntent = Intent(Intent.ACTION_VIEW, webUri)
+                webIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                startActivity(webIntent)
+            } catch (_: Exception) {}
         }
     }
 
@@ -84,9 +104,49 @@ class MainActivity : ComponentActivity() {
         return Pair(37.9845, 23.7335)
     }
 
+    private fun loadStoredFavorites(): List<WearStopItem> {
+        val favs = mutableListOf<WearStopItem>()
+        val prefsList = listOf(
+            getSharedPreferences("OASA_PERSISTENT_DATA", Context.MODE_PRIVATE),
+            getSharedPreferences("BusTopWatch", Context.MODE_PRIVATE)
+        )
+        for (p in prefsList) {
+            val raw = p.getString("OASA_FAV_STOPS", null) ?: p.getString("fav_stops", null)
+            if (!raw.isNullOrBlank() && raw != "[]" && raw != "null") {
+                try {
+                    val arr = JSONArray(raw)
+                    for (i in 0 until arr.length()) {
+                        val obj = arr.getJSONObject(i)
+                        val code = obj.optString("code", obj.optString("StopCode", ""))
+                        val name = obj.optString("name", obj.optString("stopName", obj.optString("StopDescr", "Στάση $code")))
+                        val lat = if (obj.has("lat") && !obj.isNull("lat")) obj.optDouble("lat", 0.0) else if (obj.has("StopLat")) obj.optDouble("StopLat", 0.0) else 0.0
+                        val lng = if (obj.has("lng") && !obj.isNull("lng")) obj.optDouble("lng", 0.0) else if (obj.has("StopLng")) obj.optDouble("StopLng", 0.0) else 0.0
+                        if (code.isNotEmpty() && favs.none { it.code == code }) {
+                            favs.add(WearStopItem(code = code, name = name, lat = lat, lng = lng, isFavorite = true))
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+        return favs
+    }
+
     private suspend fun fetchNearbyStopsList(): List<WearStopItem> = withContext(Dispatchers.IO) {
         val (lat, lng) = getLastKnownLocation()
         val list = mutableListOf<WearStopItem>()
+        val favs = loadStoredFavorites()
+
+        // Calculate distance for favourites
+        favs.forEach { fav ->
+            var dist = 0
+            if (fav.lat != 0.0 && fav.lng != 0.0) {
+                val results = FloatArray(1)
+                Location.distanceBetween(lat, lng, fav.lat, fav.lng, results)
+                dist = results[0].toInt()
+            }
+            list.add(fav.copy(distanceMeters = dist))
+        }
+
         try {
             val url = "https://telematics.oasa.gr/api/?act=getClosestStops&p1=$lat&p2=$lng"
             val req = Request.Builder()
@@ -109,21 +169,23 @@ class MainActivity : ComponentActivity() {
                         Location.distanceBetween(lat, lng, sLat, sLng, results)
                         dist = results[0].toInt()
                     }
-                    if (sCode.isNotEmpty()) {
-                        list.add(WearStopItem(code = sCode, name = sName, distanceMeters = dist))
+                    if (sCode.isNotEmpty() && list.none { it.code == sCode }) {
+                        list.add(WearStopItem(code = sCode, name = sName, lat = sLat, lng = sLng, distanceMeters = dist))
                     }
                 }
             }
         } catch (_: Exception) {}
 
         if (list.isEmpty()) {
-            list.add(WearStopItem("10175", "Πλ. Κάνιγγος", 85))
-            list.add(WearStopItem("60010", "Ναυαρίνου", 160))
-            list.add(WearStopItem("10022", "Πλ. Συντάγματος", 280))
-            list.add(WearStopItem("10034", "Ακαδημία", 320))
-            list.add(WearStopItem("10018", "Ομόνοια", 410))
+            list.add(WearStopItem("10175", "Πλ. Κάνιγγος", 37.9856, 23.7314, 85))
+            list.add(WearStopItem("60010", "Ναυαρίνου", 37.9840, 23.7345, 160))
+            list.add(WearStopItem("10022", "Πλ. Συντάγματος", 37.9754, 23.7350, 280))
+            list.add(WearStopItem("10034", "Ακαδημία", 37.9801, 23.7330, 320))
+            list.add(WearStopItem("10018", "Ομόνοια", 37.9841, 23.7280, 410))
         }
-        list
+
+        // Sort: Favorites first, then nearest
+        list.sortedWith(compareByDescending<WearStopItem> { it.isFavorite }.thenBy { it.distanceMeters })
     }
 
     suspend fun queryStopArrivals(stopCode: String): List<ArrivalItem> = withContext(Dispatchers.IO) {
@@ -149,7 +211,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
         } catch (_: Exception) {}
-        list
+        list.sortedBy { it.minutes }
     }
 
     private fun ensureRouteMap(stopCode: String) {
@@ -179,7 +241,10 @@ class MainActivity : ComponentActivity() {
 data class WearStopItem(
     val code: String,
     val name: String,
-    val distanceMeters: Int = 0
+    val lat: Double = 0.0,
+    val lng: Double = 0.0,
+    val distanceMeters: Int = 0,
+    val isFavorite: Boolean = false
 )
 
 data class ArrivalItem(
@@ -187,22 +252,27 @@ data class ArrivalItem(
     val minutes: Int
 )
 
-// ─── Colours ──────────────────────────────────────────────────────────────────
+// ─── Clean Expressive Theme Palette ──────────────────────────────────────────
 
-private val BgDeep      = Color(0xFF0F172A)
-private val BgCard      = Color(0xFF1E293B)
-private val Amber       = Color(0xFFD97706)
-private val Sky         = Color(0xFF38BDF8)
-private val Green       = Color(0xFF10B981)
-private val TextPrimary = Color(0xFFF1F5F9)
-private val TextMuted   = Color(0xFF94A3B8)
+private val BgDeep          = Color(0xFF0B132B) // Clean Midnight Slate
+private val BgCard          = Color(0xFF1C2541) // Elevated Slate Surface
+private val PrimaryBlue     = Color(0xFF005AC1) // Clean Primary Blue
+private val PrimaryPill     = Color(0xFFE0F2FE) // High contrast Light Blue badge
+private val PrimaryText     = Color(0xFF0369A1) // Deep text on Light Blue badge
+private val AmberGold       = Color(0xFFF59E0B) // Favorite accent
+private val LiveGreen       = Color(0xFF10B981) // Imminent arrival
+private val SkyBlue         = Color(0xFF38BDF8) // Normal arrival
+private val TextPrimary     = Color(0xFFF8FAFC) // Clean Crisp White
+private val TextSecondary   = Color(0xFF94A3B8) // Muted Info
+private val BorderSubtle    = Color(0xFF334155) // Card border line
 
 // ─── Root app composable ──────────────────────────────────────────────────────
 
 @Composable
 fun WearBusTopApp(
     onFetchNearbyStops: suspend () -> List<WearStopItem>,
-    onFetchArrivals: suspend (String) -> List<ArrivalItem>
+    onFetchArrivals: suspend (String) -> List<ArrivalItem>,
+    onNavigateToStop: (Double, Double, String) -> Unit
 ) {
     val arrivalsMap = remember { mutableStateMapOf<String, List<ArrivalItem>>() }
     var stops by remember { mutableStateOf<List<WearStopItem>>(emptyList()) }
@@ -248,6 +318,9 @@ fun WearBusTopApp(
                 scope.launch {
                     arrivalsMap[selectedStop!!.code] = onFetchArrivals(selectedStop!!.code)
                 }
+            },
+            onNavigate = {
+                onNavigateToStop(selectedStop!!.lat, selectedStop!!.lng, selectedStop!!.name)
             }
         )
     } else {
@@ -275,14 +348,13 @@ fun StopPagerScreen(
     if (stops.isEmpty()) { EmptyScreen(onRefresh); return }
 
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
-    // Use screen height so each tile fills one page
     val screenHeight = LocalConfiguration.current.screenHeightDp.dp
 
     Scaffold(
         timeText = {
             TimeText(
                 modifier = Modifier.fillMaxWidth(),
-                timeTextStyle = TimeTextDefaults.timeTextStyle(fontSize = 11.sp, color = TextMuted)
+                timeTextStyle = TimeTextDefaults.timeTextStyle(fontSize = 11.sp, color = TextSecondary)
             )
         },
         positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
@@ -296,7 +368,7 @@ fun StopPagerScreen(
             contentPadding = PaddingValues(0.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             scalingParams = ScalingLazyColumnDefaults.scalingParams(
-                edgeScale = 0.85f,
+                edgeScale = 0.88f,
                 edgeAlpha = 0.6f,
                 minTransitionArea = 0.2f,
                 maxTransitionArea = 0.6f
@@ -328,7 +400,7 @@ fun StopPageTile(
             .fillMaxWidth()
             .height(tileHeight)
             .padding(horizontal = 8.dp, vertical = 4.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(18.dp))
             .background(BgCard)
             .clickable { onClick() },
         contentAlignment = Alignment.TopCenter
@@ -336,29 +408,46 @@ fun StopPageTile(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 12.dp, vertical = 14.dp),
+                .padding(horizontal = 12.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Stop name
-            Text(
-                text = stop.name,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = TextPrimary,
-                textAlign = TextAlign.Center,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth()
-            )
+            // Header: Stop Name + Favorite / Distance tag
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (stop.isFavorite) {
+                    Text(text = "⭐ ", fontSize = 11.sp)
+                }
+                Text(
+                    text = stop.name,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            if (stop.distanceMeters > 0) {
+                Text(
+                    text = "${stop.distanceMeters}μ μακριά",
+                    fontSize = 10.sp,
+                    color = TextSecondary,
+                    modifier = Modifier.padding(top = 1.dp, bottom = 4.dp)
+                )
+            } else {
+                Spacer(modifier = Modifier.height(4.dp))
+            }
 
             when {
                 arrivals == null -> {
                     Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            indicatorColor = Amber
+                            modifier = Modifier.size(22.dp),
+                            indicatorColor = SkyBlue
                         )
                     }
                 }
@@ -367,7 +456,7 @@ fun StopPageTile(
                         Text(
                             text = "Δεν υπάρχουν\nδρομολόγια",
                             fontSize = 11.sp,
-                            color = TextMuted,
+                            color = TextSecondary,
                             textAlign = TextAlign.Center,
                             lineHeight = 16.sp
                         )
@@ -376,40 +465,44 @@ fun StopPageTile(
                 else -> {
                     Column(
                         modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
                         arrivals.take(4).forEach { arr ->
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFF0F172A))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(Amber)
+                                        .clip(RoundedCornerShape(5.dp))
+                                        .background(PrimaryPill)
                                         .padding(horizontal = 6.dp, vertical = 2.dp)
                                 ) {
                                     Text(
                                         text = arr.line,
                                         fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = BgDeep
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = PrimaryText
                                     )
                                 }
                                 Text(
-                                    text = if (arr.minutes == 0) "Τώρα" else "${arr.minutes}λ",
-                                    fontSize = 15.sp,
+                                    text = if (arr.minutes == 0) "Τώρα" else "${arr.minutes}'",
+                                    fontSize = 14.sp,
                                     fontWeight = FontWeight.Black,
-                                    color = if (arr.minutes <= 3) Green else Sky
+                                    color = if (arr.minutes <= 3) LiveGreen else SkyBlue
                                 )
                             }
                         }
                         if (arrivals.size > 4) {
                             Text(
-                                text = "+${arrivals.size - 4} ακόμα →",
+                                text = "+${arrivals.size - 4} ακόμη →",
                                 fontSize = 10.sp,
-                                color = TextMuted,
+                                color = TextSecondary,
                                 modifier = Modifier.fillMaxWidth(),
                                 textAlign = TextAlign.End
                             )
@@ -418,11 +511,11 @@ fun StopPageTile(
                 }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
-                text = "πατήστε για όλες",
+                text = "πατήστε για λεπτομέρειες",
                 fontSize = 9.sp,
-                color = TextMuted,
+                color = TextSecondary,
                 textAlign = TextAlign.Center
             )
         }
@@ -436,7 +529,8 @@ fun ArrivalsScreen(
     stop: WearStopItem,
     arrivals: List<ArrivalItem>?,
     onBack: () -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onNavigate: () -> Unit
 ) {
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
 
@@ -444,7 +538,7 @@ fun ArrivalsScreen(
         timeText = {
             TimeText(
                 modifier = Modifier.fillMaxWidth(),
-                timeTextStyle = TimeTextDefaults.timeTextStyle(fontSize = 11.sp, color = TextMuted)
+                timeTextStyle = TimeTextDefaults.timeTextStyle(fontSize = 11.sp, color = TextSecondary)
             )
         },
         positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
@@ -457,12 +551,12 @@ fun ArrivalsScreen(
             autoCentering = AutoCenteringParams(itemIndex = 0),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Title
+            // Header Stop Title
             item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 24.dp, bottom = 8.dp, start = 12.dp, end = 12.dp),
+                        .padding(top = 22.dp, bottom = 6.dp, start = 12.dp, end = 12.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
@@ -475,10 +569,10 @@ fun ArrivalsScreen(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = "Αφίξεις",
+                        text = "Αφίξεις σε πραγματικό χρόνο",
                         fontSize = 10.sp,
-                        color = Amber,
-                        fontWeight = FontWeight.SemiBold
+                        color = SkyBlue,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }
@@ -492,7 +586,7 @@ fun ArrivalsScreen(
                         ) {
                             CircularProgressIndicator(
                                 modifier = Modifier.size(24.dp),
-                                indicatorColor = Amber
+                                indicatorColor = SkyBlue
                             )
                         }
                     }
@@ -500,11 +594,11 @@ fun ArrivalsScreen(
                 arrivals.isEmpty() -> {
                     item {
                         Text(
-                            text = "Δεν υπάρχουν\nδρομολόγια",
+                            text = "Δεν υπάρχουν\nπρογραμματισμένες αφίξεις",
                             fontSize = 12.sp,
-                            color = TextMuted,
+                            color = TextSecondary,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(24.dp),
+                            modifier = Modifier.padding(20.dp),
                             lineHeight = 18.sp
                         )
                     }
@@ -514,65 +608,87 @@ fun ArrivalsScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth(0.92f)
-                                .padding(vertical = 2.dp)
+                                .padding(vertical = 2.5.dp)
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(BgCard)
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                .padding(horizontal = 10.dp, vertical = 7.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(6.dp))
-                                    .background(Amber)
+                                    .background(PrimaryPill)
                                     .padding(horizontal = 7.dp, vertical = 3.dp)
                             ) {
                                 Text(
                                     text = arr.line,
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = BgDeep
+                                    color = PrimaryText
                                 )
                             }
                             Text(
                                 text = when {
                                     arr.minutes == 0 -> "Τώρα"
                                     arr.minutes == 1 -> "1 λεπτό"
-                                    else -> "${arr.minutes} λεπτά"
+                                    else -> "${arr.minutes}'"
                                 },
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.Black,
-                                color = if (arr.minutes <= 3) Green else Sky
+                                color = if (arr.minutes <= 3) LiveGreen else SkyBlue
                             )
                         }
                     }
                 }
             }
 
-            // Action buttons
+            // Quick Actions: Direct Google Maps Navigation, Back, and Refresh
             item {
-                Spacer(modifier = Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.padding(bottom = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Spacer(modifier = Modifier.height(6.dp))
+                Column(
+                    modifier = Modifier.padding(bottom = 22.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    // Navigation Chip
                     CompactChip(
-                        onClick = onBack,
+                        onClick = onNavigate,
                         label = {
                             Text(
-                                "← Πίσω",
+                                "🧭 Πλοήγηση στη στάση",
                                 fontSize = 11.sp,
                                 color = TextPrimary,
-                                fontWeight = FontWeight.SemiBold
+                                fontWeight = FontWeight.Bold
                             )
                         },
-                        colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF334155))
+                        colors = ChipDefaults.chipColors(backgroundColor = PrimaryBlue),
+                        modifier = Modifier.fillMaxWidth(0.85f)
                     )
-                    CompactChip(
-                        onClick = onRefresh,
-                        label = { Text("🔄", fontSize = 13.sp) },
-                        colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF334155))
-                    )
+
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Back Button
+                        CompactChip(
+                            onClick = onBack,
+                            label = {
+                                Text(
+                                    "← Πίσω",
+                                    fontSize = 11.sp,
+                                    color = TextPrimary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            },
+                            colors = ChipDefaults.chipColors(backgroundColor = BorderSubtle)
+                        )
+                        // Refresh Button
+                        CompactChip(
+                            onClick = onRefresh,
+                            label = { Text("🔄", fontSize = 13.sp) },
+                            colors = ChipDefaults.chipColors(backgroundColor = BorderSubtle)
+                        )
+                    }
                 }
             }
         }
@@ -590,9 +706,9 @@ fun LoadingScreen() {
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator(modifier = Modifier.size(32.dp), indicatorColor = Amber)
+            CircularProgressIndicator(modifier = Modifier.size(32.dp), indicatorColor = SkyBlue)
             Spacer(modifier = Modifier.height(12.dp))
-            Text(text = "Φόρτωση στάσεων…", fontSize = 12.sp, color = TextMuted)
+            Text(text = "Φόρτωση στάσεων…", fontSize = 12.sp, color = TextSecondary)
         }
     }
 }
@@ -609,15 +725,16 @@ fun EmptyScreen(onRefresh: () -> Unit) {
             Text(
                 text = "Δεν βρέθηκαν στάσεις",
                 fontSize = 12.sp,
-                color = TextMuted,
+                color = TextSecondary,
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(12.dp))
             CompactChip(
                 onClick = onRefresh,
                 label = { Text("Ανανέωση 🔄", fontSize = 11.sp, color = TextPrimary) },
-                colors = ChipDefaults.chipColors(backgroundColor = Color(0xFF334155))
+                colors = ChipDefaults.chipColors(backgroundColor = BorderSubtle)
             )
         }
     }
 }
+
