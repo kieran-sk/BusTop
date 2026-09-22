@@ -1,54 +1,69 @@
 /**
- * BusTop Dot-Matrix Transit Edition (Light Mode)
- * Authentic Athens Transit Telematics aesthetic:
- * LED matrix digit styling, phosphor/amber accents, sharp 90-degree pixel frames,
- * tactile hardware buttons, and crisp monospace Greek typography.
+ * BusTop Arcade / Dot-Matrix Transit Edition (Light Mode)
+ * Authentic Athens Transit Telematics & Retro Arcade aesthetic:
+ * LED matrix digit styling, phosphor/amber accents, sharp tactile pixel frames,
+ * hardware push-buttons, and ultra-readable Greek monospace typography.
  */
 
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,600;0,700;1,400&family=Silkscreen:wght@400;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap&subset=greek,greek-ext,latin');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Noto+Sans+Mono:wght@400;600;700&display=swap&subset=greek,greek-ext,latin');
 
 :root {
-  /* Dot-Matrix Light Mode Palette */
-  --matrix-bg: #f5f4ef;
+  /* Arcade Light Mode Palette */
+  --matrix-bg: #f4f3ed;
   --matrix-surface: #ffffff;
-  --matrix-surface-sunken: #edece5;
-  --matrix-surface-raised: #fbfbfa;
+  --matrix-surface-sunken: #e9e8e0;
+  --matrix-surface-raised: #fdfdfc;
   --matrix-border: #1e293b;
   --matrix-border-light: #cbd5e1;
   --matrix-text-main: #0f172a;
-  --matrix-text-muted: #475569;
+  --matrix-text-muted: #334155;
+  --matrix-text-secondary: #475569;
   
-  /* Telematics Display Colors */
-  --led-amber: #d97706;
-  --led-amber-glow: rgba(217, 119, 6, 0.25);
-  --led-green: #059669;
-  --led-green-glow: rgba(5, 150, 105, 0.2);
-  --led-blue: #0284c7;
-  --led-red: #dc2626;
+  /* Telematics & Arcade Accent Colors */
+  --led-amber: #b45309;
+  --led-amber-bright: #f59e0b;
+  --led-green: #047857;
+  --led-blue: #0369a1;
+  --led-red: #b91c1c;
 
-  /* Typography: Greek-compatible monospace fonts with proper diacritics */
-  --font-matrix-display: 'IBM Plex Mono', 'Space Mono', monospace;
-  --font-matrix-greek: 'IBM Plex Mono', 'Space Mono', 'Noto Sans Mono', monospace;
+  /* Typography: Highly legible Greek monospace with standard sans fallback */
+  --font-matrix-display: 'IBM Plex Mono', 'Space Mono', 'Noto Sans Mono', monospace;
+  --font-matrix-greek: 'IBM Plex Mono', 'Noto Sans Mono', 'Space Mono', monospace;
   --font-matrix-mono: 'IBM Plex Mono', 'Space Mono', monospace;
 }
 
-/* Background subtle LED grid */
+/* Background subtle arcade dot raster */
 body {
   background-color: var(--matrix-bg) !important;
-  background-image: radial-gradient(#0000000d 1px, transparent 1px) !important;
+  background-image: radial-gradient(rgba(30, 41, 59, 0.08) 1px, transparent 1px) !important;
   background-size: 8px 8px !important;
-  font-family: var(--font-matrix-mono), monospace !important;
+  font-family: var(--font-matrix-greek), monospace !important;
   color: var(--matrix-text-main) !important;
-  image-rendering: pixelated;
 }
 
-/* Sharp Pixel Container & App Bar */
+/* Sharp Pixel Container & Top App Bar */
 .m3-top-app-bar {
   background: var(--matrix-surface) !important;
   border-bottom: 2px solid var(--matrix-border) !important;
-  box-shadow: 0 3px 0 rgba(0,0,0,0.06) !important;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.08) !important;
   font-family: var(--font-matrix-display) !important;
-  letter-spacing: 0.05em;
+}
+
+#top-bar-settings-btn,
+#global-back-btn,
+.m3-back-btn {
+  border-radius: 4px !important;
+  border: 2px solid var(--matrix-border) !important;
+  background: var(--matrix-surface-sunken) !important;
+  box-shadow: 2px 2px 0 var(--matrix-border) !important;
+  color: var(--matrix-text-main) !important;
+}
+
+#top-bar-settings-btn:active,
+#global-back-btn:active,
+.m3-back-btn:active {
+  transform: translate(2px, 2px) !important;
+  box-shadow: 0 0 0 var(--matrix-border) !important;
 }
 
 /* Telematics Live Status Dot */
@@ -56,19 +71,20 @@ body {
   background: #ecfdf5 !important;
   border: 1.5px solid var(--led-green) !important;
   color: var(--led-green) !important;
-  border-radius: 2px !important;
+  border-radius: 3px !important;
   font-family: var(--font-matrix-display) !important;
-  font-size: 0.75rem !important;
+  font-size: 0.72rem !important;
+  font-weight: 700 !important;
   box-shadow: 1px 1px 0 var(--matrix-border) !important;
 }
 
-/* Dot-Matrix Cards */
+/* Arcade Hardware Cards across every section */
 .m3-card {
-  border-radius: 4px !important;
+  border-radius: 6px !important;
   border: 2px solid var(--matrix-border) !important;
   box-shadow: 3px 3px 0 var(--matrix-border) !important;
   background: var(--matrix-surface) !important;
-  transition: transform 0.1s ease, box-shadow 0.1s ease !important;
+  transition: transform 0.08s ease, box-shadow 0.08s ease !important;
 }
 
 .m3-card:active {
@@ -78,32 +94,38 @@ body {
 
 /* Headings & Subtitles */
 h1, h2, h3, h4, .m3-title {
-  font-family: var(--font-matrix-greek), var(--font-matrix-mono), monospace !important;
-  letter-spacing: -0.02em !important;
+  font-family: var(--font-matrix-greek), monospace !important;
+  letter-spacing: -0.01em !important;
+  color: var(--matrix-text-main) !important;
 }
 
-/* Search Bar (Telematics Command Box) */
+/* Search Bar (Arcade Command Console) */
 .m3-search-bar {
-  border-radius: 4px !important;
+  border-radius: 6px !important;
   border: 2px solid var(--matrix-border) !important;
   background: #ffffff !important;
   box-shadow: 3px 3px 0 var(--matrix-border) !important;
 }
 
 .m3-search-bar input {
-  font-family: var(--font-matrix-mono), monospace !important;
-  font-size: 0.9rem !important;
-  letter-spacing: -0.02em;
+  font-family: var(--font-matrix-greek), monospace !important;
+  font-size: 0.88rem !important;
+  color: var(--matrix-text-main) !important;
+}
+
+#global-search-dropdown {
+  border-radius: 6px !important;
+  border: 2px solid var(--matrix-border) !important;
+  box-shadow: 4px 4px 0 var(--matrix-border) !important;
+  background: #ffffff !important;
 }
 
 /* Chunky Physical Tactile Buttons */
 .m3-btn {
   border-radius: 4px !important;
   border: 2px solid var(--matrix-border) !important;
-  font-family: var(--font-matrix-mono), monospace !important;
+  font-family: var(--font-matrix-greek), monospace !important;
   font-weight: 700 !important;
-  text-transform: uppercase !important;
-  letter-spacing: 0.04em !important;
   box-shadow: 2px 2px 0 var(--matrix-border) !important;
   transition: all 0.08s ease !important;
 }
@@ -115,7 +137,7 @@ h1, h2, h3, h4, .m3-title {
 
 .m3-btn-primary {
   background: var(--matrix-border) !important;
-  color: #ffffff !important;
+  color: #fbbf24 !important;
 }
 
 .m3-btn-tonal {
@@ -133,10 +155,11 @@ h1, h2, h3, h4, .m3-title {
 .m3-filter-chip, .ticker-filter-pill {
   border-radius: 4px !important;
   border: 1.5px solid var(--matrix-border) !important;
-  font-family: var(--font-matrix-mono), monospace !important;
+  font-family: var(--font-matrix-greek), monospace !important;
   font-weight: 700 !important;
   box-shadow: 1px 1px 0 var(--matrix-border) !important;
-  transition: all 0.08s ease !important;
+  background: #ffffff !important;
+  color: var(--matrix-text-main) !important;
 }
 
 .m3-filter-chip.active, .ticker-filter-pill.is-active {
@@ -148,90 +171,86 @@ h1, h2, h3, h4, .m3-title {
 #day-today-btn, #day-tomorrow-btn,
 #filter-all-btn, #filter-live-btn, #filter-sched-btn {
   border-radius: 4px !important;
-  font-family: var(--font-matrix-mono), monospace !important;
+  font-family: var(--font-matrix-greek), monospace !important;
   font-weight: 700 !important;
   font-size: 0.76rem !important;
 }
 
-/* Line Badges: Physical Amber / Dark LED plates */
+/* Line Badges: High Contrast Arcade Plates */
 .ticker-line-badge {
-  border-radius: 3px !important;
+  border-radius: 4px !important;
   border: 2px solid var(--matrix-border) !important;
   background: #0f172a !important;
   color: #fbbf24 !important;
   font-family: var(--font-matrix-display) !important;
-  font-weight: 700 !important;
-  text-shadow: 0 0 6px rgba(251, 191, 36, 0.4) !important;
-  letter-spacing: 0.08em !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.04em !important;
   padding: 3px 8px !important;
-  box-shadow: 2px 2px 0 rgba(0,0,0,0.15) !important;
+  box-shadow: 2px 2px 0 var(--matrix-border) !important;
+  text-shadow: none !important;
 }
 
-/* Dot-Matrix Split Flap Digit Tiles */
+/* Arcade Split Flap Digit Tiles - High Contrast & Crisp */
 .flap-digit-box {
-  border-radius: 2px !important;
-  border: 1px solid #1e293b !important;
+  border-radius: 3px !important;
+  border: 1.5px solid #1e293b !important;
   background: #0f172a !important;
   color: #ffffff !important;
   font-family: var(--font-matrix-mono), monospace !important;
   font-weight: 800 !important;
   text-shadow: none !important;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.15) !important;
+  box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.25) !important;
 }
 
 .split-flap-board.urgency-soon .flap-digit-box {
+  background: #1e293b !important;
   color: #f59e0b !important;
-  border-color: #78350f !important;
-  text-shadow: none !important;
+  border-color: #f59e0b !important;
 }
 
 .split-flap-board.urgency-now .flap-digit-box {
-  color: #ef4444 !important;
-  border-color: #7f1d1d !important;
-  text-shadow: none !important;
+  background: #450a0a !important;
+  color: #fca5a5 !important;
+  border-color: #ef4444 !important;
 }
 
-/* Ticker Clock */
-.ticker-clock {
-  font-family: var(--font-matrix-mono), monospace !important;
-  border: 1.5px solid var(--matrix-border) !important;
-  border-radius: 4px !important;
+.split-flap-board.urgency-normal .flap-digit-box {
   background: #0f172a !important;
   color: #38bdf8 !important;
-  box-shadow: 1px 1px 0 var(--matrix-border) !important;
+  border-color: #0284c7 !important;
 }
 
-.ticker-clock-compact {
-  border-radius: 9999px !important;
-  background: #0f172a !important;
-  border: 1px solid #334155 !important;
-  padding: 2px 8px !important;
-}
-
-.ticker-clock-compact .flap-digit-box {
+.split-flap-board.urgency-scheduled .flap-digit-box {
   background: #1e293b !important;
-  color: #38bdf8 !important;
-  font-size: 0.82rem !important;
-  min-width: 14px !important;
-  height: 20px !important;
-  line-height: 20px !important;
-  border-color: #334155 !important;
-  margin: 0 1px !important;
+  color: #e2e8f0 !important;
+  border-color: #64748b !important;
 }
 
-.ticker-clock-compact .flap-separator {
-  color: #94a3b8 !important;
-  font-family: var(--font-matrix-mono), monospace !important;
+/* Live Header Clock in Arcade Mode */
+.m3-top-app-bar .ticker-clock {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.m3-top-app-bar .ticker-clock .flap-digit-box {
+  background: #0f172a !important;
+  border-color: #334155 !important;
+  color: #38bdf8 !important;
+}
+
+.m3-top-app-bar .ticker-clock .flap-separator {
+  color: #38bdf8 !important;
 }
 
 /* Ticker Rows (Hardware Departures Board) */
 .ticker-row {
-  border-radius: 4px !important;
+  border-radius: 6px !important;
   border: 2px solid var(--matrix-border) !important;
   background: #ffffff !important;
   box-shadow: 2px 2px 0 var(--matrix-border) !important;
   margin-bottom: 0.65rem !important;
-  transition: transform 0.08s ease !important;
 }
 
 .ticker-row:hover {
@@ -240,9 +259,9 @@ h1, h2, h3, h4, .m3-title {
 }
 
 .ticker-dest-name {
-  font-family: var(--font-matrix-greek), var(--font-matrix-mono), monospace !important;
+  font-family: var(--font-matrix-greek), monospace !important;
   font-weight: 700 !important;
-  letter-spacing: -0.01em !important;
+  color: var(--matrix-text-main) !important;
 }
 
 /* Action Buttons inside Ticker rows */
@@ -262,11 +281,11 @@ h1, h2, h3, h4, .m3-title {
 .m3-nav-bar {
   background: var(--matrix-surface) !important;
   border-top: 2px solid var(--matrix-border) !important;
-  box-shadow: 0 -3px 0 rgba(0,0,0,0.04) !important;
+  box-shadow: 0 -3px 0 rgba(0, 0, 0, 0.05) !important;
 }
 
 .m3-nav-item span {
-  font-family: var(--font-matrix-mono), monospace !important;
+  font-family: var(--font-matrix-greek), monospace !important;
   font-weight: 700 !important;
   font-size: 0.72rem !important;
 }
@@ -275,64 +294,45 @@ h1, h2, h3, h4, .m3-title {
   background: #0f172a !important;
   color: #fbbf24 !important;
   border-radius: 4px !important;
-  box-shadow: 2px 2px 0 rgba(0,0,0,0.2) !important;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.25) !important;
 }
 
-/* Badges & Commute Advice */
+/* Badges & Pills */
 .m3-badge, .ticker-commute-badge, .ticker-walk-pill {
-  border-radius: 3px !important;
-  border: 1px solid currentColor !important;
-  font-family: var(--font-matrix-mono), monospace !important;
+  border-radius: 4px !important;
+  border: 1px solid var(--matrix-border) !important;
+  font-family: var(--font-matrix-greek), monospace !important;
   font-weight: 700 !important;
 }
 
-/* Header Clock: match arrival tickers split-flap design */
-.m3-top-app-bar .ticker-clock {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  padding: 0 !important;
+/* Walk pill: warm arcade beige */
+.ticker-walk-pill,
+#selected-stop-walk-pill {
+  background: #fbf9f4 !important;
+  color: #78350f !important;
+  border: 1.5px solid #d97706 !important;
 }
 
-/* Radar / locate button: black body + yellow icon in dot-matrix */
+/* Radar & Locate buttons */
 #radar-search-btn,
+#map-locate-btn,
 button[aria-label="Εντοπισμός στάσεων κοντά μου"] {
   background: #0f172a !important;
   color: #fbbf24 !important;
   border: 2px solid #0f172a !important;
-  box-shadow: 2px 2px 0 rgba(0,0,0,0.3) !important;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.3) !important;
 }
 
-/* Walk pill: beige/warm cream instead of light blue */
-.ticker-walk-pill {
-  border-color: #b5a98e !important;
-  background: #f5f0e8 !important;
-  color: #78614a !important;
-}
-
-#selected-stop-walk-pill {
-  background: #f5f0e8 !important;
-  color: #78614a !important;
-  border-color: #b5a98e !important;
-}
-
-/* Map stop markers: dark blue accent (override Leaflet default blue) */
-.leaflet-marker-icon .stop-marker,
-.map-stop-dot {
-  background: #1e3a5f !important;
-  border-color: #1e3a5f !important;
-}
-
-.ticker-board {
-  border: none !important;
-  box-shadow: none !important;
-  background: transparent !important;
-  padding: 0 !important;
+#map-fullscreen-btn {
+  background: #ffffff !important;
+  border: 2px solid var(--matrix-border) !important;
+  box-shadow: 2px 2px 0 var(--matrix-border) !important;
+  border-radius: 4px !important;
 }
 
 /* Modals & Dialogs: Physical Hardware Terminal */
 .m3-dialog, .m3-dialog-content {
-  border-radius: 6px !important;
+  border-radius: 8px !important;
   border: 3px solid var(--matrix-border) !important;
   box-shadow: 6px 6px 0 var(--matrix-border) !important;
   background: #ffffff !important;
@@ -342,25 +342,11 @@ button[aria-label="Εντοπισμός στάσεων κοντά μου"] {
 .m3-dialog-content input, .m3-dialog-content select {
   border-radius: 4px !important;
   border: 2px solid var(--matrix-border) !important;
-  font-family: var(--font-matrix-mono), monospace !important;
-  box-shadow: 2px 2px 0 rgba(0,0,0,0.08) !important;
+  font-family: var(--font-matrix-greek), monospace !important;
+  box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.1) !important;
 }
 
-/* Custom Scrollbars: Flat Pixel Sliders */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: var(--matrix-surface-sunken);
-  border-left: 1px solid var(--matrix-border-light);
-}
-::-webkit-scrollbar-thumb {
-  background: var(--matrix-border);
-  border: 1px solid #ffffff;
-}
-
-/* Favourite stop banner in arcade / dot-matrix mode — arcade tactile drop shadow */
+/* Favourite stop banner in arcade mode: tactile drop shadow */
 body #selected-stop-banner.is-favourite {
   border: 2px solid var(--matrix-border) !important;
   outline: none !important;
@@ -377,10 +363,10 @@ body .m3-card.is-favourite-stop {
   background: #fffdf5 !important;
 }
 
-/* Polished Dot-Matrix Route Stop Items */
+/* Polished Route Stop Items */
 .route-stop-item {
-  border-radius: 4px !important;
-  border: 1.5px solid var(--matrix-border) !important;
+  border-radius: 6px !important;
+  border: 2px solid var(--matrix-border) !important;
   background: #ffffff !important;
   box-shadow: 2px 2px 0 var(--matrix-border) !important;
   transition: transform 0.08s ease, box-shadow 0.08s ease !important;
@@ -396,3 +382,47 @@ body .m3-card.is-favourite-stop {
   box-shadow: 1px 1px 0 var(--matrix-border) !important;
 }
 
+/* Pinned trips card & notifications card consistency */
+#section-pinned .m3-card,
+#section-notifications .m3-card,
+#section-favorites .m3-card {
+  border: 2px solid var(--matrix-border) !important;
+  box-shadow: 3px 3px 0 var(--matrix-border) !important;
+}
+
+/* Custom Scrollbars: Flat Pixel Sliders */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--matrix-surface-sunken);
+  border-left: 1px solid var(--matrix-border-light);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--matrix-border);
+  border: 1px solid #ffffff;
+}
+
+/* Mobile Responsiveness for Phones: clean spacing & readable font sizes */
+@media (max-width: 600px) {
+  body {
+    font-size: 0.92rem !important;
+  }
+
+  .ticker-dest-name {
+    font-size: 0.92rem !important;
+  }
+
+  .ticker-row {
+    padding: 0.6rem 0.65rem !important;
+  }
+
+  .m3-btn {
+    letter-spacing: 0.01em !important;
+  }
+
+  .flap-digit-box {
+    min-width: 13px !important;
+  }
+}

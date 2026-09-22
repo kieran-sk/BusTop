@@ -1,0 +1,383 @@
+/**
+ * BusTop "Cloud" Experimental Theme
+ * Modern ethereal aesthetic:
+ * Ultra-refined liquid glass, translucent hazy blur layers,
+ * subtle prismatic/specular light borders, frosted glassmorphism cards,
+ * glowing floating pills, and smooth organic elevations.
+ */
+
+:root {
+  /* Cloud Palette */
+  --cloud-bg-gradient: linear-gradient(135deg, #f0f4fd 0%, #e2eafc 35%, #edf2fb 70%, #f7f9fe 100%);
+  --cloud-glass-surface: rgba(255, 255, 255, 0.72);
+  --cloud-glass-surface-high: rgba(255, 255, 255, 0.88);
+  --cloud-glass-surface-subtle: rgba(255, 255, 255, 0.55);
+  --cloud-glass-border: rgba(255, 255, 255, 0.8);
+  --cloud-glass-border-subtle: rgba(255, 255, 255, 0.45);
+  --cloud-glass-specular: inset 0 1px 1px 0 rgba(255, 255, 255, 0.9), 0 8px 32px 0 rgba(31, 38, 135, 0.08);
+  --cloud-glass-shadow-floating: inset 0 1px 2px 0 rgba(255, 255, 255, 0.95), 0 12px 36px -4px rgba(99, 102, 241, 0.12), 0 4px 12px rgba(0, 0, 0, 0.03);
+  --cloud-glass-blur: blur(20px);
+  --cloud-glass-blur-heavy: blur(28px);
+  --cloud-glass-blur-light: blur(12px);
+
+  /* Cloud Accents: Cerulean / Celestial Blue & Lavender Glow */
+  --cloud-primary: #2563eb;
+  --cloud-primary-light: #60a5fa;
+  --cloud-primary-glow: rgba(37, 99, 235, 0.22);
+  --cloud-accent-lavender: #818cf8;
+  --cloud-accent-cyan: #06b6d4;
+  --cloud-text-main: #0f172a;
+  --cloud-text-muted: #64748b;
+  --cloud-text-soft: #94a3b8;
+}
+
+/* Fluid Hazy Ambient Backdrop */
+body {
+  background: var(--cloud-bg-gradient) !important;
+  background-attachment: fixed !important;
+  color: var(--cloud-text-main) !important;
+  min-height: 100vh;
+}
+
+/* Atmospheric Ambient Orbs behind content */
+body::before {
+  content: '';
+  position: fixed;
+  top: -100px;
+  right: -50px;
+  width: 450px;
+  height: 450px;
+  background: radial-gradient(circle, rgba(147, 197, 253, 0.45) 0%, rgba(199, 210, 254, 0.25) 50%, transparent 70%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(40px);
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  bottom: 60px;
+  left: -80px;
+  width: 480px;
+  height: 480px;
+  background: radial-gradient(circle, rgba(165, 243, 252, 0.35) 0%, rgba(224, 231, 255, 0.3) 55%, transparent 75%);
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 0;
+  filter: blur(50px);
+}
+
+/* App Bar: Liquid Glass Strip */
+.m3-top-app-bar {
+  background: rgba(255, 255, 255, 0.68) !important;
+  backdrop-filter: var(--cloud-glass-blur-heavy) saturate(180%) !important;
+  -webkit-backdrop-filter: var(--cloud-glass-blur-heavy) saturate(180%) !important;
+  border-bottom: 1px solid var(--cloud-glass-border) !important;
+  box-shadow: 0 4px 20px -2px rgba(37, 99, 235, 0.06) !important;
+  z-index: 100;
+}
+
+/* Top Bar Settings & Back Buttons */
+#top-bar-settings-btn,
+#global-back-btn,
+.m3-back-btn {
+  background: rgba(255, 255, 255, 0.7) !important;
+  backdrop-filter: var(--cloud-glass-blur-light) !important;
+  -webkit-backdrop-filter: var(--cloud-glass-blur-light) !important;
+  border: 1px solid var(--cloud-glass-border) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+#top-bar-settings-btn:active,
+#global-back-btn:active,
+.m3-back-btn:active {
+  transform: scale(0.94) !important;
+}
+
+/* EXP badge: Hazy celestial gradient */
+.m3-top-app-bar span[style*="EXP"] {
+  background: linear-gradient(135deg, rgba(237, 233, 254, 0.8), rgba(219, 234, 254, 0.8)) !important;
+  border: 1px solid rgba(196, 181, 253, 0.6) !important;
+  color: #6366f1 !important;
+  backdrop-filter: blur(8px) !important;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.15) !important;
+}
+
+/* Header Live Clock: Frosted Pill Floating */
+.m3-top-app-bar .ticker-clock {
+  background: rgba(255, 255, 255, 0.75) !important;
+  border: 1px solid var(--cloud-glass-border) !important;
+  box-shadow: var(--cloud-glass-specular) !important;
+  border-radius: 9999px !important;
+  padding: 3px 10px !important;
+  backdrop-filter: var(--cloud-glass-blur-light) !important;
+  -webkit-backdrop-filter: var(--cloud-glass-blur-light) !important;
+}
+
+.m3-top-app-bar .ticker-clock .flap-digit-box {
+  background: rgba(255, 255, 255, 0.8) !important;
+  border: 1px solid rgba(191, 219, 254, 0.7) !important;
+  color: #005ac1 !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.9), 0 1px 3px rgba(0, 90, 193, 0.1) !important;
+  text-shadow: none !important;
+}
+
+.m3-top-app-bar .ticker-clock .flap-digit-box::after {
+  background: rgba(0, 90, 193, 0.1) !important;
+}
+
+.m3-top-app-bar .ticker-clock .flap-separator {
+  color: #60a5fa !important;
+}
+
+/* Search Bar: Floating Pill Glass Capsule */
+.m3-search-bar {
+  background: rgba(255, 255, 255, 0.75) !important;
+  backdrop-filter: var(--cloud-glass-blur-heavy) saturate(180%) !important;
+  -webkit-backdrop-filter: var(--cloud-glass-blur-heavy) saturate(180%) !important;
+  border: 1px solid var(--cloud-glass-border) !important;
+  border-radius: 9999px !important;
+  box-shadow: var(--cloud-glass-shadow-floating) !important;
+  transition: all 0.25s ease !important;
+}
+
+.m3-search-bar:focus-within {
+  background: rgba(255, 255, 255, 0.92) !important;
+  border-color: #93c5fd !important;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.95), 0 14px 40px -4px rgba(37, 99, 235, 0.2) !important;
+}
+
+.m3-search-bar input {
+  background: transparent !important;
+  color: var(--cloud-text-main) !important;
+  font-family: inherit !important;
+}
+
+#global-search-dropdown {
+  background: rgba(255, 255, 255, 0.82) !important;
+  backdrop-filter: var(--cloud-glass-blur-heavy) saturate(180%) !important;
+  -webkit-backdrop-filter: var(--cloud-glass-blur-heavy) saturate(180%) !important;
+  border: 1px solid var(--cloud-glass-border) !important;
+  box-shadow: 0 16px 40px -8px rgba(37, 99, 235, 0.18) !important;
+  border-radius: 20px !important;
+}
+
+/* Glassmorphism Cards across the entire application */
+.m3-card,
+.ticker-row,
+.route-stop-item {
+  background: var(--cloud-glass-surface) !important;
+  backdrop-filter: var(--cloud-glass-blur) !important;
+  -webkit-backdrop-filter: var(--cloud-glass-blur) !important;
+  border: 1px solid var(--cloud-glass-border) !important;
+  border-radius: 18px !important;
+  box-shadow: var(--cloud-glass-shadow-floating) !important;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+.m3-card:hover,
+.ticker-row:hover,
+.route-stop-item:hover {
+  background: var(--cloud-glass-surface-high) !important;
+  box-shadow: inset 0 1px 2px 0 rgba(255, 255, 255, 1), 0 16px 44px -4px rgba(37, 99, 235, 0.16) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* Selected Stop Banner: Celestial Glass Card */
+#selected-stop-banner {
+  background: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: var(--cloud-glass-blur-heavy) !important;
+  -webkit-backdrop-filter: var(--cloud-glass-blur-heavy) !important;
+  border: 1px solid var(--cloud-glass-border) !important;
+  border-left: 4px solid var(--cloud-primary) !important;
+  border-radius: 18px !important;
+  box-shadow: var(--cloud-glass-shadow-floating) !important;
+}
+
+#selected-stop-banner.is-favourite,
+.m3-card.is-favourite,
+.m3-card.is-favourite-stop {
+  background: rgba(255, 254, 245, 0.88) !important;
+  backdrop-filter: var(--cloud-glass-blur-heavy) !important;
+  -webkit-backdrop-filter: var(--cloud-glass-blur-heavy) !important;
+  border: 1.5px solid rgba(252, 211, 77, 0.8) !important;
+  box-shadow: inset 0 1px 2px 0 rgba(255, 255, 255, 1), 0 12px 32px -4px rgba(245, 158, 11, 0.18) !important;
+}
+
+/* Split-Flap Arrival Digits in Cloud Mode: Frosted Crystal Tiles */
+.flap-digit-box {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: var(--cloud-glass-blur-light) !important;
+  -webkit-backdrop-filter: var(--cloud-glass-blur-light) !important;
+  border: 1px solid rgba(255, 255, 255, 0.9) !important;
+  color: #0f172a !important;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 1), 0 2px 6px rgba(0, 0, 0, 0.05) !important;
+  border-radius: 6px !important;
+}
+
+.split-flap-board.urgency-now .flap-digit-box {
+  background: rgba(254, 242, 242, 0.9) !important;
+  border-color: rgba(248, 113, 113, 0.6) !important;
+  color: #dc2626 !important;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 1), 0 2px 8px rgba(239, 68, 68, 0.2) !important;
+}
+
+.split-flap-board.urgency-soon .flap-digit-box {
+  background: rgba(240, 253, 244, 0.9) !important;
+  border-color: rgba(74, 222, 128, 0.6) !important;
+  color: #15803d !important;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 1), 0 2px 8px rgba(34, 197, 94, 0.2) !important;
+}
+
+.split-flap-board.urgency-normal .flap-digit-box {
+  background: rgba(239, 246, 255, 0.9) !important;
+  border-color: rgba(147, 197, 253, 0.6) !important;
+  color: #005ac1 !important;
+  box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 1), 0 2px 8px rgba(37, 99, 235, 0.15) !important;
+}
+
+.split-flap-board.urgency-scheduled .flap-digit-box {
+  background: rgba(248, 250, 252, 0.85) !important;
+  border-color: rgba(203, 213, 225, 0.6) !important;
+  color: #334155 !important;
+}
+
+/* Line Badges: Pearlescent glowing pill */
+.ticker-line-badge {
+  background: linear-gradient(135deg, rgba(239, 246, 255, 0.95), rgba(219, 234, 254, 0.8)) !important;
+  border: 1px solid rgba(191, 219, 254, 0.9) !important;
+  color: #005ac1 !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.95), 0 2px 6px rgba(37, 99, 235, 0.1) !important;
+  border-radius: 10px !important;
+  font-weight: 900 !important;
+}
+
+/* Buttons: Translucent Liquid Gel */
+.m3-btn {
+  border-radius: 9999px !important;
+  backdrop-filter: var(--cloud-glass-blur-light) !important;
+  -webkit-backdrop-filter: var(--cloud-glass-blur-light) !important;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+.m3-btn-primary {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.4) !important;
+}
+
+.m3-btn-primary:active {
+  transform: scale(0.96) !important;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25) !important;
+}
+
+.m3-btn-tonal {
+  background: rgba(255, 255, 255, 0.65) !important;
+  border: 1px solid var(--cloud-glass-border) !important;
+  color: var(--cloud-text-main) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+}
+
+.m3-btn-tonal:hover {
+  background: rgba(255, 255, 255, 0.85) !important;
+}
+
+.m3-btn-outlined {
+  background: rgba(255, 255, 255, 0.45) !important;
+  border: 1px solid rgba(203, 213, 225, 0.7) !important;
+}
+
+/* Filter Bars & Option Groups */
+#arrivals-options-bar > div,
+.ticker-filter-bar {
+  background: rgba(255, 255, 255, 0.6) !important;
+  backdrop-filter: var(--cloud-glass-blur-light) !important;
+  -webkit-backdrop-filter: var(--cloud-glass-blur-light) !important;
+  border: 1px solid var(--cloud-glass-border) !important;
+  border-radius: 9999px !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03) !important;
+}
+
+.ticker-filter-pill {
+  background: rgba(255, 255, 255, 0.7) !important;
+  border: 1px solid var(--cloud-glass-border-subtle) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+}
+
+.ticker-filter-pill.is-active {
+  background: rgba(37, 99, 235, 0.12) !important;
+  color: #005ac1 !important;
+  border-color: #93c5fd !important;
+}
+
+/* Bottom Navigation Bar: Floating Liquid Glass Dock */
+.m3-nav-bar {
+  background: rgba(255, 255, 255, 0.72) !important;
+  backdrop-filter: var(--cloud-glass-blur-heavy) saturate(200%) !important;
+  -webkit-backdrop-filter: var(--cloud-glass-blur-heavy) saturate(200%) !important;
+  border-top: 1px solid var(--cloud-glass-border) !important;
+  box-shadow: 0 -8px 32px 0 rgba(31, 38, 135, 0.08) !important;
+}
+
+.m3-nav-item.active .m3-nav-pill {
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.15), rgba(129, 140, 248, 0.2)) !important;
+  color: #005ac1 !important;
+  border: 1px solid rgba(147, 197, 253, 0.5) !important;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.9), 0 2px 8px rgba(37, 99, 235, 0.15) !important;
+}
+
+/* Modals & Dialogs: Deep Glass Elevation */
+.m3-dialog-backdrop {
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  background: rgba(15, 23, 42, 0.25) !important;
+}
+
+.m3-dialog-content {
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: var(--cloud-glass-blur-heavy) saturate(180%) !important;
+  -webkit-backdrop-filter: var(--cloud-glass-blur-heavy) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.9) !important;
+  border-radius: 24px !important;
+  box-shadow: inset 0 1px 2px 0 rgba(255, 255, 255, 1), 0 24px 64px -12px rgba(31, 38, 135, 0.22) !important;
+}
+
+.m3-dialog-content input,
+.m3-dialog-content select {
+  background: rgba(255, 255, 255, 0.75) !important;
+  border: 1px solid rgba(203, 213, 225, 0.7) !important;
+  border-radius: 12px !important;
+}
+
+/* Badges & Walk Pills */
+.ticker-walk-pill,
+#selected-stop-walk-pill {
+  background: rgba(239, 246, 255, 0.85) !important;
+  border: 1px solid rgba(191, 219, 254, 0.8) !important;
+  color: #005ac1 !important;
+  backdrop-filter: blur(6px) !important;
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.08) !important;
+}
+
+/* Map Card */
+#map-card-wrapper {
+  border-radius: 20px !important;
+  border: 1px solid var(--cloud-glass-border) !important;
+  box-shadow: var(--cloud-glass-shadow-floating) !important;
+}
+
+/* Smooth Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.4);
+  border-radius: 9999px;
+}

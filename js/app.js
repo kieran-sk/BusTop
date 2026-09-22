@@ -124,49 +124,74 @@ class AppController {
   }
 
   setThemeMode(mode) {
-    const isMatrix = mode === 'matrix';
-    const link = document.getElementById('theme-dot-matrix');
-    if (link) {
-      link.disabled = !isMatrix;
+    const validModes = ['m3', 'matrix', 'cloud'];
+    const activeMode = validModes.includes(mode) ? mode : 'm3';
+
+    const linkMatrix = document.getElementById('theme-dot-matrix');
+    const linkCloud = document.getElementById('theme-cloud');
+
+    if (linkMatrix) {
+      linkMatrix.disabled = (activeMode !== 'matrix');
     }
-    localStorage.setItem('OASA_DOT_MATRIX_THEME', isMatrix ? 'true' : 'false');
-    this.updateThemeButtonsUI(isMatrix);
+    if (linkCloud) {
+      linkCloud.disabled = (activeMode !== 'cloud');
+    }
+
+    localStorage.setItem('OASA_APP_THEME', activeMode);
+    localStorage.setItem('OASA_DOT_MATRIX_THEME', activeMode === 'matrix' ? 'true' : 'false');
+    this.updateThemeButtonsUI(activeMode);
     this.triggerHaptic('light');
   }
 
-  updateThemeButtonsUI(isMatrix) {
+  updateThemeButtonsUI(activeMode) {
     const btnM3 = document.getElementById('theme-btn-m3');
     const btnMatrix = document.getElementById('theme-btn-matrix');
-    if (btnM3 && btnMatrix) {
-      if (isMatrix) {
-        btnM3.className = 'm3-btn m3-btn-tonal';
-        btnMatrix.className = 'm3-btn m3-btn-primary';
-      } else {
-        btnM3.className = 'm3-btn m3-btn-primary';
-        btnMatrix.className = 'm3-btn m3-btn-tonal';
-      }
+    const btnCloud = document.getElementById('theme-btn-cloud');
+
+    if (btnM3) {
+      btnM3.className = activeMode === 'm3' ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-tonal';
+    }
+    if (btnMatrix) {
+      btnMatrix.className = activeMode === 'matrix' ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-tonal';
+    }
+    if (btnCloud) {
+      btnCloud.className = activeMode === 'cloud' ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-tonal';
     }
   }
 
   toggleDotMatrixTheme() {
-    const link = document.getElementById('theme-dot-matrix');
-    if (!link) return;
-    const isEnabled = !link.disabled;
-    const nextState = !isEnabled;
-    this.setThemeMode(nextState ? 'matrix' : 'm3');
+    const stored = localStorage.getItem('OASA_APP_THEME') || (localStorage.getItem('OASA_DOT_MATRIX_THEME') === 'true' ? 'matrix' : 'm3');
+    const nextState = stored === 'matrix' ? 'm3' : 'matrix';
+    this.setThemeMode(nextState);
   }
 
   applyStoredTheme() {
-    const isExpUrl = window.location.hostname.includes('experimental') || 
-                     window.location.search.includes('theme=matrix') || 
-                     window.location.pathname.includes('experimental');
-    const stored = localStorage.getItem('OASA_DOT_MATRIX_THEME');
-    const shouldEnableMatrix = stored === 'true' || (stored === null && isExpUrl);
-    const link = document.getElementById('theme-dot-matrix');
-    if (link) {
-      link.disabled = !shouldEnableMatrix;
+    const urlParams = new URLSearchParams(window.location.search);
+    const themeParam = urlParams.get('theme');
+
+    let chosenMode = 'm3';
+    const storedTheme = localStorage.getItem('OASA_APP_THEME');
+    const legacyMatrix = localStorage.getItem('OASA_DOT_MATRIX_THEME');
+
+    if (themeParam && ['m3', 'matrix', 'cloud'].includes(themeParam)) {
+      chosenMode = themeParam;
+    } else if (storedTheme && ['m3', 'matrix', 'cloud'].includes(storedTheme)) {
+      chosenMode = storedTheme;
+    } else if (legacyMatrix === 'true') {
+      chosenMode = 'matrix';
     }
-    this.updateThemeButtonsUI(shouldEnableMatrix);
+
+    const linkMatrix = document.getElementById('theme-dot-matrix');
+    const linkCloud = document.getElementById('theme-cloud');
+
+    if (linkMatrix) {
+      linkMatrix.disabled = (chosenMode !== 'matrix');
+    }
+    if (linkCloud) {
+      linkCloud.disabled = (chosenMode !== 'cloud');
+    }
+
+    this.updateThemeButtonsUI(chosenMode);
   }
 
   async init() {
