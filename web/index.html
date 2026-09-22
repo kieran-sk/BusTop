@@ -35,10 +35,8 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- Stylesheets (Relative paths with cache-busting for PWA updates) -->
-  <link rel="stylesheet" href="css/m3-expressive.css?v=20260922_2225">
-  <link rel="stylesheet" href="css/airport-ticker.css?v=20260922_2225">
-  <link id="theme-dot-matrix" rel="stylesheet" href="css/dot-matrix.css?v=20260922_2225" disabled>
-  <link id="theme-cloud" rel="stylesheet" href="css/cloud-theme.css?v=20260922_2225" disabled>
+  <link rel="stylesheet" href="css/m3-expressive.css?v=20260922_2235">
+  <link rel="stylesheet" href="css/airport-ticker.css?v=20260922_2235">
 </head>
 <body>
 
@@ -397,26 +395,7 @@
       </div>
 
       <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.25rem;">
-        <!-- Theme Mode Selection: Clean vs Arcade vs Cloud -->
-        <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 12px; padding: 0.9rem;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-            <div>
-              <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface);">Στυλ Εμφάνισης</div>
-              <div style="font-size: 0.75rem; color: var(--md-sys-color-outline);">Επιλέξτε Clean, Arcade ή Cloud (Liquid Glass)</div>
-            </div>
-          </div>
-          <div style="display: flex; gap: 0.4rem; margin-top: 0.6rem;">
-            <button id="theme-btn-m3" class="m3-btn m3-btn-primary" style="flex: 1; padding: 0.45rem 0.5rem; font-size: 0.8rem; border-radius: 8px;" onclick="window.App.setThemeMode('m3')">
-              Clean
-            </button>
-            <button id="theme-btn-matrix" class="m3-btn m3-btn-tonal" style="flex: 1; padding: 0.45rem 0.5rem; font-size: 0.8rem; border-radius: 8px;" onclick="window.App.setThemeMode('matrix')">
-              Arcade
-            </button>
-            <button id="theme-btn-cloud" class="m3-btn m3-btn-tonal" style="flex: 1; padding: 0.45rem 0.5rem; font-size: 0.8rem; border-radius: 8px;" onclick="window.App.setThemeMode('cloud')">
-              Cloud
-            </button>
-          </div>
-        </div>
+
 
         <!-- Battery Saver Mode for Live Tracking -->
         <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 12px; padding: 0.9rem;">
@@ -524,14 +503,14 @@
   </nav>
 
   <!-- Scripts (Cache-busted with defer for non-blocking execution) -->
-  <script defer src="js/api.js?v=20260922_2225"></script>
-  <script defer src="js/map-manager.js?v=20260922_2225"></script>
-  <script defer src="js/ticker.js?v=20260922_2225"></script>
-  <script defer src="js/alarms.js?v=20260922_2225"></script>
-  <script defer src="js/pinned-trips.js?v=20260922_2225"></script>
-  <script defer src="js/timetable.js?v=20260922_2225"></script>
-  <script defer src="js/search.js?v=20260922_2225"></script>
-  <script defer src="js/favorites.js?v=20260922_2225"></script>
-  <script defer src="js/app.js?v=20260922_2225"></script>
+  <script defer src="js/api.js?v=20260922_2235"></script>
+  <script defer src="js/map-manager.js?v=20260922_2235"></script>
+  <script defer src="js/ticker.js?v=20260922_2235"></script>
+  <script defer src="js/alarms.js?v=20260922_2235"></script>
+  <script defer src="js/pinned-trips.js?v=20260922_2235"></script>
+  <script defer src="js/timetable.js?v=20260922_2235"></script>
+  <script defer src="js/search.js?v=20260922_2235"></script>
+  <script defer src="js/favorites.js?v=20260922_2235"></script>
+  <script defer src="js/app.js?v=20260922_2235"></script>
 </body>
 </html>

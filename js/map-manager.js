@@ -48,7 +48,7 @@ class MapManager {
 
     this.map = L.map(this.containerId, {
       center: initialCenter,
-      zoom: 16,
+      zoom: 17.5,
       zoomControl: false
     });
 
@@ -390,7 +390,7 @@ class MapManager {
    * @param {Array} [nearbyStops] - Optional list of nearby stops to include in bounds
    * @param {number} [radiusMeters=500] - Radius around user in meters
    */
-  fitAreaAroundUser(lat, lng, nearbyStops = [], radiusMeters = 350) {
+  fitAreaAroundUser(lat, lng, nearbyStops = [], radiusMeters = 200) {
     if (!this.map) return;
     const pLat = parseFloat(lat);
     const pLng = parseFloat(lng);
@@ -439,9 +439,9 @@ class MapManager {
       if (!this.map) return;
       this.map.invalidateSize();
       if (typeof this.map.flyToBounds === 'function') {
-        this.map.flyToBounds(bounds, { padding: [35, 35], maxZoom: 17, duration: 0.8 });
+        this.map.flyToBounds(bounds, { padding: [35, 35], maxZoom: 18, duration: 0.8 });
       } else {
-        this.map.fitBounds(bounds, { padding: [35, 35], maxZoom: 17, animate: true });
+        this.map.fitBounds(bounds, { padding: [35, 35], maxZoom: 18, animate: true });
       }
     };
 

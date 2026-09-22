@@ -124,74 +124,30 @@ class AppController {
   }
 
   setThemeMode(mode) {
-    const validModes = ['m3', 'matrix', 'cloud'];
-    const activeMode = validModes.includes(mode) ? mode : 'm3';
-
+    // Only 'm3' (Clean) theme is maintained
+    localStorage.setItem('OASA_APP_THEME', 'm3');
+    localStorage.removeItem('OASA_DOT_MATRIX_THEME');
     const linkMatrix = document.getElementById('theme-dot-matrix');
     const linkCloud = document.getElementById('theme-cloud');
-
-    if (linkMatrix) {
-      linkMatrix.disabled = (activeMode !== 'matrix');
-    }
-    if (linkCloud) {
-      linkCloud.disabled = (activeMode !== 'cloud');
-    }
-
-    localStorage.setItem('OASA_APP_THEME', activeMode);
-    localStorage.setItem('OASA_DOT_MATRIX_THEME', activeMode === 'matrix' ? 'true' : 'false');
-    this.updateThemeButtonsUI(activeMode);
-    this.triggerHaptic('light');
+    if (linkMatrix) linkMatrix.disabled = true;
+    if (linkCloud) linkCloud.disabled = true;
   }
 
   updateThemeButtonsUI(activeMode) {
-    const btnM3 = document.getElementById('theme-btn-m3');
-    const btnMatrix = document.getElementById('theme-btn-matrix');
-    const btnCloud = document.getElementById('theme-btn-cloud');
-
-    if (btnM3) {
-      btnM3.className = activeMode === 'm3' ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-tonal';
-    }
-    if (btnMatrix) {
-      btnMatrix.className = activeMode === 'matrix' ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-tonal';
-    }
-    if (btnCloud) {
-      btnCloud.className = activeMode === 'cloud' ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-tonal';
-    }
+    // Legacy helper kept for backward safety
   }
 
   toggleDotMatrixTheme() {
-    const stored = localStorage.getItem('OASA_APP_THEME') || (localStorage.getItem('OASA_DOT_MATRIX_THEME') === 'true' ? 'matrix' : 'm3');
-    const nextState = stored === 'matrix' ? 'm3' : 'matrix';
-    this.setThemeMode(nextState);
+    // No-op: Only Clean theme is active
   }
 
   applyStoredTheme() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const themeParam = urlParams.get('theme');
-
-    let chosenMode = 'm3';
-    const storedTheme = localStorage.getItem('OASA_APP_THEME');
-    const legacyMatrix = localStorage.getItem('OASA_DOT_MATRIX_THEME');
-
-    if (themeParam && ['m3', 'matrix', 'cloud'].includes(themeParam)) {
-      chosenMode = themeParam;
-    } else if (storedTheme && ['m3', 'matrix', 'cloud'].includes(storedTheme)) {
-      chosenMode = storedTheme;
-    } else if (legacyMatrix === 'true') {
-      chosenMode = 'matrix';
-    }
-
+    localStorage.setItem('OASA_APP_THEME', 'm3');
+    localStorage.removeItem('OASA_DOT_MATRIX_THEME');
     const linkMatrix = document.getElementById('theme-dot-matrix');
     const linkCloud = document.getElementById('theme-cloud');
-
-    if (linkMatrix) {
-      linkMatrix.disabled = (chosenMode !== 'matrix');
-    }
-    if (linkCloud) {
-      linkCloud.disabled = (chosenMode !== 'cloud');
-    }
-
-    this.updateThemeButtonsUI(chosenMode);
+    if (linkMatrix) linkMatrix.disabled = true;
+    if (linkCloud) linkCloud.disabled = true;
   }
 
   async init() {

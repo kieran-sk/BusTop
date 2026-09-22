@@ -335,7 +335,7 @@ class SearchManager {
         window.App.userLocation.lat,
         window.App.userLocation.lng,
         this.nearbyStops,
-        350
+        200
       );
     }
 
@@ -350,7 +350,7 @@ class SearchManager {
       const lng = 23.7335;
       if (window.App) window.App.setUserLocation(lat, lng);
       if (window.App && window.App.mapManager) {
-        window.App.mapManager.fitAreaAroundUser(lat, lng, this.nearbyStops, 350);
+        window.App.mapManager.fitAreaAroundUser(lat, lng, this.nearbyStops, 200);
       }
       try {
         const stops = await window.API.getClosestStops(lat, lng);
@@ -386,7 +386,7 @@ class SearchManager {
           window.App.setUserLocation(latitude, longitude);
         }
         if (window.App && window.App.mapManager) {
-          window.App.mapManager.fitAreaAroundUser(latitude, longitude, this.nearbyStops, 350);
+          window.App.mapManager.fitAreaAroundUser(latitude, longitude, this.nearbyStops, 200);
         }
 
         try {
