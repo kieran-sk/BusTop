@@ -178,7 +178,7 @@ class TimetableManager {
                 ${stopTitle}
               </div>
               <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 1px;">
-                ${s.StopStreet ? s.StopStreet + ' • ' : ''}Στάση #${s.StopCode}
+                ${s.StopStreet ? s.StopStreet + ' • ' : ''}#${s.StopCode}
               </div>
               ${nearBus ? `
                 <div style="display: inline-flex; align-items: center; gap: 4px; margin-top: 3px; font-size: 0.7rem; font-weight: 700; color: #047857; background: #ecfdf5; padding: 1px 6px; border-radius: 4px;">
@@ -188,9 +188,6 @@ class TimetableManager {
               ` : ''}
             </div>
           </div>
-          <span class="m3-badge" style="background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-primary); font-size: 0.9rem; font-weight: 800; flex-shrink: 0; margin-left: 0.5rem; padding: 3px 8px;" title="Προβολή Αφίξεων">
-            ➔
-          </span>
         </div>
       `;
     }).join('');
@@ -462,10 +459,10 @@ class TimetableManager {
     const isScheduleMode = this.currentViewMode === 'schedule';
     const isMapMode = this.currentViewMode === 'map';
 
-    // Subtitle description (clean without repeating circular)
+    // Subtitle description (clean without repeating circular, only parenthesis content)
     const subtitleText = isCircular
-      ? `${outStops.length} στάσεις • ${isStopsMode ? 'Πλήρης κύκλος διαδρομής' : `${goTrips.length} προγραμματισμένα δρομολόγια`}`
-      : `Πλήρες Δρομολόγιο • 2 Κατευθύνσεις (${outStops.length} στάσεις Μετάβαση / ${inStops.length} Επιστροφή)`;
+      ? `${outStops.length} στάσεις`
+      : `${outStops.length} στάσεις Μετάβαση / ${inStops.length} Επιστροφή`;
 
     // Main Content
     let mainContentHtml = '';
@@ -573,23 +570,27 @@ class TimetableManager {
     container.innerHTML = `
       <div class="m3-card" style="margin-bottom: ${isMapMode ? '0.5rem' : '1.5rem'}; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);">
         <!-- Header -->
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
-          <div style="flex: 1; min-width: 0;">
-            <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.25rem; flex-wrap: wrap;">
+        <div style="margin-bottom: 1rem;">
+          <!-- Top row: Line Badge (and Circular indicator) on left, Favorite Star diametrically on right -->
+          <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 0.4rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
               <span class="ticker-line-badge" style="font-size: 1.05rem;">
                 ${this.currentLine.lineId || 'BUS'}
               </span>
-              <h2 style="font-size: 1.2rem; font-weight: 900; color: var(--md-sys-color-on-surface); margin: 0;">${displayTitle}</h2>
               ${isCircular ? `
                 <span class="m3-badge" style="background: #eff6ff; color: #005ac1; font-weight: 800; font-size: 0.72rem; padding: 2px 8px;">
                   🔄 Κυκλική Διαδρομή
                 </span>
               ` : ''}
-              <button class="m3-icon-btn" style="width: 36px; height: 36px; border: none; cursor: pointer; background: none;" title="Αποθήκευση γραμμής" onclick="event.stopPropagation(); const isFav = window.Favorites.toggleLine('${this.currentLine.lineCode}', '${this.currentLine.lineId}', '${(this.currentLine.lineDescr || '').replace(/'/g, "\\'")}'); this.querySelector('svg').setAttribute('fill', isFav ? '#eab308' : 'none'); this.querySelector('svg').setAttribute('stroke', isFav ? '#ca8a04' : '#64748b');">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="${window.Favorites && window.Favorites.isLineFav(this.currentLine.lineCode) ? '#eab308' : 'none'}" stroke="${window.Favorites && window.Favorites.isLineFav(this.currentLine.lineCode) ? '#ca8a04' : '#64748b'}" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-              </button>
             </div>
-            <div style="font-size: 0.8rem; color: #64748b;">
+            <button class="m3-icon-btn" style="width: 36px; height: 36px; border: none; cursor: pointer; background: none; flex-shrink: 0;" title="Αποθήκευση γραμμής" onclick="event.stopPropagation(); const isFav = window.Favorites.toggleLine('${this.currentLine.lineCode}', '${this.currentLine.lineId}', '${(this.currentLine.lineDescr || '').replace(/'/g, "\\'")}'); this.querySelector('svg').setAttribute('fill', isFav ? '#eab308' : 'none'); this.querySelector('svg').setAttribute('stroke', isFav ? '#ca8a04' : '#64748b');">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="${window.Favorites && window.Favorites.isLineFav(this.currentLine.lineCode) ? '#eab308' : 'none'}" stroke="${window.Favorites && window.Favorites.isLineFav(this.currentLine.lineCode) ? '#ca8a04' : '#64748b'}" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            </button>
+          </div>
+          <!-- Second row: Title and concise subtitle -->
+          <div>
+            <h2 style="font-size: 1.2rem; font-weight: 900; color: var(--md-sys-color-on-surface); margin: 0 0 0.25rem 0; line-height: 1.25;">${displayTitle}</h2>
+            <div style="font-size: 0.8rem; color: #64748b; font-weight: 600;">
               ${subtitleText}
             </div>
           </div>

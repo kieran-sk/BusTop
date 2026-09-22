@@ -315,7 +315,7 @@ class MapManager {
           ${stopTitle}
         </div>
         <div style="font-size: 0.72rem; color: #64748b; margin-bottom: 6px;">
-          ${s.StopStreet ? s.StopStreet + ' • ' : ''}Στάση #${s.StopCode}
+          ${s.StopStreet ? s.StopStreet + ' • ' : ''}#${s.StopCode}
         </div>
         <div style="font-size: 0.7rem; font-weight: 800; color: #005ac1; text-transform: uppercase; margin-bottom: 3px; letter-spacing: 0.04em;">
           Γραμμές &amp; Κατευθύνσεις

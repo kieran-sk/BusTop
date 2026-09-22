@@ -552,7 +552,7 @@ class SearchManager {
                     <div style="font-weight: 800; font-size: 0.94rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: break-word;">${stopTitle}</div>
                   </div>
                   <div style="font-size: 0.75rem; color: var(--md-sys-color-outline); margin-top: 3px;">
-                    ${s.StopStreet ? s.StopStreet + ' • ' : ''}Στάση #${s.StopCode}
+                    ${s.StopStreet ? s.StopStreet + ' • ' : ''}#${s.StopCode}
                   </div>
                 </div>
                 <div style="text-align: right; flex-shrink: 0;">

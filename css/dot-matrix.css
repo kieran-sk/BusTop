@@ -377,3 +377,22 @@ body .m3-card.is-favourite-stop {
   box-shadow: 3px 3px 0 #d97706, 5px 5px 0 #0f172a !important;
 }
 
+/* Polished Dot-Matrix Route Stop Items */
+.route-stop-item {
+  border-radius: 4px !important;
+  border: 1.5px solid var(--matrix-border) !important;
+  background: #ffffff !important;
+  box-shadow: 2px 2px 0 var(--matrix-border) !important;
+  transition: transform 0.08s ease, box-shadow 0.08s ease !important;
+}
+
+.route-stop-item:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 3px 3px 0 var(--matrix-border) !important;
+}
+
+.route-stop-item:active {
+  transform: translate(1px, 1px) !important;
+  box-shadow: 1px 1px 0 var(--matrix-border) !important;
+}
+

@@ -290,7 +290,7 @@ class FavoritesManager {
                   </div>
                   <div style="min-width: 0; flex: 1;">
                     <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: break-word;">${s.name}</div>
-                    <div style="font-size: 0.75rem; color: var(--md-sys-color-outline); margin-top: 2px;">Στάση #${s.code}</div>
+                    <div style="font-size: 0.75rem; color: var(--md-sys-color-outline); margin-top: 2px;">#${s.code}</div>
                   </div>
                 </div>
                 <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
