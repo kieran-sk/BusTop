@@ -9,8 +9,13 @@ import android.location.Location
 import android.location.LocationManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.view.HapticFeedbackConstants
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -26,6 +31,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -47,6 +53,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import kotlin.math.abs
 
 class MainActivity : ComponentActivity() {
 
@@ -97,7 +104,10 @@ class MainActivity : ComponentActivity() {
         if (hasFine || hasCoarse) {
             val locManager = getSystemService(Context.LOCATION_SERVICE) as? LocationManager
             if (locManager != null) {
+                // Priority to modern fused provider on Wear OS / Android 14
                 val providers = listOf(
+                    "fused",
+                    LocationManager.FUSED_PROVIDER,
                     LocationManager.GPS_PROVIDER,
                     LocationManager.NETWORK_PROVIDER,
                     LocationManager.PASSIVE_PROVIDER
@@ -105,7 +115,18 @@ class MainActivity : ComponentActivity() {
                 for (p in providers) {
                     try {
                         val loc: Location? = locManager.getLastKnownLocation(p)
-                        if (loc != null) return Pair(loc.latitude, loc.longitude)
+                        if (loc != null && loc.latitude != 0.0 && loc.longitude != 0.0) {
+                            return Pair(loc.latitude, loc.longitude)
+                        }
+                    } catch (_: Exception) {}
+                }
+                // Try all available providers on device
+                for (p in locManager.getProviders(true)) {
+                    try {
+                        val loc: Location? = locManager.getLastKnownLocation(p)
+                        if (loc != null && loc.latitude != 0.0 && loc.longitude != 0.0) {
+                            return Pair(loc.latitude, loc.longitude)
+                        }
                     } catch (_: Exception) {}
                 }
             }
@@ -372,8 +393,20 @@ fun WearBusTopApp(
         }
     }
 
-    // Initial load: Starts immediately with nearby stops
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        scope.launch { loadAll() }
+    }
+
+    // Initial load: Request location permissions if needed and load stops
     LaunchedEffect(Unit) {
+        permissionLauncher.launch(
+            arrayOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            )
+        )
         loadAll()
     }
 
@@ -437,6 +470,9 @@ fun NearbyStopsListScreen(
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
     val focusRequester = remember { FocusRequester() }
     val coroutineScope = rememberCoroutineScope()
+    val view = LocalView.current
+    var rotaryAccumulator by remember { mutableFloatStateOf(0f) }
+    val tickThreshold = 18f
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -456,6 +492,11 @@ fun NearbyStopsListScreen(
                 .fillMaxSize()
                 .background(PhoneSurfaceBg)
                 .onRotaryScrollEvent {
+                    rotaryAccumulator += it.verticalScrollPixels
+                    if (abs(rotaryAccumulator) >= tickThreshold) {
+                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                        rotaryAccumulator = 0f
+                    }
                     coroutineScope.launch {
                         listState.scrollBy(it.verticalScrollPixels)
                     }
@@ -687,6 +728,9 @@ fun ArrivalsScreen(
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
     val focusRequester = remember { FocusRequester() }
     val coroutineScope = rememberCoroutineScope()
+    val view = LocalView.current
+    var rotaryAccumulator by remember { mutableFloatStateOf(0f) }
+    val tickThreshold = 18f
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -706,6 +750,11 @@ fun ArrivalsScreen(
                 .fillMaxSize()
                 .background(PhoneSurfaceBg)
                 .onRotaryScrollEvent {
+                    rotaryAccumulator += it.verticalScrollPixels
+                    if (abs(rotaryAccumulator) >= tickThreshold) {
+                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                        rotaryAccumulator = 0f
+                    }
                     coroutineScope.launch {
                         listState.scrollBy(it.verticalScrollPixels)
                     }

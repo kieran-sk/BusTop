@@ -72,18 +72,64 @@ class BusTopTileService : TileService() {
         if (hasFine || hasCoarse) {
             val locManager = getSystemService(Context.LOCATION_SERVICE) as? LocationManager
             if (locManager != null) {
-                val providers = listOf(LocationManager.GPS_PROVIDER, LocationManager.NETWORK_PROVIDER, LocationManager.PASSIVE_PROVIDER)
+                val providers = listOf(
+                    "fused",
+                    LocationManager.FUSED_PROVIDER,
+                    LocationManager.GPS_PROVIDER,
+                    LocationManager.NETWORK_PROVIDER,
+                    LocationManager.PASSIVE_PROVIDER
+                )
                 for (p in providers) {
                     try {
                         val loc: Location? = locManager.getLastKnownLocation(p)
-                        if (loc != null) {
+                        if (loc != null && loc.latitude != 0.0 && loc.longitude != 0.0) {
                             return Pair(loc.latitude, loc.longitude)
                         }
-                    } catch (e: Exception) {}
+                    } catch (_: Exception) {}
+                }
+                for (p in locManager.getProviders(true)) {
+                    try {
+                        val loc: Location? = locManager.getLastKnownLocation(p)
+                        if (loc != null && loc.latitude != 0.0 && loc.longitude != 0.0) {
+                            return Pair(loc.latitude, loc.longitude)
+                        }
+                    } catch (_: Exception) {}
                 }
             }
         }
         return Pair(37.9845, 23.7335)
+    }
+
+    data class PinnedTrip(
+        val stopCode: String,
+        val stopName: String,
+        val lineId: String
+    )
+
+    private fun loadPinnedItems(): List<PinnedTrip> {
+        val list = mutableListOf<PinnedTrip>()
+        val prefsList = listOf(
+            getSharedPreferences("OASA_PERSISTENT_DATA", Context.MODE_PRIVATE),
+            getSharedPreferences("BusTopWatch", Context.MODE_PRIVATE)
+        )
+        for (p in prefsList) {
+            val raw = p.getString("OASA_PINNED_ARRIVALS", null) ?: p.getString("pinned_trips", null)
+            if (!raw.isNullOrBlank() && raw != "[]" && raw != "null") {
+                try {
+                    val arr = JSONArray(raw)
+                    for (i in 0 until arr.length()) {
+                        val obj = arr.getJSONObject(i)
+                        val stopCode = obj.optString("stopCode", obj.optString("code", ""))
+                        val lineId = obj.optString("lineId", obj.optString("line", "BUS"))
+                        val stopName = obj.optString("stopName", "Στάση $stopCode")
+                        if (stopCode.isNotEmpty() && lineId.isNotEmpty() && list.none { it.stopCode == stopCode && it.lineId == lineId }) {
+                            list.add(PinnedTrip(stopCode = stopCode, stopName = stopName, lineId = lineId))
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+        return list
     }
 
     data class FavStopCandidate(
@@ -116,7 +162,7 @@ class BusTopTileService : TileService() {
                             candidates.add(FavStopCandidate(code, name, latVal, lngVal))
                         }
                     }
-                } catch (e: Exception) {}
+                } catch (_: Exception) {}
             }
         }
 
@@ -127,7 +173,6 @@ class BusTopTileService : TileService() {
                 Location.distanceBetween(userLat, userLng, c.lat, c.lng, res)
                 c.distanceMeters = res[0]
             } else {
-                // If coordinates unknown, rank after stops with known distance
                 c.distanceMeters = 50000f
             }
         }
@@ -138,9 +183,18 @@ class BusTopTileService : TileService() {
 
     private fun fetchTopArrival(): WatchArrival {
         val (userLat, userLng) = getLastKnownLocation()
-        val favStops = loadFavoriteStops(userLat, userLng)
 
-        // 1. Try favorite stops in order of distance from user
+        // 1. TOP PRIORITY: Check user pinned lines
+        val pinned = loadPinnedItems()
+        for (pin in pinned) {
+            val arr = tryFetchForStop(pin.stopCode, pin.stopName, targetLine = pin.lineId)
+            if (arr != null) {
+                return arr.copy(isPinned = true)
+            }
+        }
+
+        // 2. Try favorite stops in order of distance from user
+        val favStops = loadFavoriteStops(userLat, userLng)
         for (fav in favStops) {
             val arrival = tryFetchForStop(fav.code, fav.name)
             if (arrival != null) {
@@ -148,7 +202,7 @@ class BusTopTileService : TileService() {
             }
         }
 
-        // 2. If no favorites or none have active arrivals, fetch closest stops via API
+        // 3. Fetch closest stops via real-time OASA API
         try {
             val url = "https://telematics.oasa.gr/api/?act=getClosestStops&p1=$userLat&p2=$userLng"
             val req = Request.Builder()
@@ -159,7 +213,7 @@ class BusTopTileService : TileService() {
             val body = resp.body?.string() ?: ""
             if (body.isNotEmpty() && body != "null") {
                 val arr = JSONArray(body)
-                for (i in 0 until minOf(arr.length(), 5)) {
+                for (i in 0 until minOf(arr.length(), 6)) {
                     val obj = arr.getJSONObject(i)
                     val sCode = obj.optString("StopCode")
                     val sName = obj.optString("StopDescr", "Στάση $sCode")
@@ -171,9 +225,9 @@ class BusTopTileService : TileService() {
                     }
                 }
             }
-        } catch (e: Exception) {}
+        } catch (_: Exception) {}
 
-        // 3. Fallbacks for major Athens hubs
+        // 4. Fallbacks for major hubs
         val hubFallbacks = listOf(
             Pair("10175", "Πλ. Κάνιγγος"),
             Pair("60010", "Ναυαρίνου"),
@@ -189,7 +243,7 @@ class BusTopTileService : TileService() {
         return WatchArrival("Πλ. Συντάγματος", "040", 4, "Σύνταγμα (Live)")
     }
 
-    private fun tryFetchForStop(code: String, sName: String): WatchArrival? {
+    private fun tryFetchForStop(code: String, sName: String, targetLine: String? = null): WatchArrival? {
         return try {
             val lineMap = fetchRouteMap(code)
             val url = "https://telematics.oasa.gr/api/?act=getStopArrivals&p1=$code"
@@ -202,13 +256,28 @@ class BusTopTileService : TileService() {
             if (body.isNotEmpty() && body != "null") {
                 val json = JSONArray(body)
                 if (json.length() > 0) {
-                    val first = json.getJSONObject(0)
-                    val routeCode = first.optString("route_code")
-                    val btime = first.optInt("btime2", -1)
-                    val mins = if (btime >= 0) btime else first.optString("btime2").toIntOrNull() ?: 3
+                    var selectedObj: org.json.JSONObject? = null
+                    if (targetLine != null) {
+                        for (idx in 0 until json.length()) {
+                            val candidate = json.getJSONObject(idx)
+                            val rCode = candidate.optString("route_code")
+                            val lId = lineMap[rCode] ?: rCode
+                            if (lId.equals(targetLine, ignoreCase = true)) {
+                                selectedObj = candidate
+                                break
+                            }
+                        }
+                    }
+                    if (selectedObj == null) {
+                        selectedObj = json.getJSONObject(0)
+                    }
+
+                    val routeCode = selectedObj.optString("route_code")
+                    val btime = selectedObj.optInt("btime2", -1)
+                    val mins = if (btime >= 0) btime else selectedObj.optString("btime2").toIntOrNull() ?: 3
                     val lineId = lineMap[routeCode] ?: routeCode.ifEmpty { "BUS" }
                     val descr = if (json.length() > 1) {
-                        val second = json.getJSONObject(1)
+                        val second = json.getJSONObject(if (selectedObj === json.getJSONObject(0)) 1 else 0)
                         val r2 = second.optString("route_code")
                         val m2 = second.optInt("btime2", 0)
                         val l2 = lineMap[r2] ?: r2
@@ -224,7 +293,7 @@ class BusTopTileService : TileService() {
                     )
                 } else null
             } else null
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
@@ -250,55 +319,55 @@ class BusTopTileService : TileService() {
                     }
                 }
             }
-        } catch (e: Exception) {
-            // ignore
-        }
+        } catch (_: Exception) {}
         return map
     }
 
     private fun buildTileLayout(arrival: WatchArrival): LayoutElementBuilders.Layout {
+        // Tile Root Container with Clean Theme styling
         val root = LayoutElementBuilders.Column.Builder()
             .setWidth(DimensionBuilders.wrap())
             .setHeight(DimensionBuilders.wrap())
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
 
-        // 1. Header (Stop Name)
+        // 1. Header (Stop Name with optional Pin indicator)
+        val headerText = if (arrival.isPinned) "📌 ${arrival.stopName}" else arrival.stopName
         root.addContent(
             LayoutElementBuilders.Text.Builder()
-                .setText(arrival.stopName)
+                .setText(headerText)
                 .setFontStyle(
                     LayoutElementBuilders.FontStyle.Builder()
                         .setSize(sp(13f))
-                        .setColor(argb(0xFF94A3B8.toInt()))
+                        .setColor(argb(0xFFE2E8F0.toInt())) // High contrast crisp light slate
+                        .setWeight(FONT_WEIGHT_BOLD)
                         .build()
                 )
                 .setMaxLines(1)
                 .build()
         )
 
-        // Spacer
         root.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(6f)).build())
 
-        // 2. Large Dot-Matrix Countdown & Badge Row
-        val mainRow = LayoutElementBuilders.Row.Builder()
+        // 2. Clean Modern Card for Arrival (White pill background card)
+        val cardInner = LayoutElementBuilders.Row.Builder()
             .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
 
-        // Line Badge (Clean Expressive Light Blue Pill)
+        // Line Badge (Phone Primary Blue Pill with Deep Blue Text)
         val badge = LayoutElementBuilders.Box.Builder()
             .setModifiers(
                 ModifiersBuilders.Modifiers.Builder()
                     .setBackground(
                         ModifiersBuilders.Background.Builder()
-                            .setColor(argb(0xFFE0F2FE.toInt()))
-                            .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(6f)).build())
+                            .setColor(argb(0xFFD8E2FF.toInt()))
+                            .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(8f)).build())
                             .build()
                     )
                     .setPadding(
                         ModifiersBuilders.Padding.Builder()
-                            .setStart(dp(8f))
-                            .setEnd(dp(8f))
-                            .setTop(dp(2f))
-                            .setBottom(dp(2f))
+                            .setStart(dp(10f))
+                            .setEnd(dp(10f))
+                            .setTop(dp(3f))
+                            .setBottom(dp(3f))
                             .build()
                     )
                     .build()
@@ -308,26 +377,26 @@ class BusTopTileService : TileService() {
                     .setText(arrival.routeId)
                     .setFontStyle(
                         LayoutElementBuilders.FontStyle.Builder()
-                            .setSize(sp(16f))
+                            .setSize(sp(18f))
                             .setWeight(FONT_WEIGHT_BOLD)
-                            .setColor(argb(0xFF0369A1.toInt()))
+                            .setColor(argb(0xFF001A41.toInt()))
                             .build()
                     )
                     .build()
             )
             .build()
 
-        mainRow.addContent(badge)
-        mainRow.addContent(LayoutElementBuilders.Spacer.Builder().setWidth(dp(8f)).build())
+        cardInner.addContent(badge)
+        cardInner.addContent(LayoutElementBuilders.Spacer.Builder().setWidth(dp(10f)).build())
 
         // Mins Remaining (Digital Phosphor Green)
-        val minsText = if (arrival.minsRemaining >= 0) "${arrival.minsRemaining}λ" else "--"
-        mainRow.addContent(
+        val minsText = if (arrival.minsRemaining == 0) "Τώρα" else if (arrival.minsRemaining > 0) "${arrival.minsRemaining}'" else "--"
+        cardInner.addContent(
             LayoutElementBuilders.Text.Builder()
                 .setText(minsText)
                 .setFontStyle(
                     LayoutElementBuilders.FontStyle.Builder()
-                        .setSize(sp(26f))
+                        .setSize(sp(28f))
                         .setWeight(FONT_WEIGHT_BOLD)
                         .setColor(argb(0xFF10B981.toInt()))
                         .build()
@@ -335,18 +404,40 @@ class BusTopTileService : TileService() {
                 .build()
         )
 
-        root.addContent(mainRow.build())
+        // Wrap inside a Clean White rounded card
+        val cardBox = LayoutElementBuilders.Box.Builder()
+            .setModifiers(
+                ModifiersBuilders.Modifiers.Builder()
+                    .setBackground(
+                        ModifiersBuilders.Background.Builder()
+                            .setColor(argb(0xFFFFFFFF.toInt()))
+                            .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(14f)).build())
+                            .build()
+                    )
+                    .setPadding(
+                        ModifiersBuilders.Padding.Builder()
+                            .setStart(dp(12f))
+                            .setEnd(dp(12f))
+                            .setTop(dp(6f))
+                            .setBottom(dp(6f))
+                            .build()
+                    )
+                    .build()
+            )
+            .addContent(cardInner.build())
+            .build()
 
-        // Spacer
-        root.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(4f)).build())
+        root.addContent(cardBox)
 
-        // 3. Destination Label
+        root.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(6f)).build())
+
+        // 3. Destination / Next arrival label
         root.addContent(
             LayoutElementBuilders.Text.Builder()
                 .setText(arrival.destination)
                 .setFontStyle(
                     LayoutElementBuilders.FontStyle.Builder()
-                        .setSize(sp(12f))
+                        .setSize(sp(11f))
                         .setColor(argb(0xFFCBD5E1.toInt()))
                         .build()
                 )
@@ -354,8 +445,7 @@ class BusTopTileService : TileService() {
                 .build()
         )
 
-        // Spacer
-        root.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(10f)).build())
+        root.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(8f)).build())
 
         // 4. Tap to open BusTop button
         val clickAction = ActionBuilders.LaunchAction.Builder()
@@ -378,7 +468,7 @@ class BusTopTileService : TileService() {
                     )
                     .setBackground(
                         ModifiersBuilders.Background.Builder()
-                            .setColor(argb(0xFF1E293B.toInt()))
+                            .setColor(argb(0xFF005AC1.toInt()))
                             .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(9999f)).build())
                             .build()
                     )
@@ -394,12 +484,12 @@ class BusTopTileService : TileService() {
             )
             .addContent(
                 LayoutElementBuilders.Text.Builder()
-                    .setText("🚍 BusTop Live")
+                    .setText("🚍 BusTop")
                     .setFontStyle(
                         LayoutElementBuilders.FontStyle.Builder()
                             .setSize(sp(11f))
                             .setWeight(FONT_WEIGHT_BOLD)
-                            .setColor(argb(0xFFF8FAFC.toInt()))
+                            .setColor(argb(0xFFFFFFFF.toInt()))
                             .build()
                     )
                     .build()
@@ -415,6 +505,7 @@ class BusTopTileService : TileService() {
         val stopName: String,
         val routeId: String,
         val minsRemaining: Int,
-        val destination: String
+        val destination: String,
+        val isPinned: Boolean = false
     )
 }
