@@ -268,16 +268,13 @@ class BusTopTileService : TileService() {
                             }
                         }
                     }
-                    if (selectedObj == null) {
-                        selectedObj = json.getJSONObject(0)
-                    }
-
-                    val routeCode = selectedObj.optString("route_code")
-                    val btime = selectedObj.optInt("btime2", -1)
-                    val mins = if (btime >= 0) btime else selectedObj.optString("btime2").toIntOrNull() ?: 3
+                    val targetObj = selectedObj ?: json.getJSONObject(0)
+                    val routeCode = targetObj.optString("route_code")
+                    val btime = targetObj.optInt("btime2", -1)
+                    val mins = if (btime >= 0) btime else targetObj.optString("btime2").toIntOrNull() ?: 3
                     val lineId = lineMap[routeCode] ?: routeCode.ifEmpty { "BUS" }
                     val descr = if (json.length() > 1) {
-                        val second = json.getJSONObject(if (selectedObj === json.getJSONObject(0)) 1 else 0)
+                        val second = json.getJSONObject(if (targetObj === json.getJSONObject(0)) 1 else 0)
                         val r2 = second.optString("route_code")
                         val m2 = second.optInt("btime2", 0)
                         val l2 = lineMap[r2] ?: r2
