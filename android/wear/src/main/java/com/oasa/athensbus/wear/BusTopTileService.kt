@@ -1,11 +1,6 @@
 package com.oasa.athensbus.wear
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
-import android.location.Location
-import android.location.LocationManager
-import androidx.core.content.ContextCompat
 import androidx.wear.protolayout.ActionBuilders
 import androidx.wear.protolayout.ColorBuilders.argb
 import androidx.wear.protolayout.DimensionBuilders
@@ -27,6 +22,7 @@ import kotlinx.coroutines.guava.future
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONArray
+import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 class BusTopTileService : TileService() {
@@ -39,9 +35,9 @@ class BusTopTileService : TileService() {
 
     override fun onTileRequest(requestParams: RequestBuilders.TileRequest): ListenableFuture<TileBuilders.Tile> {
         return serviceScope.future {
-            val arrival = fetchTopArrival()
-            val layout = buildTileLayout(arrival)
-            
+            val arrivals = fetchPinnedArrivals()
+            val layout = buildTileLayout(arrivals)
+
             val timeline = TimelineBuilders.Timeline.Builder()
                 .addTimelineEntry(
                     TimelineBuilders.TimelineEntry.Builder()
@@ -53,7 +49,7 @@ class BusTopTileService : TileService() {
             TileBuilders.Tile.Builder()
                 .setResourcesVersion("1")
                 .setTileTimeline(timeline)
-                .setFreshnessIntervalMillis(60_000L) // Refresh every 60s
+                .setFreshnessIntervalMillis(45_000L) // Refresh every 45s
                 .build()
         }
     }
@@ -64,40 +60,6 @@ class BusTopTileService : TileService() {
                 .setVersion("1")
                 .build()
         )
-    }
-
-    private fun getLastKnownLocation(): Pair<Double, Double> {
-        val hasFine = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        val hasCoarse = ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        if (hasFine || hasCoarse) {
-            val locManager = getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-            if (locManager != null) {
-                val providers = listOf(
-                    "fused",
-                    LocationManager.FUSED_PROVIDER,
-                    LocationManager.GPS_PROVIDER,
-                    LocationManager.NETWORK_PROVIDER,
-                    LocationManager.PASSIVE_PROVIDER
-                )
-                for (p in providers) {
-                    try {
-                        val loc: Location? = locManager.getLastKnownLocation(p)
-                        if (loc != null && loc.latitude != 0.0 && loc.longitude != 0.0) {
-                            return Pair(loc.latitude, loc.longitude)
-                        }
-                    } catch (_: Exception) {}
-                }
-                for (p in locManager.getProviders(true)) {
-                    try {
-                        val loc: Location? = locManager.getLastKnownLocation(p)
-                        if (loc != null && loc.latitude != 0.0 && loc.longitude != 0.0) {
-                            return Pair(loc.latitude, loc.longitude)
-                        }
-                    } catch (_: Exception) {}
-                }
-            }
-        }
-        return Pair(37.9845, 23.7335)
     }
 
     data class PinnedTrip(
@@ -132,118 +94,52 @@ class BusTopTileService : TileService() {
         return list
     }
 
-    data class FavStopCandidate(
-        val code: String,
-        val name: String,
-        val lat: Double?,
-        val lng: Double?,
-        var distanceMeters: Float = Float.MAX_VALUE
-    )
+    private fun removePinnedItem(stopCode: String, lineId: String) {
+        val currentPins = loadPinnedItems().toMutableList()
+        currentPins.removeAll { it.stopCode == stopCode && it.lineId.equals(lineId, ignoreCase = true) }
 
-    private fun loadFavoriteStops(userLat: Double, userLng: Double): List<FavStopCandidate> {
-        val candidates = mutableListOf<FavStopCandidate>()
-        val prefsList = listOf(
+        val jsonArr = JSONArray()
+        currentPins.forEach { pin ->
+            val obj = JSONObject()
+            obj.put("stopCode", pin.stopCode)
+            obj.put("stopName", pin.stopName)
+            obj.put("lineId", pin.lineId)
+            jsonArr.put(obj)
+        }
+
+        listOf(
             getSharedPreferences("OASA_PERSISTENT_DATA", Context.MODE_PRIVATE),
             getSharedPreferences("BusTopWatch", Context.MODE_PRIVATE)
-        )
-
-        for (p in prefsList) {
-            val raw = p.getString("OASA_FAV_STOPS", null) ?: p.getString("fav_stops", null)
-            if (!raw.isNullOrBlank() && raw != "[]" && raw != "null") {
-                try {
-                    val arr = JSONArray(raw)
-                    for (i in 0 until arr.length()) {
-                        val obj = arr.getJSONObject(i)
-                        val code = obj.optString("code", obj.optString("StopCode", ""))
-                        val name = obj.optString("name", obj.optString("stopName", obj.optString("StopDescr", "Στάση $code")))
-                        val latVal = if (obj.has("lat") && !obj.isNull("lat")) obj.optDouble("lat") else if (obj.has("StopLat")) obj.optDouble("StopLat") else null
-                        val lngVal = if (obj.has("lng") && !obj.isNull("lng")) obj.optDouble("lng") else if (obj.has("StopLng")) obj.optDouble("StopLng") else null
-                        if (code.isNotEmpty() && candidates.none { it.code == code }) {
-                            candidates.add(FavStopCandidate(code, name, latVal, lngVal))
-                        }
-                    }
-                } catch (_: Exception) {}
-            }
+        ).forEach { prefs ->
+            prefs.edit()
+                .putString("OASA_PINNED_ARRIVALS", jsonArr.toString())
+                .putString("pinned_trips", jsonArr.toString())
+                .apply()
         }
-
-        // Calculate distance for each favorite stop
-        for (c in candidates) {
-            if (c.lat != null && c.lng != null && c.lat != 0.0 && c.lng != 0.0) {
-                val res = FloatArray(1)
-                Location.distanceBetween(userLat, userLng, c.lat, c.lng, res)
-                c.distanceMeters = res[0]
-            } else {
-                c.distanceMeters = 50000f
-            }
-        }
-
-        // Sort by distance ascending
-        return candidates.sortedBy { it.distanceMeters }
     }
 
-    private fun fetchTopArrival(): WatchArrival {
-        val (userLat, userLng) = getLastKnownLocation()
-
-        // 1. TOP PRIORITY: Check user pinned lines
+    private fun fetchPinnedArrivals(): List<WatchArrival> {
         val pinned = loadPinnedItems()
+        if (pinned.isEmpty()) {
+            return emptyList()
+        }
+
+        val results = mutableListOf<WatchArrival>()
         for (pin in pinned) {
             val arr = tryFetchForStop(pin.stopCode, pin.stopName, targetLine = pin.lineId)
             if (arr != null) {
-                return arr.copy(isPinned = true)
-            }
-        }
-
-        // 2. Try favorite stops in order of distance from user
-        val favStops = loadFavoriteStops(userLat, userLng)
-        for (fav in favStops) {
-            val arrival = tryFetchForStop(fav.code, fav.name)
-            if (arrival != null) {
-                return arrival
-            }
-        }
-
-        // 3. Fetch closest stops via real-time OASA API
-        try {
-            val url = "https://telematics.oasa.gr/api/?act=getClosestStops&p1=$userLat&p2=$userLng"
-            val req = Request.Builder()
-                .url(url)
-                .header("User-Agent", "Mozilla/5.0 (Linux; Android Wear OS; BusTop)")
-                .build()
-            val resp = httpClient.newCall(req).execute()
-            val body = resp.body?.string() ?: ""
-            if (body.isNotEmpty() && body != "null") {
-                val arr = JSONArray(body)
-                for (i in 0 until minOf(arr.length(), 6)) {
-                    val obj = arr.getJSONObject(i)
-                    val sCode = obj.optString("StopCode")
-                    val sName = obj.optString("StopDescr", "Στάση $sCode")
-                    if (sCode.isNotEmpty()) {
-                        val arrLive = tryFetchForStop(sCode, sName)
-                        if (arrLive != null) {
-                            return arrLive
-                        }
-                    }
+                // If bus has arrived / passed (mins <= 0), automatically unpin it!
+                if (arr.minsRemaining <= 0) {
+                    removePinnedItem(pin.stopCode, pin.lineId)
+                } else {
+                    results.add(arr)
                 }
             }
-        } catch (_: Exception) {}
-
-        // 4. Fallbacks for major hubs
-        val hubFallbacks = listOf(
-            Pair("10175", "Πλ. Κάνιγγος"),
-            Pair("60010", "Ναυαρίνου"),
-            Pair("10022", "Πλ. Συντάγματος")
-        )
-        for ((code, name) in hubFallbacks) {
-            val arrival = tryFetchForStop(code, name)
-            if (arrival != null) {
-                return arrival
-            }
         }
-
-        return WatchArrival("Πλ. Συντάγματος", "040", 4, "Σύνταγμα (Live)")
+        return results.sortedBy { it.minsRemaining }
     }
 
-    private fun tryFetchForStop(code: String, sName: String, targetLine: String? = null): WatchArrival? {
+    private fun tryFetchForStop(code: String, sName: String, targetLine: String): WatchArrival? {
         return try {
             val lineMap = fetchRouteMap(code)
             val url = "https://telematics.oasa.gr/api/?act=getStopArrivals&p1=$code"
@@ -256,38 +152,29 @@ class BusTopTileService : TileService() {
             if (body.isNotEmpty() && body != "null") {
                 val json = JSONArray(body)
                 if (json.length() > 0) {
-                    var selectedObj: org.json.JSONObject? = null
-                    if (targetLine != null) {
-                        for (idx in 0 until json.length()) {
-                            val candidate = json.getJSONObject(idx)
-                            val rCode = candidate.optString("route_code")
-                            val lId = lineMap[rCode] ?: rCode
-                            if (lId.equals(targetLine, ignoreCase = true)) {
-                                selectedObj = candidate
-                                break
-                            }
+                    var selectedObj: JSONObject? = null
+                    for (idx in 0 until json.length()) {
+                        val candidate = json.getJSONObject(idx)
+                        val rCode = candidate.optString("route_code")
+                        val lId = lineMap[rCode] ?: rCode
+                        if (lId.equals(targetLine, ignoreCase = true)) {
+                            selectedObj = candidate
+                            break
                         }
                     }
-                    val targetObj = selectedObj ?: json.getJSONObject(0)
-                    val routeCode = targetObj.optString("route_code")
-                    val btime = targetObj.optInt("btime2", -1)
-                    val mins = if (btime >= 0) btime else targetObj.optString("btime2").toIntOrNull() ?: 3
-                    val lineId = lineMap[routeCode] ?: routeCode.ifEmpty { "BUS" }
-                    val descr = if (json.length() > 1) {
-                        val second = json.getJSONObject(if (targetObj === json.getJSONObject(0)) 1 else 0)
-                        val r2 = second.optString("route_code")
-                        val m2 = second.optInt("btime2", 0)
-                        val l2 = lineMap[r2] ?: r2
-                        "Επόμενο: $l2 (${m2}λ)"
-                    } else {
-                        "ΟΑΣΑ Live"
-                    }
-                    WatchArrival(
-                        stopName = sName,
-                        routeId = lineId,
-                        minsRemaining = mins,
-                        destination = descr
-                    )
+
+                    if (selectedObj != null) {
+                        val routeCode = selectedObj.optString("route_code")
+                        val btime = selectedObj.optInt("btime2", -1)
+                        val mins = if (btime >= 0) btime else selectedObj.optString("btime2").toIntOrNull() ?: 0
+                        val lineId = lineMap[routeCode] ?: targetLine
+                        WatchArrival(
+                            stopName = sName,
+                            routeId = lineId,
+                            minsRemaining = mins,
+                            destination = sName
+                        )
+                    } else null
                 } else null
             } else null
         } catch (_: Exception) {
@@ -320,131 +207,12 @@ class BusTopTileService : TileService() {
         return map
     }
 
-    private fun buildTileLayout(arrival: WatchArrival): LayoutElementBuilders.Layout {
-        // Tile Root Container with Clean Theme styling
+    private fun buildTileLayout(arrivals: List<WatchArrival>): LayoutElementBuilders.Layout {
         val root = LayoutElementBuilders.Column.Builder()
             .setWidth(DimensionBuilders.wrap())
             .setHeight(DimensionBuilders.wrap())
             .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
 
-        // 1. Header (Stop Name with optional Pin indicator)
-        val headerText = if (arrival.isPinned) "📌 ${arrival.stopName}" else arrival.stopName
-        root.addContent(
-            LayoutElementBuilders.Text.Builder()
-                .setText(headerText)
-                .setFontStyle(
-                    LayoutElementBuilders.FontStyle.Builder()
-                        .setSize(sp(13f))
-                        .setColor(argb(0xFFE2E8F0.toInt())) // High contrast crisp light slate
-                        .setWeight(FONT_WEIGHT_BOLD)
-                        .build()
-                )
-                .setMaxLines(1)
-                .build()
-        )
-
-        root.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(6f)).build())
-
-        // 2. Clean Modern Card for Arrival (White pill background card)
-        val cardInner = LayoutElementBuilders.Row.Builder()
-            .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
-
-        // Line Badge (Phone Primary Blue Pill with Deep Blue Text)
-        val badge = LayoutElementBuilders.Box.Builder()
-            .setModifiers(
-                ModifiersBuilders.Modifiers.Builder()
-                    .setBackground(
-                        ModifiersBuilders.Background.Builder()
-                            .setColor(argb(0xFFD8E2FF.toInt()))
-                            .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(8f)).build())
-                            .build()
-                    )
-                    .setPadding(
-                        ModifiersBuilders.Padding.Builder()
-                            .setStart(dp(10f))
-                            .setEnd(dp(10f))
-                            .setTop(dp(3f))
-                            .setBottom(dp(3f))
-                            .build()
-                    )
-                    .build()
-            )
-            .addContent(
-                LayoutElementBuilders.Text.Builder()
-                    .setText(arrival.routeId)
-                    .setFontStyle(
-                        LayoutElementBuilders.FontStyle.Builder()
-                            .setSize(sp(18f))
-                            .setWeight(FONT_WEIGHT_BOLD)
-                            .setColor(argb(0xFF001A41.toInt()))
-                            .build()
-                    )
-                    .build()
-            )
-            .build()
-
-        cardInner.addContent(badge)
-        cardInner.addContent(LayoutElementBuilders.Spacer.Builder().setWidth(dp(10f)).build())
-
-        // Mins Remaining (Digital Phosphor Green)
-        val minsText = if (arrival.minsRemaining == 0) "Τώρα" else if (arrival.minsRemaining > 0) "${arrival.minsRemaining}'" else "--"
-        cardInner.addContent(
-            LayoutElementBuilders.Text.Builder()
-                .setText(minsText)
-                .setFontStyle(
-                    LayoutElementBuilders.FontStyle.Builder()
-                        .setSize(sp(28f))
-                        .setWeight(FONT_WEIGHT_BOLD)
-                        .setColor(argb(0xFF10B981.toInt()))
-                        .build()
-                )
-                .build()
-        )
-
-        // Wrap inside a Clean White rounded card
-        val cardBox = LayoutElementBuilders.Box.Builder()
-            .setModifiers(
-                ModifiersBuilders.Modifiers.Builder()
-                    .setBackground(
-                        ModifiersBuilders.Background.Builder()
-                            .setColor(argb(0xFFFFFFFF.toInt()))
-                            .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(14f)).build())
-                            .build()
-                    )
-                    .setPadding(
-                        ModifiersBuilders.Padding.Builder()
-                            .setStart(dp(12f))
-                            .setEnd(dp(12f))
-                            .setTop(dp(6f))
-                            .setBottom(dp(6f))
-                            .build()
-                    )
-                    .build()
-            )
-            .addContent(cardInner.build())
-            .build()
-
-        root.addContent(cardBox)
-
-        root.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(6f)).build())
-
-        // 3. Destination / Next arrival label
-        root.addContent(
-            LayoutElementBuilders.Text.Builder()
-                .setText(arrival.destination)
-                .setFontStyle(
-                    LayoutElementBuilders.FontStyle.Builder()
-                        .setSize(sp(11f))
-                        .setColor(argb(0xFFCBD5E1.toInt()))
-                        .build()
-                )
-                .setMaxLines(1)
-                .build()
-        )
-
-        root.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(8f)).build())
-
-        // 4. Tap to open BusTop button
         val clickAction = ActionBuilders.LaunchAction.Builder()
             .setAndroidActivity(
                 ActionBuilders.AndroidActivity.Builder()
@@ -454,12 +222,236 @@ class BusTopTileService : TileService() {
             )
             .build()
 
+        if (arrivals.isEmpty()) {
+            // Clean Empty State: No pinned arrivals
+            root.addContent(
+                LayoutElementBuilders.Text.Builder()
+                    .setText("📌 BusTop")
+                    .setFontStyle(
+                        LayoutElementBuilders.FontStyle.Builder()
+                            .setSize(sp(14f))
+                            .setColor(argb(0xFFCBD5E1.toInt()))
+                            .setWeight(FONT_WEIGHT_BOLD)
+                            .build()
+                    )
+                    .build()
+            )
+
+            root.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(6f)).build())
+
+            val emptyBox = LayoutElementBuilders.Box.Builder()
+                .setModifiers(
+                    ModifiersBuilders.Modifiers.Builder()
+                        .setBackground(
+                            ModifiersBuilders.Background.Builder()
+                                .setColor(argb(0xFFFFFFFF.toInt()))
+                                .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(12f)).build())
+                                .build()
+                        )
+                        .setPadding(
+                            ModifiersBuilders.Padding.Builder()
+                                .setStart(dp(10f))
+                                .setEnd(dp(10f))
+                                .setTop(dp(8f))
+                                .setBottom(dp(8f))
+                                .build()
+                        )
+                        .build()
+                )
+                .addContent(
+                    LayoutElementBuilders.Text.Builder()
+                        .setText("Δεν υπάρχουν\nκαρφιτσωμένες αφίξεις")
+                        .setFontStyle(
+                            LayoutElementBuilders.FontStyle.Builder()
+                                .setSize(sp(11f))
+                                .setColor(argb(0xFF0F172A.toInt()))
+                                .setWeight(FONT_WEIGHT_BOLD)
+                                .build()
+                        )
+                        .setMaxLines(2)
+                        .build()
+                )
+                .build()
+
+            root.addContent(emptyBox)
+            root.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(8f)).build())
+
+            val openBtn = LayoutElementBuilders.Box.Builder()
+                .setModifiers(
+                    ModifiersBuilders.Modifiers.Builder()
+                        .setClickable(
+                            ModifiersBuilders.Clickable.Builder()
+                                .setId("open_app_empty")
+                                .setOnClick(clickAction)
+                                .build()
+                        )
+                        .setBackground(
+                            ModifiersBuilders.Background.Builder()
+                                .setColor(argb(0xFF005AC1.toInt()))
+                                .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(9999f)).build())
+                                .build()
+                        )
+                        .setPadding(
+                            ModifiersBuilders.Padding.Builder()
+                                .setStart(dp(12f))
+                                .setEnd(dp(12f))
+                                .setTop(dp(4f))
+                                .setBottom(dp(4f))
+                                .build()
+                        )
+                        .build()
+                )
+                .addContent(
+                    LayoutElementBuilders.Text.Builder()
+                        .setText("🚍 Άνοιγμα BusTop")
+                        .setFontStyle(
+                            LayoutElementBuilders.FontStyle.Builder()
+                                .setSize(sp(11f))
+                                .setWeight(FONT_WEIGHT_BOLD)
+                                .setColor(argb(0xFFFFFFFF.toInt()))
+                                .build()
+                        )
+                        .build()
+                )
+                .build()
+
+            root.addContent(openBtn)
+            return LayoutElementBuilders.Layout.Builder().setRoot(root.build()).build()
+        }
+
+        // Pinned Arrivals Present
+        root.addContent(
+            LayoutElementBuilders.Text.Builder()
+                .setText("📌 Καρφιτσωμένες (${arrivals.size})")
+                .setFontStyle(
+                    LayoutElementBuilders.FontStyle.Builder()
+                        .setSize(sp(12f))
+                        .setColor(argb(0xFFE2E8F0.toInt()))
+                        .setWeight(FONT_WEIGHT_BOLD)
+                        .build()
+                )
+                .setMaxLines(1)
+                .build()
+        )
+
+        root.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(4f)).build())
+
+        // Render up to 2-3 arrivals in compact rows
+        val cardList = LayoutElementBuilders.Column.Builder()
+            .setHorizontalAlignment(LayoutElementBuilders.HORIZONTAL_ALIGN_CENTER)
+
+        arrivals.take(2).forEachIndexed { index, arr ->
+            if (index > 0) {
+                cardList.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(3f)).build())
+            }
+
+            val row = LayoutElementBuilders.Row.Builder()
+                .setVerticalAlignment(LayoutElementBuilders.VERTICAL_ALIGN_CENTER)
+
+            // Line Badge
+            val badge = LayoutElementBuilders.Box.Builder()
+                .setModifiers(
+                    ModifiersBuilders.Modifiers.Builder()
+                        .setBackground(
+                            ModifiersBuilders.Background.Builder()
+                                .setColor(argb(0xFFD8E2FF.toInt()))
+                                .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(6f)).build())
+                                .build()
+                        )
+                        .setPadding(
+                            ModifiersBuilders.Padding.Builder()
+                                .setStart(dp(6f))
+                                .setEnd(dp(6f))
+                                .setTop(dp(2f))
+                                .setBottom(dp(2f))
+                                .build()
+                        )
+                        .build()
+                )
+                .addContent(
+                    LayoutElementBuilders.Text.Builder()
+                        .setText(arr.routeId)
+                        .setFontStyle(
+                            LayoutElementBuilders.FontStyle.Builder()
+                                .setSize(sp(13f))
+                                .setWeight(FONT_WEIGHT_BOLD)
+                                .setColor(argb(0xFF001A41.toInt()))
+                                .build()
+                        )
+                        .build()
+                )
+                .build()
+
+            row.addContent(badge)
+            row.addContent(LayoutElementBuilders.Spacer.Builder().setWidth(dp(6f)).build())
+
+            // Stop Name
+            row.addContent(
+                LayoutElementBuilders.Text.Builder()
+                    .setText(arr.stopName)
+                    .setFontStyle(
+                        LayoutElementBuilders.FontStyle.Builder()
+                            .setSize(sp(11f))
+                            .setWeight(FONT_WEIGHT_BOLD)
+                            .setColor(argb(0xFF0F172A.toInt()))
+                            .build()
+                    )
+                    .setMaxLines(1)
+                    .build()
+            )
+
+            row.addContent(LayoutElementBuilders.Spacer.Builder().setWidth(dp(6f)).build())
+
+            // Time
+            val minsText = if (arr.minsRemaining == 0) "Τώρα" else "${arr.minsRemaining}'"
+            row.addContent(
+                LayoutElementBuilders.Text.Builder()
+                    .setText(minsText)
+                    .setFontStyle(
+                        LayoutElementBuilders.FontStyle.Builder()
+                            .setSize(sp(14f))
+                            .setWeight(FONT_WEIGHT_BOLD)
+                            .setColor(argb(0xFF10B981.toInt()))
+                            .build()
+                    )
+                    .build()
+            )
+
+            val rowCard = LayoutElementBuilders.Box.Builder()
+                .setModifiers(
+                    ModifiersBuilders.Modifiers.Builder()
+                        .setBackground(
+                            ModifiersBuilders.Background.Builder()
+                                .setColor(argb(0xFFFFFFFF.toInt()))
+                                .setCorner(ModifiersBuilders.Corner.Builder().setRadius(dp(10f)).build())
+                                .build()
+                        )
+                        .setPadding(
+                            ModifiersBuilders.Padding.Builder()
+                                .setStart(dp(8f))
+                                .setEnd(dp(8f))
+                                .setTop(dp(4f))
+                                .setBottom(dp(4f))
+                                .build()
+                        )
+                        .build()
+                )
+                .addContent(row.build())
+                .build()
+
+            cardList.addContent(rowCard)
+        }
+
+        root.addContent(cardList.build())
+        root.addContent(LayoutElementBuilders.Spacer.Builder().setHeight(dp(6f)).build())
+
+        // Open BusTop button
         val openBtn = LayoutElementBuilders.Box.Builder()
             .setModifiers(
                 ModifiersBuilders.Modifiers.Builder()
                     .setClickable(
                         ModifiersBuilders.Clickable.Builder()
-                            .setId("open_app")
+                            .setId("open_app_pinned")
                             .setOnClick(clickAction)
                             .build()
                     )
@@ -502,7 +494,6 @@ class BusTopTileService : TileService() {
         val stopName: String,
         val routeId: String,
         val minsRemaining: Int,
-        val destination: String,
-        val isPinned: Boolean = false
+        val destination: String
     )
 }
