@@ -289,7 +289,7 @@ class FavoritesManager {
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"></path><circle cx="12" cy="9" r="2.5"></circle></svg>
                   </div>
                   <div style="min-width: 0; flex: 1;">
-                    <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: break-word;">${s.name}</div>
+                    <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: normal; overflow-wrap: normal; hyphens: none;">${s.name}</div>
                     <div style="font-size: 0.75rem; color: var(--md-sys-color-outline); margin-top: 2px;">#${s.code}</div>
                   </div>
                 </div>
@@ -325,7 +325,7 @@ class FavoritesManager {
                       ${l.id}
                     </span>
                     <div style="min-width: 0; flex: 1;">
-                      <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: break-word;">${l.descr}</div>
+                      <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: normal; overflow-wrap: normal; hyphens: none;">${l.descr}</div>
                       <div style="font-size: 0.75rem; color: var(--md-sys-color-outline); margin-top: 2px;">Γραμμή #${l.code}</div>
                     </div>
                   </div>

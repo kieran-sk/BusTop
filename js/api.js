@@ -28,10 +28,79 @@ const API = {
     } catch (e) {}
   },
 
+  getAthensMinutes() {
+    try {
+      const now = new Date();
+      const formatter = new Intl.DateTimeFormat('el-GR', {
+        timeZone: 'Europe/Athens',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+      const parts = formatter.formatToParts(now);
+      const hour = parseInt(parts.find(p => p.type === 'hour')?.value || '0', 10);
+      const minute = parseInt(parts.find(p => p.type === 'minute')?.value || '0', 10);
+      return hour * 60 + minute;
+    } catch (e) {
+      const d = new Date();
+      return d.getHours() * 60 + d.getMinutes();
+    }
+  },
+
+  adjustOfflineArrivals(data, cachedTimestamp) {
+    if (!data || !Array.isArray(data.arrivals)) return data;
+    const currentMinutes = this.getAthensMinutes();
+    const cloned = JSON.parse(JSON.stringify(data));
+    cloned.is_offline = true;
+
+    const adjustedArrivals = [];
+    for (const a of cloned.arrivals) {
+      a.is_live = false;
+      a.is_offline = true;
+
+      const timeStr = a.estimated_arrival_time || a.departure_time;
+      if (timeStr) {
+        const m = timeStr.match(/(\d{1,2}):(\d{2})/);
+        if (m) {
+          const arrM = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+          let diff = arrM - currentMinutes;
+          // If this scheduled trip already departed earlier today, roll forward to tomorrow (+1440m)
+          if (diff < -5) {
+            diff += 1440;
+          }
+          a.btime2 = diff;
+          a.status_label = a.departure_time ? `Προγρ. (${a.departure_time})` : `Προγρ. (${timeStr})`;
+          adjustedArrivals.push(a);
+          continue;
+        }
+      }
+
+      // If no HH:MM format found, decay previous btime2 by elapsed minutes
+      if (typeof a.btime2 === 'number') {
+        const elapsedMins = Math.floor((Date.now() - (cachedTimestamp || Date.now())) / 60000);
+        const rem = a.btime2 - elapsedMins;
+        if (rem >= 0) {
+          a.btime2 = rem;
+          adjustedArrivals.push(a);
+        }
+      }
+    }
+
+    // Sort upcoming arrivals chronologically so the next actual bus is at top
+    adjustedArrivals.sort((a, b) => a.btime2 - b.btime2);
+    cloned.arrivals = adjustedArrivals;
+    return cloned;
+  },
+
   getFromOfflineCache(key) {
     try {
       const cache = this.getOfflineCache();
-      return cache[key] ? cache[key].data : null;
+      const entry = cache[key];
+      if (!entry || !entry.data) return null;
+      if (key.includes('/arrivals')) {
+        return this.adjustOfflineArrivals(entry.data, entry.timestamp);
+      }
+      return entry.data;
     } catch (e) {
       return null;
     }
@@ -140,6 +209,14 @@ const API = {
 
   async getWalkingRoute(fromLat, fromLng, toLat, toLng) {
     return this.fetchJson(`/api/routing/walk?fromLat=${fromLat}&fromLng=${fromLng}&toLat=${toLat}&toLng=${toLng}`);
+  },
+
+  async getDisruptions() {
+    return this.fetchJson('/api/disruptions');
+  },
+
+  async planJourney(originLat, originLng, destLat, destLng) {
+    return this.fetchJson(`/api/routing/journey?originLat=${originLat}&originLng=${originLng}&destLat=${destLat}&destLng=${destLng}`);
   }
 };
 

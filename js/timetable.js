@@ -105,7 +105,7 @@ class TimetableManager {
     let nextTripFound = false;
 
     return trips.map(t => {
-      const raw = t.sde_start1 || t.sdd_start1 || '';
+      const raw = t.sde_start1 || t.sdd_start1 || t.sde_start2 || t.sdd_start2 || '';
       const match = raw.match(/(\d{1,2}):(\d{2})/);
       if (!match) return '';
       const h = parseInt(match[1], 10);

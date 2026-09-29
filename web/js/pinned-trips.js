@@ -133,9 +133,6 @@ class PinnedTripsManager {
     this.pinnedItems = this.pinnedItems.filter(p => p.id !== pinId);
     this.save();
     this.showToast('Το σκέλος αφαιρέθηκε');
-    if (item && window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
-      window.Alarms.removeAlarmByStopAndLine(item.stopCode, item.lineId);
-    }
     if (this.pinnedItems.length === 0) {
       if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
         try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
@@ -154,9 +151,6 @@ class PinnedTripsManager {
     this.pinnedItems = this.pinnedItems.filter(p => !(String(p.stopCode).trim() === normStop && String(p.lineId).trim().toUpperCase() === normLine));
     if (this.pinnedItems.length !== initialCount) {
       this.save();
-      if (window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
-        window.Alarms.removeAlarmByStopAndLine(normStop, normLine);
-      }
       if (this.pinnedItems.length === 0) {
         if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
           try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
@@ -459,7 +453,7 @@ class PinnedTripsManager {
                 ${item.lineId}
               </span>
               <div style="min-width: 0; flex: 1;">
-                <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: break-word;">${item.stopName}</div>
+                <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: normal; overflow-wrap: normal; hyphens: none;">${item.stopName}</div>
                 <div style="font-size: 0.76rem; color: var(--md-sys-color-outline); margin-top: 2px;">
                   ${item.direction ? `<strong style="color: var(--md-sys-color-primary); margin-right: 4px;">${item.direction}</strong> • ` : ''}Στάση #${item.stopCode} • <span style="color: var(--md-sys-color-primary); text-decoration: underline;">Προβολή στάσης ➜</span>
                 </div>

@@ -622,7 +622,7 @@ class AirportTicker {
                           ${l.LineID}
                         </span>
                         <div style="min-width: 0; flex: 1;">
-                          <div style="font-weight: 800; font-size: 0.92rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: break-word;">${l.LineDescr}</div>
+                          <div style="font-weight: 800; font-size: 0.92rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: normal; overflow-wrap: normal; hyphens: none;">${l.LineDescr}</div>
                           <div style="font-size: 0.74rem; color: var(--md-sys-color-outline); margin-top: 2px;">Γραμμή #${l.LineCode}</div>
                         </div>
                       </div>

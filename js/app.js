@@ -23,6 +23,9 @@ class AppController {
     this.notifiedBuses = new Set();
     this.navHistory = [];
     this.arrivalsTargetDay = 'today';
+    this.geoWatchId = null;
+    this.disruptions = [];
+    this.disruptionsMap = new Map(); // lineId -> [disruption]
   }
 
   /**
@@ -62,6 +65,153 @@ class AppController {
       this.syncBatterySaverUI();
       this.updateOfflineCacheCount();
       this.updateBackButtonsVisibility();
+    }
+  }
+
+  async loadDisruptions() {
+    try {
+      const list = await window.API.getDisruptions();
+      if (Array.isArray(list)) {
+        this.disruptions = list;
+        this.disruptionsMap.clear();
+        for (const item of list) {
+          if (Array.isArray(item.affectedLines)) {
+            for (const line of item.affectedLines) {
+              const clean = String(line).trim().toUpperCase();
+              if (!this.disruptionsMap.has(clean)) {
+                this.disruptionsMap.set(clean, []);
+              }
+              this.disruptionsMap.get(clean).push(item);
+            }
+          }
+        }
+        this.updateDisruptionsBadgeUI();
+      }
+    } catch (e) {
+      console.warn('Failed to load disruptions:', e);
+    }
+  }
+
+  updateDisruptionsBadgeUI() {
+    const badge = document.getElementById('top-bar-disruptions-badge');
+    if (!badge) return;
+    const count = this.disruptions.length;
+    if (count > 0) {
+      badge.innerText = count;
+      badge.style.display = 'inline-flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  openDisruptionsModal() {
+    const modal = document.getElementById('disruptions-modal');
+    const container = document.getElementById('disruptions-modal-list');
+    if (!modal || !container) return;
+
+    if (this.disruptions.length === 0) {
+      container.innerHTML = `
+        <div style="padding: 2rem 1rem; text-align: center; color: #64748b; font-size: 0.9rem;">
+          Δεν υπάρχουν καταγεγραμμένες τροποποιήσεις ή απεργίες αυτή τη στιγμή.
+        </div>
+      `;
+    } else {
+      container.innerHTML = this.disruptions.map(d => {
+        let badgeColor = '#005ac1';
+        let badgeBg = '#eff6ff';
+        if (d.type === 'strike') {
+          badgeColor = '#dc2626';
+          badgeBg = '#fef2f2';
+        } else if (d.type === 'modification') {
+          badgeColor = '#d97706';
+          badgeBg = '#fffbeb';
+        } else if (d.type === 'roadworks') {
+          badgeColor = '#7c3aed';
+          badgeBg = '#f5f3ff';
+        }
+
+        const linesHtml = (Array.isArray(d.affectedLines) && d.affectedLines.length > 0) ? `
+          <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;">
+            ${d.affectedLines.map(l => `
+              <span class="m3-badge clickable-line-badge" style="background: #e2e8f0; color: #0f172a; font-size: 0.72rem; font-weight: 800; cursor: pointer;" 
+                    onclick="event.stopPropagation(); window.App.isolateLineOnMap('${l}'); window.App.closeModal('disruptions-modal');" title="Εστίαση γραμμής στον χάρτη">
+                ${l}
+              </span>
+            `).join('')}
+          </div>
+        ` : '';
+
+        return `
+          <div class="m3-card" style="padding: 0.85rem 1rem; border: 1px solid var(--md-sys-color-outline-variant); background: #ffffff; border-radius: 14px; margin-bottom: 0.65rem;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px;">
+              <span class="m3-badge" style="background: ${badgeBg}; color: ${badgeColor}; font-weight: 800; font-size: 0.72rem; border: 1px solid ${badgeColor}33;">
+                ${d.typeLabel || 'Ενημέρωση'}
+              </span>
+              <span style="font-size: 0.72rem; color: #64748b; font-weight: 600;">${d.dateFormatted || ''}</span>
+            </div>
+            <div style="font-size: 0.88rem; font-weight: 800; color: #0f172a; line-height: 1.3; margin-bottom: 4px;">
+              ${d.title}
+            </div>
+            ${d.excerpt ? `<div style="font-size: 0.78rem; color: #475569; line-height: 1.35; margin-bottom: 6px;">${d.excerpt}</div>` : ''}
+            ${linesHtml}
+            ${d.link ? `
+              <div style="margin-top: 6px; text-align: right;">
+                <a href="${d.link}" target="_blank" rel="noopener noreferrer" style="font-size: 0.75rem; color: #005ac1; font-weight: 700; text-decoration: none;">
+                  Περισσότερα στο oasa.gr ↗
+                </a>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    modal.classList.add('open');
+    this.updateBackButtonsVisibility();
+  }
+
+  isolateLineOnMap(lineId, lineCode = null) {
+    if (!lineId) return;
+    this.triggerHaptic('selection');
+    this.switchTab('search');
+    if (this.mapManager) {
+      this.mapManager.isolateLine(lineId, lineCode);
+    }
+    const mapEl = document.getElementById('map-container');
+    if (mapEl) {
+      mapEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+
+  checkStopDisruptions(routes = []) {
+    const banner = document.getElementById('selected-stop-disruption-banner');
+    if (!banner) return;
+    if (!Array.isArray(routes) || routes.length === 0 || this.disruptionsMap.size === 0) {
+      banner.style.display = 'none';
+      return;
+    }
+
+    const matchedDisruptions = [];
+    for (const r of routes) {
+      const lid = String(r.LineID || '').trim().toUpperCase();
+      if (lid && this.disruptionsMap.has(lid)) {
+        matchedDisruptions.push(...this.disruptionsMap.get(lid));
+      }
+    }
+
+    if (matchedDisruptions.length > 0) {
+      const first = matchedDisruptions[0];
+      banner.innerHTML = `
+        <div style="display:flex; align-items:center; gap:6px;">
+          <span>⚠️</span>
+          <span style="font-weight:700;">${first.typeLabel}:</span>
+          <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px;">${first.title}</span>
+        </div>
+        <button style="background:none; border:none; color:#b45309; font-weight:800; cursor:pointer; font-size:0.75rem; text-decoration:underline;" onclick="window.App.openDisruptionsModal()">Προβολή</button>
+      `;
+      banner.style.display = 'flex';
+    } else {
+      banner.style.display = 'none';
     }
   }
 
@@ -294,13 +444,22 @@ class AppController {
 
     // Update back button initial state
     this.updateBackButtonsVisibility();
+
+    // Load real-time OASA service disruptions & strike bulletins
+    this.loadDisruptions();
+
+    // Initialize Journey Planner if available
+    if (window.JourneyPlanner && typeof window.JourneyPlanner.init === 'function') {
+      window.JourneyPlanner.init();
+    }
   }
 
   initGeolocation() {
     if ('geolocation' in navigator) {
+      // 1. Initial position with cached fix support (maximumAge: 10000) for instant startup
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          this.setUserLocation(pos.coords.latitude, pos.coords.longitude);
+          this.handleLocationChange(pos.coords.latitude, pos.coords.longitude, true);
           // Center map immediately on user on app open
           if (this.mapManager) {
             const stops = window.Search ? window.Search.nearbyStops : [];
@@ -309,13 +468,61 @@ class AppController {
         },
         (err) => {
           console.log('Default geolocation fallback (Athens Center):', err.message);
-          this.setUserLocation(37.9845, 23.7335);
-          if (this.mapManager) {
-            this.mapManager.setView(37.9845, 23.7335, 15);
+          if (!this.userLocation) {
+            this.setUserLocation(37.9845, 23.7335);
+            if (this.mapManager) {
+              this.mapManager.setView(37.9845, 23.7335, 15);
+            }
           }
         },
-        { enableHighAccuracy: true, timeout: 8000 }
+        { enableHighAccuracy: true, timeout: 7000, maximumAge: 10000 }
       );
+
+      // 2. Continuous real-time location tracking for instant updates as user moves
+      try {
+        if (this.geoWatchId !== null) {
+          navigator.geolocation.clearWatch(this.geoWatchId);
+        }
+        this.geoWatchId = navigator.geolocation.watchPosition(
+          (pos) => {
+            this.handleLocationChange(pos.coords.latitude, pos.coords.longitude, false);
+          },
+          (err) => {
+            console.warn('Geolocation watchPosition warning:', err.message);
+          },
+          { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+        );
+      } catch (e) {
+        console.warn('Could not start watchPosition:', e);
+      }
+    }
+  }
+
+  handleLocationChange(lat, lng, isInitial = false) {
+    const pLat = parseFloat(lat);
+    const pLng = parseFloat(lng);
+    if (isNaN(pLat) || isNaN(pLng)) return;
+
+    const prevLoc = this.userLocation;
+    this.setUserLocation(pLat, pLng);
+
+    if (!prevLoc || isInitial) {
+      if (window.Search && typeof window.Search.updateNearbyForLocation === 'function') {
+        window.Search.updateNearbyForLocation(pLat, pLng);
+      }
+      return;
+    }
+
+    // Distance calculation in meters
+    const dLatM = (pLat - prevLoc.lat) * 111139;
+    const dLngM = (pLng - prevLoc.lng) * (111139 * Math.cos(pLat * Math.PI / 180));
+    const distMoved = Math.sqrt(dLatM * dLatM + dLngM * dLngM);
+
+    // If user moved significantly (> 75 meters), update nearby stops immediately
+    if (distMoved >= 75) {
+      if (window.Search && typeof window.Search.updateNearbyForLocation === 'function') {
+        window.Search.updateNearbyForLocation(pLat, pLng);
+      }
     }
   }
 
@@ -494,6 +701,13 @@ class AppController {
       if (searchBar) searchBar.style.display = '';
     }
 
+    // When switching to Journey / Navigation tab
+    if (tabId === 'journey') {
+      if (window.JourneyPlanner && typeof window.JourneyPlanner.renderTab === 'function') {
+        window.JourneyPlanner.renderTab();
+      }
+    }
+
     // Invalidate Leaflet Map size if on search / map tab
     if ((tabId === 'map' || tabId === 'search') && this.mapManager) {
       setTimeout(() => {
@@ -568,9 +782,9 @@ class AppController {
 
     routesListEl.innerHTML = uniqueRoutes.map(r => `
       <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 9999px; padding: 3px 10px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; box-shadow: 0 1px 2px rgba(0,0,0,0.05); cursor: pointer;" onclick="window.App.openLineTimetableBothDirections('${r.LineCode}', '${r.LineID}', '${r.cleanDestination}')">
-        <span style="font-weight: 800; color: var(--md-sys-color-primary);">${r.LineID || 'BUS'}</span>
+        <span style="font-weight: 800; color: #005ac1; background: #eff6ff; padding: 2px 6px; border-radius: 6px; border: 1px solid #bfdbfe;" onclick="event.stopPropagation(); window.App.isolateLineOnMap('${r.LineID}', '${r.LineCode}');" title="Εστίαση γραμμής στον χάρτη">🗺️ ${r.LineID || 'BUS'}</span>
         <span style="color: var(--md-sys-color-outline);">προς</span>
-        <span style="color: var(--md-sys-color-on-surface); max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600;">${r.cleanDestination}</span>
+        <span style="color: var(--md-sys-color-on-surface); max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600;">${r.cleanDestination}</span>
         <span class="m3-badge" style="background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); font-size: 0.65rem; padding: 1px 6px;">${r.directionLabel}</span>
       </div>
     `).join('');
@@ -693,6 +907,7 @@ class AppController {
         try {
           const parsed = JSON.parse(cached);
           this.renderRoutesOverview(routesListEl, parsed);
+          this.checkStopDisruptions(parsed);
         } catch (e) {}
       } else {
         routesListEl.innerHTML = '<span style="color: var(--md-sys-color-outline); font-size: 0.8rem;">Φόρτωση γραμμών...</span>';
@@ -702,6 +917,7 @@ class AppController {
         if (Array.isArray(routes) && routes.length > 0) {
           localStorage.setItem('OASA_STOP_ROUTES_' + stopCode, JSON.stringify(routes));
           this.renderRoutesOverview(routesListEl, routes);
+          this.checkStopDisruptions(routes);
         } else if (!cached) {
           routesListEl.innerHTML = '<span style="color: var(--md-sys-color-outline); font-size: 0.8rem;">Δεν βρέθηκαν γραμμές για αυτή τη στάση.</span>';
         }
@@ -963,28 +1179,7 @@ class AppController {
       walkMins = Math.ceil(this.currentStop.distanceMeters / 80) + 2;
     }
 
-    // 1. Automatically pin the notification first (without triggering alarm noise)
-    if (window.PinnedTrips && typeof window.PinnedTrips.pinArrival === 'function') {
-      try {
-        window.PinnedTrips.pinArrival({
-          line_id: lineId,
-          route_code: routeCode,
-          destination: lineDescr,
-          route_descr: lineDescr,
-          btime2: dueMins
-        }, {
-          StopCode: stopCode,
-          StopDescr: stopName,
-          distanceMeters: this.currentStop ? this.currentStop.distanceMeters : null,
-          StopLat: this.currentStop ? this.currentStop.StopLat : null,
-          StopLng: this.currentStop ? this.currentStop.StopLng : null
-        });
-      } catch (e) {
-        console.warn('Could not auto-pin arrival for alarm:', e);
-      }
-    }
-
-    // 2. Set alarm with user's threshold and ring settings (arms the alarm)
+    // Set alarm with user's threshold and ring settings (arms the alarm)
     if (window.Alarms) {
       window.Alarms.addAlarm({
         stopCode: stopCode,

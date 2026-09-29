@@ -197,7 +197,7 @@ class SearchManager {
                       ${l.LineID}
                     </span>
                     <div style="min-width: 0; flex: 1;">
-                      <div style="font-weight: 800; font-size: 0.92rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: break-word;">${l.LineDescr}</div>
+                      <div style="font-weight: 800; font-size: 0.92rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: normal; overflow-wrap: normal; hyphens: none;">${l.LineDescr}</div>
                       <div style="font-size: 0.74rem; color: var(--md-sys-color-outline); margin-top: 2px;">Γραμμή #${l.LineCode}</div>
                     </div>
                   </div>
@@ -313,6 +313,44 @@ class SearchManager {
   }
 
   /**
+   * Fast location change handler: immediately updates stops around coordinates from local memory,
+   * then enriches in the background from official API.
+   */
+  updateNearbyForLocation(lat, lng) {
+    const pLat = parseFloat(lat);
+    const pLng = parseFloat(lng);
+    if (isNaN(pLat) || isNaN(pLng)) return;
+
+    // Instant local calculation (0-2ms)
+    const localStops = this.getLocalClosestStops(pLat, pLng);
+    if (Array.isArray(localStops) && localStops.length > 0) {
+      this.nearbyStops = localStops;
+      this.sortStopsWithFavorites();
+      this.renderNearbyStops(pLat, pLng);
+      if (window.App && window.App.mapManager) {
+        window.App.mapManager.renderNearbyStops(this.nearbyStops);
+      }
+      if (window.App && window.App.ticker && !window.App.currentStop) {
+        window.App.ticker.render();
+      }
+    }
+
+    // Background enrichment with official API stops/routes without blocking UI
+    window.API.getClosestStops(pLat, pLng).then(stops => {
+      if (Array.isArray(stops) && stops.length > 0) {
+        this.nearbyStops = stops;
+        this.sortStopsWithFavorites();
+        this.renderNearbyStops(pLat, pLng);
+        if (window.App && window.App.mapManager) {
+          window.App.mapManager.renderNearbyStops(this.nearbyStops);
+        }
+      }
+    }).catch(err => {
+      // Harmless if offline or timeout
+    });
+  }
+
+  /**
    * "Near Me" GPS Radar
    */
   async findNearbyStops(silent = false) {
@@ -329,14 +367,20 @@ class SearchManager {
       window.App.switchTab('search');
     }
 
-    // If user's location is already known, immediately fit map to area around user
-    if (window.App && window.App.userLocation && window.App.mapManager) {
-      window.App.mapManager.fitAreaAroundUser(
-        window.App.userLocation.lat,
-        window.App.userLocation.lng,
-        this.nearbyStops,
-        200
-      );
+    // If user's location is already known, immediately render local stops and fit map (0ms latency)
+    if (window.App && window.App.userLocation) {
+      const uLat = window.App.userLocation.lat;
+      const uLng = window.App.userLocation.lng;
+      const localStops = this.getLocalClosestStops(uLat, uLng);
+      if (localStops.length > 0) {
+        this.nearbyStops = localStops;
+        this.sortStopsWithFavorites();
+        this.renderNearbyStops(uLat, uLng);
+      }
+      if (window.App.mapManager) {
+        window.App.mapManager.fitAreaAroundUser(uLat, uLng, this.nearbyStops, 200);
+        window.App.mapManager.renderNearbyStops(this.nearbyStops);
+      }
     }
 
     // Smooth scroll to map container if not silent
@@ -380,7 +424,7 @@ class SearchManager {
     }
 
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
+      (pos) => {
         const { latitude, longitude } = pos.coords;
         if (window.App) {
           window.App.setUserLocation(latitude, longitude);
@@ -389,22 +433,7 @@ class SearchManager {
           window.App.mapManager.fitAreaAroundUser(latitude, longitude, this.nearbyStops, 200);
         }
 
-        try {
-          const stops = await window.API.getClosestStops(latitude, longitude);
-          this.nearbyStops = (Array.isArray(stops) && stops.length > 0) ? stops : this.getLocalClosestStops(latitude, longitude);
-        } catch (err) {
-          console.warn('API getClosestStops error, using local index:', err);
-          this.nearbyStops = this.getLocalClosestStops(latitude, longitude);
-        }
-
-        this.sortStopsWithFavorites();
-        this.renderNearbyStops(latitude, longitude);
-        if (window.App && window.App.mapManager) {
-          window.App.mapManager.renderNearbyStops(this.nearbyStops);
-        }
-        if (window.App && window.App.ticker && !window.App.currentStop) {
-          window.App.ticker.render();
-        }
+        this.updateNearbyForLocation(latitude, longitude);
 
         if (radarBtn) {
           radarBtn.classList.remove('spin-animation');
@@ -413,9 +442,14 @@ class SearchManager {
       },
       async (err) => {
         console.warn('Geolocation fallback to Athens center:', err.message);
-        await fallbackToCenter();
+        if (!window.App || !window.App.userLocation) {
+          await fallbackToCenter();
+        } else if (radarBtn) {
+          radarBtn.classList.remove('spin-animation');
+          radarBtn.disabled = false;
+        }
       },
-      { enableHighAccuracy: true, timeout: 8000 }
+      { enableHighAccuracy: true, timeout: 6000, maximumAge: 10000 }
     );
   }
 
@@ -457,6 +491,23 @@ class SearchManager {
     const pLat = parseFloat(lat);
     const pLng = parseFloat(lng);
     if (isNaN(pLat) || isNaN(pLng)) return;
+
+    // Instant local stops for viewport (0-2ms)
+    const local = this.getLocalClosestStops(pLat, pLng);
+    if (Array.isArray(local) && local.length > 0) {
+      this.nearbyStops = local;
+      this.sortStopsWithFavorites();
+      const uLat = window.App && window.App.userLocation ? window.App.userLocation.lat : pLat;
+      const uLng = window.App && window.App.userLocation ? window.App.userLocation.lng : pLng;
+      this.renderNearbyStops(uLat, uLng);
+      if (window.App && window.App.mapManager) {
+        window.App.mapManager.renderNearbyStops(this.nearbyStops);
+      }
+      if (window.App && window.App.ticker && !window.App.currentStop) {
+        window.App.ticker.render();
+      }
+    }
+
     try {
       const stops = await window.API.getClosestStops(pLat, pLng);
       if (Array.isArray(stops) && stops.length > 0) {
@@ -473,7 +524,7 @@ class SearchManager {
         }
       }
     } catch (err) {
-      console.warn('Failed to reload stops for coordinates:', err);
+      console.warn('Failed to reload stops for coordinates from API:', err);
     }
   }
 
@@ -549,7 +600,7 @@ class SearchManager {
                 <div style="min-width: 0; flex: 1;">
                   <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                     ${isFav ? '<span class="m3-badge" style="background: #fef08a; color: #854d0e; font-size: 0.72rem; font-weight: 800; padding: 2px 6px;">⭐</span>' : ''}
-                    <div style="font-weight: 800; font-size: 0.94rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: break-word;">${stopTitle}</div>
+                    <div style="font-weight: 800; font-size: 0.94rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: normal; overflow-wrap: normal; hyphens: none;">${stopTitle}</div>
                   </div>
                   <div style="font-size: 0.75rem; color: var(--md-sys-color-outline); margin-top: 3px;">
                     ${s.StopStreet ? s.StopStreet + ' • ' : ''}#${s.StopCode}

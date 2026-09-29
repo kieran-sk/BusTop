@@ -14,8 +14,17 @@ class MapManager {
     this.userLocation = null;
     this.isLoaded = false;
     this.moveDebounceTimer = null;
+    this.lastSearchCenter = null;
+    this.lastSearchZoom = null;
+    this.busLoadTimer = null;
+    this.resolvedLinesCache = new Map();
     this.stopMarkersMap = new Map();
     this.vehicleHistoryMap = new Map(); // vehNo -> { lat, lng, heading }
+    this.busMarkersMap = new Map(); // vehNo -> L.Marker for smooth animation
+    this.busAnimationFrames = new Map(); // vehNo -> requestAnimationFrame ID
+    this.isolatedLine = null; // { lineId, lineCode, routeCode } when in isolation mode
+    this.isolatedPollTimer = null;
+    this.journeyLayer = null;
   }
 
   async init() {
@@ -48,15 +57,27 @@ class MapManager {
 
     this.map = L.map(this.containerId, {
       center: initialCenter,
-      zoom: 17.5,
-      zoomControl: false
+      zoom: 17,
+      zoomControl: false,
+      preferCanvas: true,
+      zoomAnimation: true,
+      fadeAnimation: true,
+      markerZoomAnimation: true,
+      inertia: true,
+      inertiaDeceleration: 3000,
+      inertiaMaxSpeed: 1500,
+      easeLinearity: 0.2
     });
 
     // Zoom control intentionally hidden — pinch/scroll to zoom
 
-    // OpenStreetMap Tile Layer (Crisp, light mode)
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    // OpenStreetMap Tile Layer with subdomains, tile buffer & idle updates for 60fps panning
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      subdomains: ['a', 'b', 'c'],
       maxZoom: 19,
+      updateWhenIdle: true,
+      updateWhenZooming: false,
+      keepBuffer: 4,
       attribution: '&copy; OpenStreetMap contributors'
     }).addTo(this.map);
 
@@ -64,6 +85,7 @@ class MapManager {
     this.stopsLayer = L.layerGroup().addTo(this.map);
     this.busLayer = L.layerGroup().addTo(this.map);
     this.routeLayer = L.layerGroup().addTo(this.map);
+    this.journeyLayer = L.layerGroup().addTo(this.map);
 
     if (this.userLocation && !isNaN(this.userLocation.lat) && !isNaN(this.userLocation.lng)) {
       this.setUserLocation(this.userLocation.lat, this.userLocation.lng);
@@ -131,37 +153,60 @@ class MapManager {
     if (this.moveDebounceTimer) clearTimeout(this.moveDebounceTimer);
 
     this.moveDebounceTimer = setTimeout(async () => {
+      if (this.isolatedLine) return; // Do not overwrite stops when user is inspecting an isolated line
       const zoom = this.map.getZoom();
       if (zoom < 13) return;
 
       const center = this.map.getCenter();
+      if (this.lastSearchCenter && this.lastSearchZoom === zoom) {
+        const dist = center.distanceTo(this.lastSearchCenter);
+        if (dist < 120) return;
+      }
+      this.lastSearchCenter = center;
+      this.lastSearchZoom = zoom;
+
       if (window.Search && typeof window.Search.findNearbyStopsForCoords === 'function') {
         window.Search.findNearbyStopsForCoords(center.lat, center.lng);
       }
-    }, 450);
+    }, 550);
   }
 
   /**
-   * Clear and render stops discovered around user or center
+   * Clear and render stops discovered around user or center with marker diffing
    */
   renderNearbyStops(stops = [], shouldFit = false) {
     if (!this.map || !this.stopsLayer) return;
-    this.stopsLayer.clearLayers();
-    this.stopMarkersMap.clear();
 
-    if (!Array.isArray(stops) || stops.length === 0) return;
+    if (!Array.isArray(stops) || stops.length === 0) {
+      this.stopsLayer.clearLayers();
+      this.stopMarkersMap.clear();
+      return;
+    }
 
+    const newCodes = new Set(stops.map(s => String(s.StopCode)));
+
+    // Diffing: remove markers that are no longer in the new set
+    for (const [code, marker] of this.stopMarkersMap.entries()) {
+      if (!newCodes.has(code)) {
+        this.stopsLayer.removeLayer(marker);
+        this.stopMarkersMap.delete(code);
+      }
+    }
+
+    // Add only new markers (preserving existing ones to avoid DOM churn)
     stops.forEach(s => {
       const sCode = String(s.StopCode);
-      const marker = this.createStopMarker(s);
-      if (marker) {
-        marker.addTo(this.stopsLayer);
-        this.stopMarkersMap.set(sCode, marker);
+      if (!this.stopMarkersMap.has(sCode)) {
+        const marker = this.createStopMarker(s);
+        if (marker) {
+          marker.addTo(this.stopsLayer);
+          this.stopMarkersMap.set(sCode, marker);
+        }
       }
     });
 
-    // Also fetch live buses traveling around nearby stops
-    this.loadBusesForNearbyStops(stops);
+    // Debounced fetch of live buses traveling around nearby stops
+    this.scheduleLoadBusesForNearbyStops(stops);
 
     if (shouldFit) {
       if (this.userLocation) {
@@ -180,8 +225,15 @@ class MapManager {
     }
   }
 
+  scheduleLoadBusesForNearbyStops(stops) {
+    if (this.busLoadTimer) clearTimeout(this.busLoadTimer);
+    this.busLoadTimer = setTimeout(() => {
+      this.loadBusesForNearbyStops(stops);
+    }, 900);
+  }
+
   /**
-   * Fetch and display live moving buses for lines serving nearby stops
+   * Fetch and display live moving buses for lines serving nearby stops (with line cache)
    */
   async loadBusesForNearbyStops(stops = []) {
     if (!this.map || !this.busLayer) return;
@@ -201,15 +253,24 @@ class MapManager {
 
       const promises = Array.from(linesToQuery).map(async (lid) => {
         try {
-          const res = await window.API.resolveLine(lid);
-          if (res && res.line_code) {
-            const routes = await window.API.getRoutes(res.line_code);
-            if (Array.isArray(routes) && routes.length > 0) {
-              const rCode = routes[0].RouteCode;
-              const buses = await window.API.getLiveBuses(rCode);
-              if (Array.isArray(buses)) {
-                return buses.map(b => ({ ...b, line_id: lid }));
+          let cached = this.resolvedLinesCache.get(lid);
+          let rCode = cached ? cached.routeCode : null;
+
+          if (!rCode) {
+            const res = await window.API.resolveLine(lid);
+            if (res && res.line_code) {
+              const routes = await window.API.getRoutes(res.line_code);
+              if (Array.isArray(routes) && routes.length > 0) {
+                rCode = routes[0].RouteCode;
+                this.resolvedLinesCache.set(lid, { lineCode: res.line_code, routeCode: rCode });
               }
+            }
+          }
+
+          if (rCode) {
+            const buses = await window.API.getLiveBuses(rCode);
+            if (Array.isArray(buses)) {
+              return buses.map(b => ({ ...b, line_id: lid }));
             }
           }
         } catch (e) {}
@@ -497,29 +558,70 @@ class MapManager {
     return (bearing + 360) % 360;
   }
 
+  createBusIcon(lineId, heading) {
+    const headingHtml = (heading !== null && heading !== undefined) ? `
+      <div style="position: absolute; top: -5px; right: -5px; width: 14px; height: 14px; border-radius: 50%; background: #0f172a; border: 1.5px solid #ffffff; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transform: rotate(${heading}deg); transition: transform 0.4s ease;" title="Κατεύθυνση: ${heading}°">
+        <svg width="8" height="8" viewBox="0 0 24 24" fill="#fbbf24">
+          <polygon points="12,2 22,21 12,17 2,21" />
+        </svg>
+      </div>
+    ` : '';
+
+    return L.divIcon({
+      className: 'map-live-bus-icon',
+      html: `
+        <div style="display: flex; flex-direction: column; align-items: center; pointer-events: auto; cursor: pointer; transform: translateZ(0);">
+          <div style="position: relative; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));">
+            <span style="font-size: 1.5rem; line-height: 1;">🚌</span>
+            ${headingHtml}
+          </div>
+          <div style="margin-top: 1px; font-size: 0.68rem; font-weight: 900; color: #0f172a; background: rgba(255,255,255,0.96); padding: 1px 5px; border-radius: 4px; border: 1px solid rgba(15,23,42,0.2); box-shadow: 0 1px 3px rgba(0,0,0,0.18); letter-spacing: 0.02em; white-space: nowrap; line-height: 1.2;">
+            ${lineId}
+          </div>
+        </div>
+      `,
+      iconSize: [36, 46],
+      iconAnchor: [18, 23]
+    });
+  }
+
   /**
-   * Redesigned Live Bus Vehicle Marker - Glowing 3D capsule with real-time directional heading chevron
+   * Smooth 60fps Bus Vehicle Marker Updates with Coordinate Interpolation (Lerp)
    */
   updateBuses(buses = [], defaultLineId = 'BUS') {
     if (!this.map || !this.busLayer) return;
-    this.busLayer.clearLayers();
 
-    const activeVehNos = new Set();
-    buses.forEach(b => {
+    // Filter if currently in Line Isolation mode
+    let targetBuses = buses;
+    if (this.isolatedLine && this.isolatedLine.lineId) {
+      targetBuses = buses.filter(b => {
+        const lid = String(b.line_id || b.LINE_ID || '').trim().toLowerCase();
+        return lid === this.isolatedLine.lineId.toLowerCase();
+      });
+      const countEl = document.getElementById('isolated-bus-count-badge');
+      if (countEl) {
+        countEl.innerText = `${targetBuses.length} ${targetBuses.length === 1 ? 'όχημα' : 'οχήματα'} σε κίνηση`;
+      }
+    }
+
+    const activeVehKeys = new Set();
+    const easeOutQuad = t => t * (2 - t);
+
+    targetBuses.forEach((b, idx) => {
       const lat = parseFloat(b.CS_LAT);
       const lng = parseFloat(b.CS_LNG);
       if (isNaN(lat) || isNaN(lng)) return;
 
       const lineId = b.line_id || b.LINE_ID || defaultLineId;
-      const vehNo = b.VEH_NO || '';
-      if (vehNo) activeVehNos.add(vehNo);
+      const vehNo = b.VEH_NO || `${lineId}_${idx}`;
+      activeVehKeys.add(vehNo);
 
       // Determine vehicle heading from movement history
       let heading = null;
-      if (vehNo && this.vehicleHistoryMap.has(vehNo)) {
+      if (this.vehicleHistoryMap.has(vehNo)) {
         const prev = this.vehicleHistoryMap.get(vehNo);
         const distMoved = Math.hypot(lat - prev.lat, lng - prev.lng);
-        // Only calculate heading if bus moved more than ~8 meters
+        // Only calculate new heading if bus moved more than ~8 meters
         if (distMoved > 0.00008) {
           heading = Math.round(this.calculateBearing(prev.lat, prev.lng, lat, lng));
         } else {
@@ -528,49 +630,276 @@ class MapManager {
       }
       this.vehicleHistoryMap.set(vehNo, { lat, lng, heading });
 
-      const headingHtml = (heading !== null && heading !== undefined) ? `
-        <div style="position: absolute; top: -5px; right: -5px; width: 14px; height: 14px; border-radius: 50%; background: #0f172a; border: 1.5px solid #ffffff; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transform: rotate(${heading}deg); transition: transform 0.4s ease;" title="Κατεύθυνση: ${heading}°">
-          <svg width="8" height="8" viewBox="0 0 24 24" fill="#fbbf24">
-            <polygon points="12,2 22,21 12,17 2,21" />
-          </svg>
-        </div>
-      ` : '';
-
-      const busIcon = L.divIcon({
-        className: 'map-live-bus-icon',
-        html: `
-          <div style="display: flex; flex-direction: column; align-items: center; pointer-events: auto; cursor: pointer; transform: translateZ(0);">
-            <div style="position: relative; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));">
-              <span style="font-size: 1.5rem; line-height: 1;">🚌</span>
-              ${headingHtml}
-            </div>
-            <div style="margin-top: 1px; font-size: 0.68rem; font-weight: 900; color: #0f172a; background: rgba(255,255,255,0.96); padding: 1px 5px; border-radius: 4px; border: 1px solid rgba(15,23,42,0.2); box-shadow: 0 1px 3px rgba(0,0,0,0.18); letter-spacing: 0.02em; white-space: nowrap; line-height: 1.2;">
-              ${lineId}
-            </div>
-          </div>
-        `,
-        iconSize: [36, 46],
-        iconAnchor: [18, 23]
-      });
-
       const headingTxt = (heading !== null && heading !== undefined) ? ` | Κατεύθυνση: ${heading}°` : '';
-      L.marker([lat, lng], { icon: busIcon }).addTo(this.busLayer)
-        .bindTooltip(`🚍 Λεωφορείο ${lineId}${headingTxt}`, { direction: 'top' });
+      const tooltipHtml = `🚍 Λεωφορείο ${lineId}${headingTxt}`;
+
+      if (this.busMarkersMap.has(vehNo)) {
+        // Marker exists: smoothly glide (lerp) from current position to new position
+        const marker = this.busMarkersMap.get(vehNo);
+        const cur = marker.getLatLng();
+        const distLat = Math.abs(lat - cur.lat);
+        const distLng = Math.abs(lng - cur.lng);
+
+        if (distLat > 0.00002 || distLng > 0.00002) {
+          // Cancel prior animation frame for this vehicle
+          if (this.busAnimationFrames.has(vehNo)) {
+            cancelAnimationFrame(this.busAnimationFrames.get(vehNo));
+          }
+
+          const fromLat = cur.lat;
+          const fromLng = cur.lng;
+          const startTime = performance.now();
+          const duration = 1400; // 1.4s smooth glide
+
+          const step = (now) => {
+            const elapsed = now - startTime;
+            const progress = Math.min(1, elapsed / duration);
+            const ease = easeOutQuad(progress);
+            const interpLat = fromLat + (lat - fromLat) * ease;
+            const interpLng = fromLng + (lng - fromLng) * ease;
+            marker.setLatLng([interpLat, interpLng]);
+
+            if (progress < 1) {
+              this.busAnimationFrames.set(vehKey => this.busAnimationFrames.set(vehNo, requestAnimationFrame(step)));
+            } else {
+              this.busAnimationFrames.delete(vehNo);
+            }
+          };
+
+          this.busAnimationFrames.set(vehNo, requestAnimationFrame(step));
+        }
+
+        // Update icon orientation and tooltip
+        marker.setIcon(this.createBusIcon(lineId, heading));
+        marker.setTooltipContent(tooltipHtml);
+      } else {
+        // New marker: create and add to map
+        const icon = this.createBusIcon(lineId, heading);
+        const marker = L.marker([lat, lng], { icon }).addTo(this.busLayer);
+        marker.bindTooltip(tooltipHtml, { direction: 'top' });
+        this.busMarkersMap.set(vehNo, marker);
+      }
     });
 
-    // Prune offline vehicles from history cache
-    if (activeVehNos.size > 0) {
-      for (const vKey of this.vehicleHistoryMap.keys()) {
-        if (!activeVehNos.has(vKey)) {
-          this.vehicleHistoryMap.delete(vKey);
+    // Prune disappeared vehicles gracefully
+    for (const [vKey, marker] of this.busMarkersMap.entries()) {
+      if (!activeVehKeys.has(vKey)) {
+        if (this.busAnimationFrames.has(vKey)) {
+          cancelAnimationFrame(this.busAnimationFrames.get(vKey));
+          this.busAnimationFrames.delete(vKey);
         }
+        this.busLayer.removeLayer(marker);
+        this.busMarkersMap.delete(vKey);
+        this.vehicleHistoryMap.delete(vKey);
       }
+    }
+  }
+
+  /**
+   * One-Tap Line Isolation Filter: focuses map entirely on a single bus line
+   */
+  async isolateLine(lineId, lineCode = null) {
+    if (!lineId || !this.map) return;
+
+    this.clearLineIsolation(false);
+    this.isolatedLine = { lineId, lineCode, routeCode: null };
+
+    // Create or show floating isolation banner on map
+    let bar = document.getElementById('map-isolated-line-bar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'map-isolated-line-bar';
+      bar.className = 'map-isolation-bar';
+      const container = document.getElementById('map-card-wrapper') || document.getElementById(this.containerId);
+      if (container) container.appendChild(bar);
+    }
+
+    bar.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="m3-badge" style="background: #005ac1; color: #ffffff; font-weight: 900; font-size: 0.85rem; padding: 3px 8px; border-radius: 6px;">${lineId}</span>
+        <span id="isolated-bus-count-badge" style="font-size: 0.8rem; font-weight: 700; color: #0f172a;">Αναζήτηση διαδρομής &amp; οχημάτων...</span>
+      </div>
+      <button class="m3-btn m3-btn-tonal" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; border-radius: 9999px; background: rgba(0,0,0,0.06); cursor: pointer;" onclick="window.App.mapManager.clearLineIsolation()">✕ Εμφάνιση όλων</button>
+    `;
+    bar.style.display = 'flex';
+
+    try {
+      // 1. Resolve lineCode if needed
+      let lCode = lineCode;
+      if (!lCode) {
+        const res = await window.API.resolveLine(lineId);
+        if (res && res.line_code) lCode = res.line_code;
+      }
+
+      if (!lCode) {
+        const countEl = document.getElementById('isolated-bus-count-badge');
+        if (countEl) countEl.innerText = `Δεν βρέθηκε η γραμμή ${lineId}`;
+        return;
+      }
+
+      // 2. Fetch routes
+      const routes = await window.API.getRoutes(lCode);
+      if (!Array.isArray(routes) || routes.length === 0) return;
+
+      const mainRoute = routes[0];
+      const rCode = mainRoute.RouteCode;
+      this.isolatedLine.routeCode = rCode;
+
+      // 3. Fetch and render route polyline
+      const details = await window.API.getRouteDetails(rCode);
+      if (Array.isArray(details) && details.length > 0) {
+        this.renderPolyline(details);
+      }
+
+      // 4. Fetch and render stops for this route only
+      const stops = await window.API.getRouteStops(rCode);
+      if (Array.isArray(stops) && stops.length > 0) {
+        this.renderRouteStops(stops);
+      }
+
+      // 5. Fetch live buses for this route
+      const fetchIsolatedBuses = async () => {
+        if (!this.isolatedLine || this.isolatedLine.routeCode !== rCode) return;
+        try {
+          const buses = await window.API.getLiveBuses(rCode);
+          if (Array.isArray(buses)) {
+            const mapped = buses.map(b => ({ ...b, line_id: lineId }));
+            this.updateBuses(mapped, lineId);
+          }
+        } catch (e) {}
+      };
+
+      await fetchIsolatedBuses();
+
+      // Poll isolated line buses every 10 seconds
+      if (this.isolatedPollTimer) clearInterval(this.isolatedPollTimer);
+      this.isolatedPollTimer = setInterval(fetchIsolatedBuses, 10000);
+    } catch (err) {
+      console.warn('Failed to isolate line on map:', err);
+    }
+  }
+
+  /**
+   * Clear Line Isolation mode and restore normal nearby exploration
+   */
+  clearLineIsolation(restoreNearby = true) {
+    if (this.isolatedPollTimer) {
+      clearInterval(this.isolatedPollTimer);
+      this.isolatedPollTimer = null;
+    }
+    this.isolatedLine = null;
+
+    const bar = document.getElementById('map-isolated-line-bar');
+    if (bar) bar.style.display = 'none';
+
+    if (this.routeLayer) this.routeLayer.clearLayers();
+
+    if (restoreNearby) {
+      if (window.Search && typeof window.Search.findNearbyStops === 'function') {
+        const stops = window.Search.nearbyStops || [];
+        this.renderNearbyStops(stops, false);
+      }
+    }
+  }
+
+  /**
+   * Render Multimodal Journey Itinerary onto Leaflet Map
+   */
+  renderJourneyRoute(itin, origin, destination) {
+    if (!this.map) return;
+    this.clearJourneyRoute();
+    if (!this.journeyLayer) this.journeyLayer = L.layerGroup().addTo(this.map);
+
+    const bounds = L.latLngBounds();
+
+    // 1. Origin Marker (Green Pin)
+    if (origin && !isNaN(origin.lat) && !isNaN(origin.lng)) {
+      const oIcon = L.divIcon({
+        className: 'journey-pin-icon',
+        html: `
+          <div style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;background:#15803d;color:#fff;border-radius:50%;border:2.5px solid #ffffff;box-shadow:0 2px 8px rgba(0,0,0,0.3);font-size:14px;font-weight:900;">
+            A
+          </div>
+        `,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+      });
+      const oMarker = L.marker([origin.lat, origin.lng], { icon: oIcon }).addTo(this.journeyLayer);
+      oMarker.bindTooltip('Αφετηρία (Α)', { direction: 'top' });
+      bounds.extend([origin.lat, origin.lng]);
+    }
+
+    // 2. Destination Marker (Red Pin)
+    if (destination && !isNaN(destination.lat) && !isNaN(destination.lng)) {
+      const dIcon = L.divIcon({
+        className: 'journey-pin-icon',
+        html: `
+          <div style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;background:#dc2626;color:#fff;border-radius:50%;border:2.5px solid #ffffff;box-shadow:0 2px 8px rgba(0,0,0,0.3);font-size:14px;font-weight:900;">
+            B
+          </div>
+        `,
+        iconSize: [28, 28],
+        iconAnchor: [14, 14]
+      });
+      const dMarker = L.marker([destination.lat, destination.lng], { icon: dIcon }).addTo(this.journeyLayer);
+      dMarker.bindTooltip('Προορισμός (Β)', { direction: 'top' });
+      bounds.extend([destination.lat, destination.lng]);
+    }
+
+    // 3. Transit Stops & Connecting Polylines
+    if (itin && itin.departureStop && itin.arrivalStop) {
+      const depLat = itin.departureStop.lat, depLng = itin.departureStop.lng;
+      const arrLat = itin.arrivalStop.lat, arrLng = itin.arrivalStop.lng;
+
+      bounds.extend([depLat, depLng]);
+      bounds.extend([arrLat, arrLng]);
+
+      // Dashed line from Origin to Departure Stop
+      if (origin && !isNaN(origin.lat) && !isNaN(origin.lng)) {
+        L.polyline([[origin.lat, origin.lng], [depLat, depLng]], {
+          color: '#64748b',
+          weight: 4,
+          dashArray: '6, 8',
+          opacity: 0.8
+        }).addTo(this.journeyLayer);
+      }
+
+      // Transit line between stops
+      const transitColor = itin.type === 'direct_metro' ? '#008751' : '#005ac1';
+      L.polyline([[depLat, depLng], [arrLat, arrLng]], {
+        color: transitColor,
+        weight: 6,
+        opacity: 0.9,
+        lineCap: 'round'
+      }).addTo(this.journeyLayer);
+
+      // Dashed line from Arrival Stop to Destination
+      if (destination && !isNaN(destination.lat) && !isNaN(destination.lng)) {
+        L.polyline([[arrLat, arrLng], [destination.lat, destination.lng]], {
+          color: '#64748b',
+          weight: 4,
+          dashArray: '6, 8',
+          opacity: 0.8
+        }).addTo(this.journeyLayer);
+      }
+    }
+
+    if (bounds.isValid()) {
+      this.map.fitBounds(bounds, { padding: [45, 45], maxZoom: 16 });
+    }
+  }
+
+  clearJourneyRoute() {
+    if (this.journeyLayer) {
+      this.journeyLayer.clearLayers();
     }
   }
 
   clearAll() {
     if (this.routeLayer) this.routeLayer.clearLayers();
     if (this.busLayer) this.busLayer.clearLayers();
+    this.clearJourneyRoute();
+    this.clearLineIsolation(false);
   }
 
   toggleFullscreen() {

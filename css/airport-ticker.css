@@ -580,7 +580,8 @@
   font-size: 0.95rem;
   line-height: 1.25;
   word-break: normal;
-  overflow-wrap: break-word;
+  overflow-wrap: normal;
+  hyphens: none;
 }
 
 .ticker-dest-sub {

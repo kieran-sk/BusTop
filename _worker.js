@@ -188,7 +188,9 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
       } catch(e) {}
       const transit = Math.max(0, (stopOrder - 1) * 2.2);
       for (const dep of departures) {
-        const rawT = dep.sde_start1 || dep.sdd_start1;
+        const rawT = isCome
+          ? (dep.sde_start2 || dep.sdd_start2 || dep.sde_start1 || dep.sdd_start1)
+          : (dep.sde_start1 || dep.sdd_start1 || dep.sde_start2 || dep.sdd_start2);
         const depM = timeToMinutes(rawT);
         if (depM === null) continue;
         const arrMin = depM + transit;
@@ -488,6 +490,146 @@ export default {
             profiles: {},
             daily_schedule: daily || {}
           });
+        }
+
+        // Service Disruptions, Route Modifications & Strikes
+        if (path === '/api/disruptions') {
+          const cached = getCache('edge_disruptions');
+          if (cached) return jsonRes(cached);
+          try {
+            const res = await fetch('https://www.oasa.gr/wp-json/wp/v2/posts?categories=82&per_page=15', {
+              headers: { 'User-Agent': 'Mozilla/5.0' }
+            });
+            if (res.ok) {
+              const posts = await res.json();
+              const parsed = (Array.isArray(posts) ? posts : []).map(p => {
+                const title = (p.title && p.title.rendered ? p.title.rendered : '')
+                  .replace(/&#8211;/g, '–').replace(/&#8212;/g, '—').replace(/&#8216;/g, '‘').replace(/&#8217;/g, '’')
+                  .replace(/&#8220;/g, '“').replace(/&#8221;/g, '”').replace(/&#8230;/g, '…').replace(/&amp;/g, '&')
+                  .replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+                const excerpt = (p.excerpt && p.excerpt.rendered ? p.excerpt.rendered : '')
+                  .replace(/<[^>]*>/g, '').replace(/\[.*?\]/g, '').replace(/\s+/g, ' ').trim();
+                const affectedLines = new Set();
+                const lineMatches = `${title} ${excerpt}`.match(/\b([0-9]{3}|[A-ZΑ-Ω][0-9]{1,2}|X[0-9]{2}|Ε[0-9]{2}|[0-9]{1,2})\b/gi);
+                if (lineMatches) {
+                  lineMatches.forEach(m => {
+                    const c = m.trim().toUpperCase();
+                    if (!/^(202\d|201\d|19\d\d|30|15|60)$/.test(c) || title.includes(`γραμμής ${c}`)) {
+                      affectedLines.add(c);
+                    }
+                  });
+                }
+                let type = 'notice';
+                let typeLabel = 'Ενημέρωση ΟΑΣΑ';
+                if (/απεργ|στάση εργασίας/i.test(title)) { type = 'strike'; typeLabel = 'Απεργία / Στάση Εργασίας'; }
+                else if (/τροποποίησ|παράταση/i.test(title)) { type = 'modification'; typeLabel = 'Τροποποίηση Διαδρομής'; }
+                else if (/έργα|εργασι/i.test(title)) { type = 'roadworks'; typeLabel = 'Οδικά Έργα'; }
+
+                let dateFormatted = '';
+                if (p.date) {
+                  const d = new Date(p.date);
+                  if (!isNaN(d.getTime())) {
+                    dateFormatted = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+                  }
+                }
+                return { id: p.id, title, excerpt, date: p.date, dateFormatted, link: p.link, type, typeLabel, affectedLines: Array.from(affectedLines) };
+              });
+              setCache('edge_disruptions', parsed, 900);
+              return jsonRes(parsed);
+            }
+          } catch(e) {}
+          return jsonRes([]);
+        }
+
+        // Point-to-Point Journey Planner (A to B Transit Routing)
+        if (path === '/api/routing/journey') {
+          const oLat = parseFloat(url.searchParams.get('originLat')), oLng = parseFloat(url.searchParams.get('originLng'));
+          const dLat = parseFloat(url.searchParams.get('destLat')), dLng = parseFloat(url.searchParams.get('destLng'));
+          if (isNaN(oLat) || isNaN(oLng) || isNaN(dLat) || isNaN(dLng)) {
+            return jsonRes({ itineraries: [] });
+          }
+
+          const calcDist = (lat1, lng1, lat2, lng2) => {
+            const dLatM = (lat2 - lat1) * 111139;
+            const dLngM = (lng2 - lng1) * (111139 * Math.cos(lat1 * Math.PI / 180));
+            return Math.round(Math.sqrt(dLatM * dLatM + dLngM * dLngM));
+          };
+
+          const directDist = calcDist(oLat, oLng, dLat, dLng);
+          if (directDist < 400) {
+            const walkMin = Math.ceil(directDist / 75) + 1;
+            return jsonRes({
+              origin: { lat: oLat, lng: oLng },
+              destination: { lat: dLat, lng: dLng },
+              directDistanceMeters: directDist,
+              itineraries: [{
+                type: 'walk_only',
+                durationMinutes: walkMin,
+                walkingMeters: directDist,
+                summary: `Απευθείας περπάτημα (${directDist}μ • ~${walkMin}')`,
+                steps: [{ kind: 'walk', instruction: 'Περπατήστε απευθείας στον προορισμό σας', meters: directDist, minutes: walkMin }]
+              }]
+            });
+          }
+
+          const [s1, s2] = await Promise.all([
+            oasaRequest('getClosestStops', { p1: oLat, p2: oLng }, 60).catch(() => []),
+            oasaRequest('getClosestStops', { p1: dLat, p2: dLng }, 60).catch(() => [])
+          ]);
+
+          const oStops = (Array.isArray(s1) ? s1 : []).slice(0, 4);
+          const dStops = (Array.isArray(s2) ? s2 : []).slice(0, 4);
+
+          const oRoutesPromises = oStops.map(s => oasaRequest('webRoutesForStop', { p1: s.StopCode }, 1800).catch(() => []));
+          const dRoutesPromises = dStops.map(s => oasaRequest('webRoutesForStop', { p1: s.StopCode }, 1800).catch(() => []));
+          const [oR, dR] = await Promise.all([Promise.all(oRoutesPromises), Promise.all(dRoutesPromises)]);
+
+          const oLineMap = new Map();
+          oStops.forEach((s, idx) => {
+            (oR[idx] || []).forEach(r => {
+              if (r && r.LineID && !oLineMap.has(r.LineID)) oLineMap.set(r.LineID, { stop: s, route: r });
+            });
+          });
+
+          const dLineMap = new Map();
+          dStops.forEach((s, idx) => {
+            (dR[idx] || []).forEach(r => {
+              if (r && r.LineID && !dLineMap.has(r.LineID)) dLineMap.set(r.LineID, { stop: s, route: r });
+            });
+          });
+
+          const itineraries = [];
+          for (const [lineId, oEntry] of oLineMap.entries()) {
+            if (dLineMap.has(lineId)) {
+              const dEntry = dLineMap.get(lineId);
+              const startStop = oEntry.stop, endStop = dEntry.stop;
+              if (startStop.StopCode === endStop.StopCode) continue;
+
+              const w1 = calcDist(oLat, oLng, parseFloat(startStop.StopLat), parseFloat(startStop.StopLng));
+              const w2 = calcDist(dLat, dLng, parseFloat(endStop.StopLat), parseFloat(endStop.StopLng));
+              const w1Min = Math.ceil(w1 / 75) + 1, w2Min = Math.ceil(w2 / 75) + 1;
+              const rideDist = calcDist(parseFloat(startStop.StopLat), parseFloat(startStop.StopLng), parseFloat(endStop.StopLat), parseFloat(endStop.StopLng));
+              const rideMin = Math.max(3, Math.round(rideDist / 280));
+              const totalMin = w1Min + 4 + rideMin + w2Min;
+
+              itineraries.push({
+                type: 'direct_bus',
+                lineId,
+                totalDurationMinutes: totalMin,
+                transitMinutes: rideMin,
+                totalWalkMeters: w1 + w2,
+                departureStop: { code: startStop.StopCode, name: startStop.StopDescr, lat: parseFloat(startStop.StopLat), lng: parseFloat(startStop.StopLng), walkMeters: w1, walkMinutes: w1Min },
+                arrivalStop: { code: endStop.StopCode, name: endStop.StopDescr, lat: parseFloat(endStop.StopLat), lng: parseFloat(endStop.StopLng), walkMeters: w2, walkMinutes: w2Min },
+                steps: [
+                  { kind: 'walk', instruction: `Περπατήστε ${w1Min}' (${w1}μ) μέχρι τη στάση ${startStop.StopDescr}`, meters: w1, minutes: w1Min },
+                  { kind: 'transit', mode: 'bus', lineId, lineDescr: `Γραμμή ${lineId}`, direction: cleanRouteDestination(oEntry.route), fromStop: startStop.StopDescr, toStop: endStop.StopDescr, durationMinutes: rideMin, distanceMeters: rideDist },
+                  { kind: 'walk', instruction: `Περπατήστε ${w2Min}' (${w2}μ) από τη στάση ${endStop.StopDescr} στον προορισμό σας`, meters: w2, minutes: w2Min }
+                ]
+              });
+            }
+          }
+          itineraries.sort((a, b) => a.totalDurationMinutes - b.totalDurationMinutes);
+          return jsonRes({ origin: { lat: oLat, lng: oLng }, destination: { lat: dLat, lng: dLng }, directDistanceMeters: directDist, itineraries: itineraries.slice(0, 5) });
         }
 
         // Web Push VAPID Configuration & Registration Endpoints

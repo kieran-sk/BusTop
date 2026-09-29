@@ -28,6 +28,7 @@ class LiveTrackingService : Service() {
 
     private val serviceJob = Job()
     private val serviceScope = CoroutineScope(Dispatchers.IO + serviceJob)
+    private var pollingJob: Job? = null
 
     private var stopCode: String = ""
     private var lineId: String = ""
@@ -112,6 +113,8 @@ class LiveTrackingService : Service() {
             if (stopToUnpin.isNotBlank() && lineToUnpin.isNotBlank()) {
                 MainActivity.currentInstance?.unpinAndDismiss(stopToUnpin, lineToUnpin)
             }
+            pollingJob?.cancel()
+            pollingJob = null
             releaseWakeLock()
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
@@ -120,19 +123,30 @@ class LiveTrackingService : Service() {
 
         acquireWakeLock()
 
-        stopCode = intent?.getStringExtra(EXTRA_STOP_CODE) ?: ""
-        lineId = intent?.getStringExtra(EXTRA_LINE_ID) ?: ""
+        val newStop = intent?.getStringExtra(EXTRA_STOP_CODE) ?: ""
+        val newLine = intent?.getStringExtra(EXTRA_LINE_ID) ?: ""
+        val isSameTrip = (newStop.isNotBlank() && newStop == stopCode && newLine.equals(lineId, ignoreCase = true))
+
+        stopCode = newStop
+        lineId = newLine
         routeCode = intent?.getStringExtra(EXTRA_ROUTE_CODE) ?: ""
         stopName = intent?.getStringExtra(EXTRA_STOP_NAME) ?: "Στάση ΟΑΣΑ"
         destination = intent?.getStringExtra(EXTRA_DESTINATION) ?: ""
         walkMinutes = intent?.getIntExtra(EXTRA_WALK_MINUTES, 0) ?: 0
         val newThreshold = intent?.getIntExtra(EXTRA_THRESHOLD, 0) ?: 0
-        thresholdMinutes = newThreshold
+        if (!isSameTrip || newThreshold > 0) {
+            thresholdMinutes = newThreshold
+        }
         val newRing = intent?.getBooleanExtra(EXTRA_RING_UNTIL_DISMISSED, false) ?: false
-        ringUntilDismissed = newRing
-        initialMinutes = intent?.getIntExtra(EXTRA_INITIAL_MINS, 10) ?: 10
-        startedAtMs = System.currentTimeMillis()
-        isAlarmTriggered = false
+        if (!isSameTrip || newRing) {
+            ringUntilDismissed = newRing
+        }
+        val newInitMins = intent?.getIntExtra(EXTRA_INITIAL_MINS, 10) ?: 10
+        if (!isSameTrip) {
+            initialMinutes = newInitMins
+            startedAtMs = System.currentTimeMillis()
+            isAlarmTriggered = false
+        }
 
         NotificationHelper.createLiveNotificationChannel(this)
         val initialNotif = buildLiveNotification(initialMinutes)
@@ -171,7 +185,8 @@ class LiveTrackingService : Service() {
     }
 
     private fun startBackgroundPolling() {
-        serviceScope.launch {
+        if (pollingJob?.isActive == true) return
+        pollingJob = serviceScope.launch {
             while (isActive) {
                 try {
                     // Try fetching live GPS telemetry from API
@@ -373,6 +388,7 @@ class LiveTrackingService : Service() {
     override fun onDestroy() {
         releaseWakeLock()
         super.onDestroy()
+        pollingJob?.cancel()
         serviceJob.cancel()
     }
 }

@@ -26,6 +26,7 @@ import android.content.res.Configuration
 import android.os.PowerManager
 import android.provider.Settings
 import android.net.Uri
+import android.view.View
 import org.json.JSONObject
 
 class MainActivity : FragmentActivity() {
@@ -70,6 +71,7 @@ class MainActivity : FragmentActivity() {
     @SuppressLint("SetJavaScriptEnabled")
     private fun initWebView() {
         webView = WebView(this)
+        webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
         setContentView(webView)
 
         val settings: WebSettings = webView.settings

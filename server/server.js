@@ -143,6 +143,34 @@ app.get('/api/routing/walk', async (req, res) => {
 });
 
 /**
+ * Real-time service disruptions, route modifications, and strike bulletins
+ */
+app.get('/api/disruptions', async (req, res) => {
+  try {
+    const disruptions = await oasa.getDisruptions();
+    res.json(disruptions || []);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch disruptions', details: err.message });
+  }
+});
+
+/**
+ * Simple Point-to-Point Journey Planner (A to B Transit Routing)
+ */
+app.get('/api/routing/journey', async (req, res) => {
+  try {
+    const { originLat, originLng, destLat, destLng } = req.query;
+    if (!originLat || !originLng || !destLat || !destLng) {
+      return res.status(400).json({ error: 'originLat, originLng, destLat, destLng required' });
+    }
+    const plan = await oasa.planJourney(originLat, originLng, destLat, destLng);
+    res.json(plan);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to plan journey', details: err.message });
+  }
+});
+
+/**
  * Helper to cleanly extract destination terminus from OASA route description
  */
 function cleanRouteDestination(route) {

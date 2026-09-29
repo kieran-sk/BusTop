@@ -285,7 +285,9 @@ class ArrivalEstimator {
 
         // Find upcoming departures
         for (const dep of departures) {
-          const depTimeRaw = dep.sde_start1 || dep.sdd_start1;
+          const depTimeRaw = isCome
+            ? (dep.sde_start2 || dep.sdd_start2 || dep.sde_start1 || dep.sdd_start1)
+            : (dep.sde_start1 || dep.sdd_start1 || dep.sde_start2 || dep.sdd_start2);
           const depMinutes = this.timeToMinutes(depTimeRaw);
           if (depMinutes === null) continue;
 

@@ -55,14 +55,21 @@
     <div class="m3-top-app-bar-center" style="display: flex; justify-content: center; align-items: center; flex-shrink: 0;">
       <div class="ticker-clock" id="ticker-live-clock" title="Τρέχουσα ώρα Αθήνας">--:--:--</div>
     </div>
-    <!-- Right slot: live dot, EXP chip, settings button (aligned to right) -->
-    <div style="flex: 1 0 0; display: flex; align-items: center; justify-content: flex-end; gap: 0.5rem; min-width: 0;">
+    <!-- Right slot: live dot, disruptions button, settings button (aligned to right) -->
+    <div style="flex: 1 0 0; display: flex; align-items: center; justify-content: flex-end; gap: 0.4rem; min-width: 0;">
       <span title="Τηλεματική Ενεργή" style="display:inline-flex;align-items:center;">
         <span class="m3-pulse-dot" style="width:10px;height:10px;background:#059669;"></span>
       </span>
-      <span style="font-size:0.6rem;font-weight:900;color:#7c3aed;background:#ede9fe;border:1px solid #c4b5fd;border-radius:4px;padding:1px 5px;letter-spacing:0.05em;">EXP</span>
-      <button id="top-bar-settings-btn" class="m3-icon-btn" style="width: 36px; height: 36px; border-radius: 9999px; background: none; border: 1px solid var(--md-sys-color-outline-variant); color: var(--md-sys-color-on-surface); cursor: pointer;" onclick="window.App.openSettingsModal()" title="Ρυθμίσεις &amp; Πληροφορίες Έκδοσης" aria-label="Ρυθμίσεις">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <button id="top-bar-disruptions-btn" class="m3-icon-btn" style="position: relative; width: 34px; height: 34px; border-radius: 9999px; background: none; border: 1px solid var(--md-sys-color-outline-variant); color: #d97706; cursor: pointer; display: flex; align-items: center; justify-content: center;" onclick="window.App.openDisruptionsModal()" title="Ενημερώσεις &amp; Τροποποιήσεις ΟΑΣΑ" aria-label="Ενημερώσεις ΟΑΣΑ">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+          <line x1="12" y1="9" x2="12" y2="13"></line>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+        <span id="top-bar-disruptions-badge" style="display: none; position: absolute; top: -3px; right: -5px; background: #dc2626; color: #ffffff; font-size: 0.58rem; font-weight: 900; padding: 1px 4.5px; border-radius: 9999px; border: 1.5px solid #ffffff;">0</span>
+      </button>
+      <button id="top-bar-settings-btn" class="m3-icon-btn" style="width: 34px; height: 34px; border-radius: 9999px; background: none; border: 1px solid var(--md-sys-color-outline-variant); color: var(--md-sys-color-on-surface); cursor: pointer;" onclick="window.App.openSettingsModal()" title="Ρυθμίσεις &amp; Πληροφορίες Έκδοσης" aria-label="Ρυθμίσεις">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="3"></circle>
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
         </svg>
@@ -87,6 +94,12 @@
       <button id="search-clear-btn" class="m3-icon-btn" title="Καθαρισμός" aria-label="Καθαρισμός" onclick="document.getElementById('global-search-input').value=''; window.Search.onSearchInput(''); this.style.display='none'; window.Search.hideDropdown();" style="display: none; width: 32px; height: 32px; border: none; background: none; color: #64748b; flex-shrink: 0; cursor: pointer;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
       </button>
+      <button id="search-journey-btn" class="m3-icon-btn" title="Σχεδιασμός Διαδρομής (Α ➔ Β)" aria-label="Σχεδιασμός Διαδρομής" onclick="window.JourneyPlanner.openModal()" style="width: 32px; height: 32px; border: none; background: #eff6ff; color: #005ac1; border-radius: 50%; flex-shrink: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; margin-left: 2px;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+        </svg>
+      </button>
     </div>
     <!-- Instant Search Floating Dropdown -->
     <div id="global-search-dropdown" style="display: none; position: absolute; top: calc(100% - 4px); left: 1rem; right: 1rem; z-index: 2500; max-height: 420px; overflow-y: auto; background: var(--md-sys-color-surface); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.18); padding: 0.75rem;"></div>
@@ -94,6 +107,27 @@
 
   <!-- Main Content Layout -->
   <main class="m3-container">
+
+    <!-- ================= 0. POINT-TO-POINT JOURNEY PLANNER / NAVIGATION TAB ================= -->
+    <section id="section-journey" class="app-section" style="display: none; max-width: 680px; margin: 0 auto; padding: 0.25rem 0.5rem 2rem;">
+      <div style="margin-bottom: 1.25rem;">
+        <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.25rem;">
+          <div style="width: 38px; height: 38px; border-radius: 50%; background: #eff6ff; color: #005ac1; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,90,193,0.15);">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+            </svg>
+          </div>
+          <div>
+            <h2 style="font-size: 1.25rem; font-weight: 800; color: var(--md-sys-color-on-surface); margin: 0;">Πλοήγηση &amp; Σχεδιασμός Διαδρομής</h2>
+            <div style="font-size: 0.78rem; color: var(--md-sys-color-outline);">Βρείτε τον ταχύτερο συνδυασμό Λεωφορείων, Τρόλεϊ &amp; Μετρό στην Αθήνα</div>
+          </div>
+        </div>
+      </div>
+      <div id="journey-tab-content">
+        <!-- Injected dynamically by JourneyPlanner.renderTab() -->
+      </div>
+    </section>
 
     <!-- ================= 1. TICKER & DEPARTURES TAB ================= -->
     <section id="section-ticker" class="app-section" style="display: none;">
@@ -128,6 +162,8 @@
           <span id="selected-stop-walk-pill" class="m3-badge" style="background: #eff6ff; color: #005ac1; font-size: 0.72rem; font-weight: 800; border: 1px solid #bfdbfe; display: none;">🚶 --'</span>
           <span id="selected-stop-street" style="font-size: 0.75rem; color: #64748b; font-weight: 600;"></span>
         </div>
+        <!-- Contextual Disruption Banner for affected lines on this stop -->
+        <div id="selected-stop-disruption-banner" style="display: none; margin-top: 0.5rem; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 5px 8px; font-size: 0.75rem; color: #92400e; align-items: center; justify-content: space-between; gap: 6px;"></div>
         <div style="display: none;"><div id="selected-stop-routes-list"></div></div>
       </div>
 
@@ -168,12 +204,29 @@
     <!-- ================= 4. SEARCH, ROUTES, TIMETABLES & NEARBY TAB ================= -->
     <section id="section-search" class="app-section">
       
+      <!-- Quick Navigation / Journey Planner Banner -->
+      <div class="m3-card journey-quick-banner" style="margin-bottom: 0.85rem; padding: 0.75rem 1rem; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 1px solid #bfdbfe; border-radius: 14px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: transform 0.15s ease;" onclick="window.App.switchTab('journey')" title="Έναρξη σχεδιασμού διαδρομής">
+        <div style="display: flex; align-items: center; gap: 0.65rem;">
+          <div style="width: 36px; height: 36px; border-radius: 50%; background: #005ac1; color: #ffffff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,90,193,0.3);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+            </svg>
+          </div>
+          <div>
+            <div style="font-size: 0.92rem; font-weight: 800; color: #003366;">Πλοήγηση (Α ➔ Β)</div>
+            <div style="font-size: 0.76rem; color: #1e40af;">Σχεδιασμός διαδρομής με Λεωφορεία &amp; Μετρό</div>
+          </div>
+        </div>
+        <span style="font-size: 0.78rem; font-weight: 800; color: #005ac1; background: #ffffff; padding: 5px 12px; border-radius: 9999px; border: 1px solid #bfdbfe; box-shadow: 0 1px 3px rgba(0,0,0,0.06);">Έναρξη ➔</span>
+      </div>
+
       <!-- PC Dual-Pane Layout (Map Left, Cards Right) / Mobile Single Column -->
       <div class="search-desktop-split">
         <!-- Interactive Stops Map Column -->
         <div id="map-card-wrapper" class="m3-card search-map-pane" style="padding: 0; overflow: hidden; position: relative;">
           <div id="map-container" style="width: 100%; height: 100%;"></div>
-          <!-- Fullscreen + Locate buttons — top right stack -->
+          <!-- Fullscreen + Locate + Journey Planner buttons — top right stack -->
           <div style="position: absolute; top: 12px; right: 12px; z-index: 1000; display: flex; flex-direction: column; gap: 6px;">
             <button id="map-fullscreen-btn" class="m3-icon-btn" onclick="window.App.mapManager.toggleFullscreen()" title="Πλήρης οθόνη χάρτη" aria-label="Πλήρης οθόνη χάρτη" style="background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); width: 34px; height: 34px; border-radius: 50%; box-shadow: var(--md-sys-elevation-2); display: flex; align-items: center; justify-content: center; color: var(--md-sys-color-on-surface); border: 1px solid var(--md-sys-color-outline-variant); cursor: pointer;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -191,6 +244,12 @@
                 <line x1="12" y1="19" x2="12" y2="22"></line>
                 <line x1="2" y1="12" x2="5" y2="12"></line>
                 <line x1="19" y1="12" x2="22" y2="12"></line>
+              </svg>
+            </button>
+            <button id="map-journey-planner-btn" class="m3-icon-btn" title="Σχεδιασμός Διαδρομής (Α ➔ Β)" aria-label="Σχεδιασμός Διαδρομής" onclick="window.JourneyPlanner.openModal();" style="background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); width: 34px; height: 34px; border-radius: 50%; box-shadow: var(--md-sys-elevation-2); display: flex; align-items: center; justify-content: center; color: var(--md-sys-color-primary); border: 1px solid var(--md-sys-color-outline-variant); cursor: pointer;">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
               </svg>
             </button>
           </div>
@@ -337,7 +396,7 @@
             </svg>
           </div>
           <div style="min-width: 0; flex: 1;">
-            <h3 id="stop-action-title" style="font-size: 1.05rem; font-weight: 800; color: var(--md-sys-color-on-surface); line-height: 1.25; margin: 0; word-break: break-word;">Στάση</h3>
+            <h3 id="stop-action-title" style="font-size: 1.05rem; font-weight: 800; color: var(--md-sys-color-on-surface); line-height: 1.25; margin: 0; word-break: normal; overflow-wrap: normal; hyphens: none;">Στάση</h3>
             <span id="stop-action-code" class="m3-badge" style="font-size: 0.7rem; font-weight: 800; background: #f1f5f9; color: #475569; margin-top: 3px; display: inline-block;">#--</span>
           </div>
         </div>
@@ -436,11 +495,11 @@
           <div style="display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.8rem;">
             <div style="display: flex; justify-content: space-between;">
               <span style="color: var(--md-sys-color-outline);">Έκδοση Εφαρμογής:</span>
-              <strong id="settings-app-version" style="color: var(--md-sys-color-primary);">v1.0.26</strong>
+              <strong id="settings-app-version" style="color: var(--md-sys-color-primary);">v1.1.0</strong>
             </div>
             <div style="display: flex; justify-content: space-between;">
               <span style="color: var(--md-sys-color-outline);">Κανάλι Διάθεσης:</span>
-              <span id="settings-app-channel" class="m3-badge" style="background: #e0f2fe; color: #005ac1; font-weight: 800;">Δοκιμαστικό (Beta / Exp)</span>
+              <span id="settings-app-channel" class="m3-badge" style="background: #ecfdf5; color: #059669; font-weight: 800;">Επίσημη Έκδοση (Release / Main)</span>
             </div>
             <div style="display: flex; justify-content: space-between;">
               <span style="color: var(--md-sys-color-outline);">Τηλεματική:</span>
@@ -458,7 +517,68 @@
     </div>
   </div>
 
-  <!-- Bottom Navigation Bar (Search, Arrivals, Notifications, Pinned Trips, Saved) -->
+  <!-- Service Disruptions & Strike Bulletins Modal -->
+  <div id="disruptions-modal" class="m3-dialog-backdrop">
+    <div class="m3-dialog-content" style="max-height: 85vh; display: flex; flex-direction: column;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-shrink: 0;">
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+          <div class="m3-icon-btn" style="background: #fffbeb; color: #d97706; border: none; width: 40px; height: 40px; flex-shrink: 0;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+          </div>
+          <div>
+            <h3 style="font-size: 1.15rem; font-weight: 800;">Τροποποιήσεις &amp; Απεργίες ΟΑΣΑ</h3>
+            <div style="font-size: 0.75rem; color: var(--md-sys-color-outline);">Επίσημες ανακοινώσεις &amp; έκτακτες αλλαγές γραμμών</div>
+          </div>
+        </div>
+        <button class="m3-icon-btn" onclick="window.App.closeModal('disruptions-modal')" style="background: none; border: none; color: #64748b; cursor: pointer;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <div id="disruptions-modal-list" style="overflow-y: auto; flex: 1; padding-right: 2px;">
+        <!-- Injected dynamically by AppController -->
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; margin-top: 1rem; flex-shrink: 0;">
+        <button class="m3-btn m3-btn-primary" style="font-size: 0.85rem; border-radius: 9999px; padding: 0.4rem 1.2rem;" onclick="window.App.closeModal('disruptions-modal')">
+          Κλείσιμο
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Point-to-Point Journey Planner Modal -->
+  <div id="journey-planner-modal" class="m3-dialog-backdrop">
+    <div class="m3-dialog-content" style="max-height: 88vh; display: flex; flex-direction: column; max-width: 540px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; flex-shrink: 0;">
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+          <div class="m3-icon-btn" style="background: #eff6ff; color: #005ac1; border: none; width: 40px; height: 40px; flex-shrink: 0;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+            </svg>
+          </div>
+          <div>
+            <h3 style="font-size: 1.15rem; font-weight: 800;">Σχεδιασμός Διαδρομής (Α ➔ Β)</h3>
+            <div style="font-size: 0.75rem; color: var(--md-sys-color-outline);">Βρείτε ταχύτερο συνδυασμό Λεωφορείων &amp; Μετρό</div>
+          </div>
+        </div>
+        <button class="m3-icon-btn" onclick="window.JourneyPlanner.closeModal()" style="background: none; border: none; color: #64748b; cursor: pointer;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+
+      <div id="journey-planner-content" style="overflow-y: auto; flex: 1; padding-right: 2px;">
+        <!-- Injected dynamically by JourneyPlanner -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Navigation Bar (Search, Navigation, Arrivals, Notifications, Pinned Trips, Saved) -->
   <nav class="m3-nav-bar">
     <div class="m3-nav-item active" data-tab="search" onclick="window.App.switchTab('search')">
       <div class="m3-nav-pill">
@@ -469,11 +589,20 @@
       </div>
       <span>Κοντά μου</span>
     </div>
+    <div class="m3-nav-item" data-tab="journey" onclick="window.App.switchTab('journey')">
+      <div class="m3-nav-pill">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+        </svg>
+      </div>
+      <span>Πλοήγηση</span>
+    </div>
     <div class="m3-nav-item" data-tab="ticker" onclick="window.App.switchTab('ticker')">
       <div class="m3-nav-pill">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7-.8 1.3z"/></svg>
       </div>
-      <span>Στάσεις &amp; Γραμμές</span>
+      <span>Δρομολόγια</span>
     </div>
     <div class="m3-nav-item" data-tab="notifications" onclick="window.App.switchTab('notifications')">
       <div class="m3-nav-pill" style="position: relative;">
@@ -511,6 +640,7 @@
   <script defer src="js/timetable.js?v=20260922_2235"></script>
   <script defer src="js/search.js?v=20260922_2235"></script>
   <script defer src="js/favorites.js?v=20260922_2235"></script>
+  <script defer src="js/journey-planner.js?v=20260928_2330"></script>
   <script defer src="js/app.js?v=20260922_2235"></script>
 </body>
 </html>

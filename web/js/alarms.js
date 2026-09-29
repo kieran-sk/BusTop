@@ -689,7 +689,7 @@ class AlarmManager {
                       ${a.lineId}
                     </span>
                     <div style="min-width: 0; flex: 1;">
-                      <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: break-word;">${a.stopName}</div>
+                      <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: normal; overflow-wrap: normal; hyphens: none;">${a.stopName}</div>
                       <div style="font-size: 0.76rem; color: var(--md-sys-color-outline); margin-top: 2px;">
                         ${a.destination ? `<strong style="color: var(--md-sys-color-primary); margin-right: 4px;">προς ${a.destination}</strong> • ` : ''}Στάση #${a.stopCode} • <span style="color: var(--md-sys-color-primary); text-decoration: underline;">Προβολή στάσης ➜</span>
                       </div>

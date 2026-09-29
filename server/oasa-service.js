@@ -386,6 +386,411 @@ class OasaService {
     this.setCache(cacheKey, result, 3600);
     return result;
   }
+
+  /**
+   * Helper to decode HTML entities in WordPress text
+   */
+  decodeHtmlEntities(text = '') {
+    if (!text) return '';
+    return text
+      .replace(/&#8211;/g, '–')
+      .replace(/&#8212;/g, '—')
+      .replace(/&#8216;/g, '‘')
+      .replace(/&#8217;/g, '’')
+      .replace(/&#8220;/g, '“')
+      .replace(/&#8221;/g, '”')
+      .replace(/&#8230;/g, '…')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/<[^>]*>/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /**
+   * Retrieve official OASA service disruptions, temporary route modifications, and strike bulletins
+   */
+  async getDisruptions() {
+    const cacheKey = 'oasa_disruptions_bulletins';
+    const cached = this.getCache(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const url = 'https://www.oasa.gr/wp-json/wp/v2/posts?categories=82&per_page=15';
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
+        },
+        signal: AbortSignal.timeout(8000)
+      });
+
+      if (!res.ok) throw new Error(`OASA News HTTP ${res.status}`);
+      const posts = await res.json();
+      if (!Array.isArray(posts)) return [];
+
+      const parsed = posts.map(p => {
+        const rawTitle = p.title && p.title.rendered ? p.title.rendered : '';
+        const title = this.decodeHtmlEntities(rawTitle);
+        const rawExcerpt = p.excerpt && p.excerpt.rendered ? p.excerpt.rendered : '';
+        const excerpt = this.decodeHtmlEntities(rawExcerpt);
+
+        // Detect affected line numbers from title and excerpt
+        const affectedLines = new Set();
+        // Regex for bus lines: 3 digits (e.g. 040, 608, 025), X/E-lines (e.g. X95, E14), letter+digits (e.g. A5, B2)
+        const lineMatches = `${title} ${excerpt}`.match(/\b([0-9]{3}|[A-ZΑ-Ω][0-9]{1,2}|X[0-9]{2}|Ε[0-9]{2}|[0-9]{1,2})\b/gi);
+        if (lineMatches) {
+          lineMatches.forEach(m => {
+            const clean = m.trim().toUpperCase();
+            // Filter out common false positives like years (2026, 2025), street numbers if huge, etc.
+            if (!/^(202\d|201\d|19\d\d|30|15|60)$/.test(clean) || title.includes(`γραμμής ${clean}`) || title.includes(`γραμμών ${clean}`)) {
+              if (clean.length >= 2 || /^[0-9]$/.test(clean)) {
+                affectedLines.add(clean);
+              }
+            }
+          });
+        }
+
+        // Determine announcement category & badge type
+        let type = 'notice';
+        let typeLabel = 'Ενημέρωση ΟΑΣΑ';
+        const lowerTitle = title.toLowerCase();
+        if (/απεργ|στάση εργασίας|κινητοποίηση/i.test(lowerTitle)) {
+          type = 'strike';
+          typeLabel = 'Απεργία / Στάση Εργασίας';
+        } else if (/τροποποίησ|παράταση προσωρινής|μερική προσωρινή/i.test(lowerTitle)) {
+          type = 'modification';
+          typeLabel = 'Τροποποίηση Διαδρομής';
+        } else if (/έργα|εργασι/i.test(lowerTitle)) {
+          type = 'roadworks';
+          typeLabel = 'Οδικά Έργα';
+        }
+
+        // Format Greek date (e.g. 28/09/2026)
+        let dateFormatted = '';
+        if (p.date) {
+          const d = new Date(p.date);
+          if (!isNaN(d.getTime())) {
+            dateFormatted = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+          }
+        }
+
+        return {
+          id: p.id,
+          title,
+          excerpt,
+          date: p.date,
+          dateFormatted,
+          link: p.link,
+          type,
+          typeLabel,
+          affectedLines: Array.from(affectedLines)
+        };
+      });
+
+      this.setCache(cacheKey, parsed, 900); // 15 min cache
+      return parsed;
+    } catch (e) {
+      console.warn('Failed to fetch OASA disruptions bulletins:', e.message);
+      return [];
+    }
+  }
+
+  /**
+   * Simple Point-to-Point Journey Planner (A to B Multimodal Transit Routing)
+   */
+  async planJourney(originLat, originLng, destLat, destLng) {
+    const oLat = parseFloat(originLat);
+    const oLng = parseFloat(originLng);
+    const dLat = parseFloat(destLat);
+    const dLng = parseFloat(destLng);
+
+    if (isNaN(oLat) || isNaN(oLng) || isNaN(dLat) || isNaN(dLng)) {
+      return { itineraries: [], error: 'Invalid coordinates' };
+    }
+
+    // Direct distance calculation
+    const calcDist = (lat1, lng1, lat2, lng2) => {
+      const dLatM = (lat2 - lat1) * 111139;
+      const dLngM = (lng2 - lng1) * (111139 * Math.cos(lat1 * Math.PI / 180));
+      return Math.round(Math.sqrt(dLatM * dLatM + dLngM * dLngM));
+    };
+
+    const directDist = calcDist(oLat, oLng, dLat, dLng);
+
+    // If destination is closer than 400m, suggest walking directly
+    if (directDist < 400) {
+      const walkMin = Math.ceil(directDist / 75) + 1;
+      return {
+        origin: { lat: oLat, lng: oLng },
+        destination: { lat: dLat, lng: dLng },
+        directDistanceMeters: directDist,
+        itineraries: [
+          {
+            type: 'walk_only',
+            durationMinutes: walkMin,
+            walkingMeters: directDist,
+            summary: `Απευθείας περπάτημα (${directDist}μ • ~${walkMin}')`,
+            steps: [
+              {
+                kind: 'walk',
+                instruction: `Περπατήστε απευθείας στον προορισμό σας`,
+                meters: directDist,
+                minutes: walkMin
+              }
+            ]
+          }
+        ]
+      };
+    }
+
+    // Step 1: Discover candidate departure stops (< 750m) and arrival stops (< 750m)
+    const [rawOStops, rawDStops] = await Promise.all([
+      this.getClosestStops(oLat, oLng).catch(() => []),
+      this.getClosestStops(dLat, dLng).catch(() => [])
+    ]);
+
+    const oStops = (Array.isArray(rawOStops) ? rawOStops : [])
+      .map(s => ({ ...s, dist: calcDist(oLat, oLng, parseFloat(s.StopLat), parseFloat(s.StopLng)) }))
+      .filter(s => s.dist <= 850)
+      .slice(0, 5);
+
+    const dStops = (Array.isArray(rawDStops) ? rawDStops : [])
+      .map(s => ({ ...s, dist: calcDist(dLat, dLng, parseFloat(s.StopLat), parseFloat(s.StopLng)) }))
+      .filter(s => s.dist <= 850)
+      .slice(0, 5);
+
+    // Fetch lines for origin and destination stops
+    const oRoutesPromises = oStops.map(s => this.getStopRoutes(s.StopCode).catch(() => []));
+    const dRoutesPromises = dStops.map(s => this.getStopRoutes(s.StopCode).catch(() => []));
+
+    const [oRoutesResults, dRoutesResults] = await Promise.all([
+      Promise.all(oRoutesPromises),
+      Promise.all(dRoutesPromises)
+    ]);
+
+    // Map: lineId -> { originStop, route }
+    const oLineMap = new Map();
+    oStops.forEach((s, idx) => {
+      const routes = oRoutesResults[idx] || [];
+      if (Array.isArray(routes)) {
+        routes.forEach(r => {
+          if (r && r.LineID && !oLineMap.has(r.LineID)) {
+            oLineMap.set(r.LineID, { stop: s, route: r });
+          }
+        });
+      }
+    });
+
+    // Map: lineId -> { destStop, route }
+    const dLineMap = new Map();
+    dStops.forEach((s, idx) => {
+      const routes = dRoutesResults[idx] || [];
+      if (Array.isArray(routes)) {
+        routes.forEach(r => {
+          if (r && r.LineID && !dLineMap.has(r.LineID)) {
+            dLineMap.set(r.LineID, { stop: s, route: r });
+          }
+        });
+      }
+    });
+
+    const itineraries = [];
+
+    // Step 2: Identify Direct Bus / Trolley Lines
+    for (const [lineId, oEntry] of oLineMap.entries()) {
+      if (dLineMap.has(lineId)) {
+        const dEntry = dLineMap.get(lineId);
+        const startStop = oEntry.stop;
+        const endStop = dEntry.stop;
+
+        // Skip if start and end are identical stop
+        if (startStop.StopCode === endStop.StopCode) continue;
+
+        const walk1Meters = startStop.dist;
+        const walk1Minutes = Math.ceil(walk1Meters / 75) + 1;
+
+        const walk2Meters = endStop.dist;
+        const walk2Minutes = Math.ceil(walk2Meters / 75) + 1;
+
+        const transitDistance = calcDist(
+          parseFloat(startStop.StopLat), parseFloat(startStop.StopLng),
+          parseFloat(endStop.StopLat), parseFloat(endStop.StopLng)
+        );
+
+        // Approximate bus speed in Athens traffic: ~17 km/h (~280 meters/minute) + 3 min wait buffer
+        const rideMinutes = Math.max(3, Math.round(transitDistance / 280));
+        const waitMinutes = 4;
+        const totalDuration = walk1Minutes + waitMinutes + rideMinutes + walk2Minutes;
+
+        const lineDescr = oEntry.route.RouteDescr || oEntry.route.LineDescr || `Γραμμή ${lineId}`;
+        const destination = oEntry.route.cleanDestination || 'Τέρμα';
+
+        itineraries.push({
+          type: 'direct_bus',
+          lineId,
+          totalDurationMinutes: totalDuration,
+          transitMinutes: rideMinutes,
+          totalWalkMeters: walk1Meters + walk2Meters,
+          departureStop: {
+            code: startStop.StopCode,
+            name: startStop.StopDescr,
+            lat: parseFloat(startStop.StopLat),
+            lng: parseFloat(startStop.StopLng),
+            walkMeters: walk1Meters,
+            walkMinutes: walk1Minutes
+          },
+          arrivalStop: {
+            code: endStop.StopCode,
+            name: endStop.StopDescr,
+            lat: parseFloat(endStop.StopLat),
+            lng: parseFloat(endStop.StopLng),
+            walkMeters: walk2Meters,
+            walkMinutes: walk2Minutes
+          },
+          steps: [
+            {
+              kind: 'walk',
+              instruction: `Περπατήστε ${walk1Minutes}' (${walk1Meters}μ) μέχρι τη στάση ${startStop.StopDescr}`,
+              meters: walk1Meters,
+              minutes: walk1Minutes
+            },
+            {
+              kind: 'transit',
+              mode: 'bus',
+              lineId,
+              lineDescr,
+              direction: destination,
+              fromStop: startStop.StopDescr,
+              toStop: endStop.StopDescr,
+              durationMinutes: rideMinutes,
+              distanceMeters: transitDistance
+            },
+            {
+              kind: 'walk',
+              instruction: `Περπατήστε ${walk2Minutes}' (${walk2Meters}μ) από τη στάση ${endStop.StopDescr} στον προορισμό σας`,
+              meters: walk2Meters,
+              minutes: walk2Minutes
+            }
+          ]
+        });
+      }
+    }
+
+    // Step 3: Check for Metro connections (Lines 1, 2, 3, Tram)
+    const metroService = require('./metro-service');
+    if (metroService && metroService.stations) {
+      const allStations = Object.values(metroService.stations);
+
+      // Find closest stations to origin (< 1000m) and destination (< 1000m)
+      const nearOStations = allStations
+        .map(st => ({ ...st, dist: calcDist(oLat, oLng, st.lat, st.lng) }))
+        .filter(st => st.dist <= 1000)
+        .sort((a, b) => a.dist - b.dist)
+        .slice(0, 2);
+
+      const nearDStations = allStations
+        .map(st => ({ ...st, dist: calcDist(dLat, dLng, st.lat, st.lng) }))
+        .filter(st => st.dist <= 1000)
+        .sort((a, b) => a.dist - b.dist)
+        .slice(0, 2);
+
+      for (const st1 of nearOStations) {
+        for (const st2 of nearDStations) {
+          if (st1.id === st2.id) continue;
+
+          // Check if they share a metro line
+          const commonLines = (st1.lines || []).filter(l => (st2.lines || []).includes(l));
+          if (commonLines.length > 0) {
+            const lineName = commonLines[0];
+            const walk1Min = Math.ceil(st1.dist / 80) + 1;
+            const walk2Min = Math.ceil(st2.dist / 80) + 1;
+
+            const metroDist = calcDist(st1.lat, st1.lng, st2.lat, st2.lng);
+            // Metro speed in Athens is ~32 km/h (~530 m/min)
+            const metroRideMin = Math.max(3, Math.round(metroDist / 530));
+            const totalDuration = walk1Min + 4 + metroRideMin + walk2Min;
+
+            itineraries.push({
+              type: 'direct_metro',
+              lineId: lineName,
+              totalDurationMinutes: totalDuration,
+              transitMinutes: metroRideMin,
+              totalWalkMeters: st1.dist + st2.dist,
+              departureStop: {
+                code: st1.id,
+                name: `Σταθμός ${st1.name}`,
+                lat: st1.lat,
+                lng: st1.lng,
+                walkMeters: st1.dist,
+                walkMinutes: walk1Min
+              },
+              arrivalStop: {
+                code: st2.id,
+                name: `Σταθμός ${st2.name}`,
+                lat: st2.lat,
+                lng: st2.lng,
+                walkMeters: st2.dist,
+                walkMinutes: walk2Min
+              },
+              steps: [
+                {
+                  kind: 'walk',
+                  instruction: `Περπατήστε ${walk1Min}' (${st1.dist}μ) μέχρι τον Σταθμό Μετρό ${st1.name}`,
+                  meters: st1.dist,
+                  minutes: walk1Min
+                },
+                {
+                  kind: 'transit',
+                  mode: 'metro',
+                  lineId: lineName,
+                  lineDescr: `Μετρό ${lineName}`,
+                  fromStop: st1.name,
+                  toStop: st2.name,
+                  durationMinutes: metroRideMin,
+                  distanceMeters: metroDist
+                },
+                {
+                  kind: 'walk',
+                  instruction: `Περπατήστε ${walk2Min}' (${st2.dist}μ) από τον Σταθμό ${st2.name} στον προορισμό σας`,
+                  meters: st2.dist,
+                  minutes: walk2Min
+                }
+              ]
+            });
+          }
+        }
+      }
+    }
+
+    // Sort itineraries by total duration
+    itineraries.sort((a, b) => a.totalDurationMinutes - b.totalDurationMinutes);
+
+    // Enrich top 3 bus itineraries with live telematics arrivals for the departure stop
+    const topItins = itineraries.slice(0, 5);
+    await Promise.all(topItins.map(async (itin) => {
+      if (itin.type === 'direct_bus' && itin.departureStop && itin.departureStop.code) {
+        try {
+          const arrivals = await this.getStopArrivals(itin.departureStop.code);
+          if (Array.isArray(arrivals)) {
+            const match = arrivals.find(a => String(a.line_id || a.btime2) && (a.line_id === itin.lineId || a.route_code));
+            if (match && match.btime2) {
+              itin.liveEtaMinutes = parseInt(match.btime2, 10);
+            }
+          }
+        } catch (e) {}
+      }
+    }));
+
+    return {
+      origin: { lat: oLat, lng: oLng },
+      destination: { lat: dLat, lng: dLng },
+      directDistanceMeters: directDist,
+      itineraries: topItins
+    };
+  }
 }
 
 module.exports = new OasaService();
