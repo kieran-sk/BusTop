@@ -35,8 +35,8 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- Stylesheets (Relative paths with cache-busting for PWA updates) -->
-  <link rel="stylesheet" href="css/m3-expressive.css?v=20260929_2300">
-  <link rel="stylesheet" href="css/airport-ticker.css?v=20260929_2300">
+  <link rel="stylesheet" href="css/m3-expressive.css?v=20260929_2310">
+  <link rel="stylesheet" href="css/airport-ticker.css?v=20260929_2310">
 </head>
 <body>
 
@@ -203,23 +203,6 @@
 
     <!-- ================= 4. SEARCH, ROUTES, TIMETABLES & NEARBY TAB ================= -->
     <section id="section-search" class="app-section">
-      
-      <!-- Quick Navigation / Journey Planner Banner -->
-      <div class="m3-card journey-quick-banner" style="margin-bottom: 0.85rem; padding: 0.75rem 1rem; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 1px solid #bfdbfe; border-radius: 14px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: transform 0.15s ease;" onclick="window.App.switchTab('journey')" title="Έναρξη σχεδιασμού διαδρομής">
-        <div style="display: flex; align-items: center; gap: 0.65rem;">
-          <div style="width: 36px; height: 36px; border-radius: 50%; background: #005ac1; color: #ffffff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,90,193,0.3);">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
-            </svg>
-          </div>
-          <div>
-            <div style="font-size: 0.92rem; font-weight: 800; color: #003366;">Πλοήγηση (Α ➔ Β)</div>
-            <div style="font-size: 0.76rem; color: #1e40af;">Σχεδιασμός διαδρομής με Λεωφορεία &amp; Μετρό</div>
-          </div>
-        </div>
-        <span style="font-size: 0.78rem; font-weight: 800; color: #005ac1; background: #ffffff; padding: 5px 12px; border-radius: 9999px; border: 1px solid #bfdbfe; box-shadow: 0 1px 3px rgba(0,0,0,0.06);">Έναρξη ➔</span>
-      </div>
 
       <!-- PC Dual-Pane Layout (Map Left, Cards Right) / Mobile Single Column -->
       <div class="search-desktop-split">
