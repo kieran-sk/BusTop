@@ -26,6 +26,8 @@ class AppController {
     this.geoWatchId = null;
     this.disruptions = [];
     this.disruptionsMap = new Map(); // lineId -> [disruption]
+    this.dismissedDisruptions = new Set(JSON.parse(localStorage.getItem('OASA_DISMISSED_DISRUPTIONS') || '[]'));
+    this.currentRoutes = [];
   }
 
   /**
@@ -92,10 +94,45 @@ class AppController {
     }
   }
 
+  saveDismissedDisruptions() {
+    try {
+      localStorage.setItem('OASA_DISMISSED_DISRUPTIONS', JSON.stringify(Array.from(this.dismissedDisruptions)));
+    } catch (e) {}
+    this.updateDisruptionsBadgeUI();
+    if (this.currentRoutes) {
+      this.checkStopDisruptions(this.currentRoutes);
+    }
+  }
+
+  dismissDisruption(id) {
+    if (!id) return;
+    this.dismissedDisruptions.add(String(id));
+    this.saveDismissedDisruptions();
+    this.triggerHaptic('light');
+    this.renderDisruptionsModalList();
+  }
+
+  dismissAllDisruptions() {
+    this.disruptions.forEach(d => {
+      if (d.id) this.dismissedDisruptions.add(String(d.id));
+    });
+    this.saveDismissedDisruptions();
+    this.triggerHaptic('medium');
+    this.renderDisruptionsModalList();
+  }
+
+  restoreAllDisruptions() {
+    this.dismissedDisruptions.clear();
+    this.saveDismissedDisruptions();
+    this.triggerHaptic('selection');
+    this.renderDisruptionsModalList();
+  }
+
   updateDisruptionsBadgeUI() {
     const badge = document.getElementById('top-bar-disruptions-badge');
     if (!badge) return;
-    const count = this.disruptions.length;
+    const unDismissed = this.disruptions.filter(d => !this.dismissedDisruptions.has(String(d.id)));
+    const count = unDismissed.length;
     if (count > 0) {
       badge.innerText = count;
       badge.style.display = 'inline-flex';
@@ -106,68 +143,123 @@ class AppController {
 
   openDisruptionsModal() {
     const modal = document.getElementById('disruptions-modal');
+    if (!modal) return;
+    this.renderDisruptionsModalList();
+    modal.classList.add('open');
+    this.updateBackButtonsVisibility();
+  }
+
+  renderDisruptionsModalList() {
     const container = document.getElementById('disruptions-modal-list');
-    if (!modal || !container) return;
+    if (!container) return;
 
     if (this.disruptions.length === 0) {
       container.innerHTML = `
-        <div style="padding: 2rem 1rem; text-align: center; color: #64748b; font-size: 0.9rem;">
+        <div style="padding: 2.5rem 1rem; text-align: center; color: #64748b; font-size: 0.9rem;">
           Δεν υπάρχουν καταγεγραμμένες τροποποιήσεις ή απεργίες αυτή τη στιγμή.
         </div>
       `;
-    } else {
-      container.innerHTML = this.disruptions.map(d => {
-        let badgeColor = '#005ac1';
-        let badgeBg = '#eff6ff';
-        if (d.type === 'strike') {
-          badgeColor = '#dc2626';
-          badgeBg = '#fef2f2';
-        } else if (d.type === 'modification') {
-          badgeColor = '#d97706';
-          badgeBg = '#fffbeb';
-        } else if (d.type === 'roadworks') {
-          badgeColor = '#7c3aed';
-          badgeBg = '#f5f3ff';
-        }
-
-        const linesHtml = (Array.isArray(d.affectedLines) && d.affectedLines.length > 0) ? `
-          <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;">
-            ${d.affectedLines.map(l => `
-              <span class="m3-badge clickable-line-badge" style="background: #e2e8f0; color: #0f172a; font-size: 0.72rem; font-weight: 800; cursor: pointer;" 
-                    onclick="event.stopPropagation(); window.App.isolateLineOnMap('${l}'); window.App.closeModal('disruptions-modal');" title="Εστίαση γραμμής στον χάρτη">
-                ${l}
-              </span>
-            `).join('')}
-          </div>
-        ` : '';
-
-        return `
-          <div class="m3-card" style="padding: 0.85rem 1rem; border: 1px solid var(--md-sys-color-outline-variant); background: #ffffff; border-radius: 14px; margin-bottom: 0.65rem;">
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px;">
-              <span class="m3-badge" style="background: ${badgeBg}; color: ${badgeColor}; font-weight: 800; font-size: 0.72rem; border: 1px solid ${badgeColor}33;">
-                ${d.typeLabel || 'Ενημέρωση'}
-              </span>
-              <span style="font-size: 0.72rem; color: #64748b; font-weight: 600;">${d.dateFormatted || ''}</span>
-            </div>
-            <div style="font-size: 0.88rem; font-weight: 800; color: #0f172a; line-height: 1.3; margin-bottom: 4px;">
-              ${d.title}
-            </div>
-            ${d.excerpt ? `<div style="font-size: 0.78rem; color: #475569; line-height: 1.35; margin-bottom: 6px;">${d.excerpt}</div>` : ''}
-            ${linesHtml}
-            ${d.link ? `
-              <div style="margin-top: 6px; text-align: right;">
-                <a href="${d.link}" target="_blank" rel="noopener noreferrer" style="font-size: 0.75rem; color: #005ac1; font-weight: 700; text-decoration: none;">
-                  Περισσότερα στο oasa.gr ↗
-                </a>
-              </div>
-            ` : ''}
-          </div>
-        `;
-      }).join('');
+      return;
     }
 
-    modal.classList.add('open');
-    this.updateBackButtonsVisibility();
+    const activeList = this.disruptions.filter(d => !this.dismissedDisruptions.has(String(d.id)));
+    const dismissedCount = this.disruptions.length - activeList.length;
+
+    let headerHtml = `
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.85rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--md-sys-color-outline-variant);">
+        <span style="font-size: 0.8rem; color: #64748b; font-weight: 700;">
+          ${activeList.length} ενεργές ενημερώσεις${dismissedCount > 0 ? ` (${dismissedCount} απορρίφθηκαν)` : ''}
+        </span>
+        <div style="display: flex; gap: 0.4rem;">
+          ${activeList.length > 0 ? `
+            <button class="m3-btn m3-btn-outlined" style="font-size: 0.72rem; padding: 2px 9px; border-radius: 9999px; color: #d97706; border-color: #f59e0b;" onclick="window.App.dismissAllDisruptions()">
+              🗑️ Απόρριψη Όλων
+            </button>
+          ` : ''}
+          ${dismissedCount > 0 ? `
+            <button class="m3-btn m3-btn-outlined" style="font-size: 0.72rem; padding: 2px 9px; border-radius: 9999px; color: #005ac1; border-color: #005ac1;" onclick="window.App.restoreAllDisruptions()">
+              🔄 Επαναφορά (${dismissedCount})
+            </button>
+          ` : ''}
+        </div>
+      </div>
+    `;
+
+    if (activeList.length === 0) {
+      container.innerHTML = `
+        ${headerHtml}
+        <div style="padding: 2.5rem 1rem; text-align: center; color: #64748b; font-size: 0.9rem;">
+          <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">✅</div>
+          <div style="font-weight: 800; font-size: 1rem; color: #0f172a; margin-bottom: 0.3rem;">Όλες οι ειδοποιήσεις έχουν απορριφθεί</div>
+          <p style="font-size: 0.8rem; max-width: 320px; margin: 0 auto 1.25rem; line-height: 1.4;">
+            Έχετε αποκρύψει όλες τις τρέχουσες ειδοποιήσεις. Μπορείτε να τις επαναφέρετε ανά πάσα στιγμή.
+          </p>
+          <button class="m3-btn m3-btn-tonal" style="border-radius: 9999px; font-size: 0.8rem; padding: 0.35rem 1.1rem;" onclick="window.App.restoreAllDisruptions()">
+            🔄 Επαναφορά ${dismissedCount} Ειδοποιήσεων
+          </button>
+        </div>
+      `;
+      return;
+    }
+
+    const cardsHtml = activeList.map(d => {
+      let badgeColor = '#005ac1';
+      let badgeBg = '#eff6ff';
+      if (d.type === 'strike') {
+        badgeColor = '#dc2626';
+        badgeBg = '#fef2f2';
+      } else if (d.type === 'modification') {
+        badgeColor = '#d97706';
+        badgeBg = '#fffbeb';
+      } else if (d.type === 'roadworks') {
+        badgeColor = '#7c3aed';
+        badgeBg = '#f5f3ff';
+      }
+
+      const linesHtml = (Array.isArray(d.affectedLines) && d.affectedLines.length > 0) ? `
+        <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;">
+          ${d.affectedLines.map(l => `
+            <span class="m3-badge clickable-line-badge" style="background: #e2e8f0; color: #0f172a; font-size: 0.72rem; font-weight: 800; cursor: pointer;" 
+                  onclick="event.stopPropagation(); window.App.isolateLineOnMap('${l}'); window.App.closeModal('disruptions-modal');" title="Εστίαση γραμμής στον χάρτη">
+              ${l}
+            </span>
+          `).join('')}
+        </div>
+      ` : '';
+
+      return `
+        <div class="m3-card" style="padding: 0.85rem 1rem; border: 1px solid var(--md-sys-color-outline-variant); background: #ffffff; border-radius: 14px; margin-bottom: 0.65rem;">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px;">
+            <span class="m3-badge" style="background: ${badgeBg}; color: ${badgeColor}; font-weight: 800; font-size: 0.72rem; border: 1px solid ${badgeColor}33;">
+              ${d.typeLabel || 'Ενημέρωση'}
+            </span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 0.72rem; color: #64748b; font-weight: 600;">${d.dateFormatted || ''}</span>
+              <button class="m3-icon-btn" onclick="event.stopPropagation(); window.App.dismissDisruption('${d.id}')" title="Απόρριψη ενημέρωσης" style="width: 24px; height: 24px; border: 1px solid var(--md-sys-color-outline-variant); background: #f8fafc; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: #64748b;">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </button>
+            </div>
+          </div>
+          <div style="font-size: 0.88rem; font-weight: 800; color: #0f172a; line-height: 1.3; margin-bottom: 4px;">
+            ${d.title}
+          </div>
+          ${d.excerpt ? `<div style="font-size: 0.78rem; color: #475569; line-height: 1.35; margin-bottom: 6px;">${d.excerpt}</div>` : ''}
+          ${linesHtml}
+          <div style="margin-top: 8px; display: flex; align-items: center; justify-content: space-between;">
+            <button class="m3-btn m3-btn-tonal" onclick="event.stopPropagation(); window.App.dismissDisruption('${d.id}')" style="font-size: 0.72rem; padding: 2px 10px; border-radius: 9999px;">
+              ✕ Απόρριψη
+            </button>
+            ${d.link ? `
+              <a href="${d.link}" target="_blank" rel="noopener noreferrer" style="font-size: 0.75rem; color: #005ac1; font-weight: 700; text-decoration: none;">
+                Περισσότερα στο oasa.gr ↗
+              </a>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    container.innerHTML = headerHtml + cardsHtml;
   }
 
   isolateLineOnMap(lineId, lineCode = null) {
@@ -184,6 +276,7 @@ class AppController {
   }
 
   checkStopDisruptions(routes = []) {
+    this.currentRoutes = routes;
     const banner = document.getElementById('selected-stop-disruption-banner');
     if (!banner) return;
     if (!Array.isArray(routes) || routes.length === 0 || this.disruptionsMap.size === 0) {
@@ -195,19 +288,25 @@ class AppController {
     for (const r of routes) {
       const lid = String(r.LineID || '').trim().toUpperCase();
       if (lid && this.disruptionsMap.has(lid)) {
-        matchedDisruptions.push(...this.disruptionsMap.get(lid));
+        const items = this.disruptionsMap.get(lid).filter(d => !this.dismissedDisruptions.has(String(d.id)));
+        matchedDisruptions.push(...items);
       }
     }
 
     if (matchedDisruptions.length > 0) {
       const first = matchedDisruptions[0];
       banner.innerHTML = `
-        <div style="display:flex; align-items:center; gap:6px;">
-          <span>⚠️</span>
-          <span style="font-weight:700;">${first.typeLabel}:</span>
-          <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px;">${first.title}</span>
+        <div style="display:flex; align-items:center; gap:6px; min-width:0; flex:1;">
+          <span style="flex-shrink:0;">⚠️</span>
+          <span style="font-weight:700; flex-shrink:0;">${first.typeLabel}:</span>
+          <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${first.title}</span>
         </div>
-        <button style="background:none; border:none; color:#b45309; font-weight:800; cursor:pointer; font-size:0.75rem; text-decoration:underline;" onclick="window.App.openDisruptionsModal()">Προβολή</button>
+        <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
+          <button style="background:none; border:none; color:#b45309; font-weight:800; cursor:pointer; font-size:0.75rem; text-decoration:underline;" onclick="window.App.openDisruptionsModal()">Προβολή</button>
+          <button class="m3-icon-btn" onclick="event.stopPropagation(); window.App.dismissDisruption('${first.id}')" title="Απόρριψη ενημέρωσης" style="background:none; border:none; color:#92400e; cursor:pointer; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; border-radius:9999px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+        </div>
       `;
       banner.style.display = 'flex';
     } else {
