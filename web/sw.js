@@ -3,7 +3,7 @@
  * Background alarm notification scheduler and offline caching
  */
 
-const CACHE_NAME = 'oasa-bus-v56';
+const CACHE_NAME = 'oasa-bus-v57';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -231,8 +231,8 @@ self.addEventListener('notificationclose', (event) => {
         client.postMessage({ type: 'NOTIFICATION_DISMISSED_PIN' });
       }
     });
-  } else if (tag.startsWith('live_alarm_')) {
-    const alarmId = tag.replace('live_alarm_', '');
+  } else if (tag.startsWith('live_alarm_') || tag.startsWith('bus_alarm_')) {
+    const alarmId = tag.replace('live_alarm_', '').replace('bus_alarm_', '');
     activeAlarms.delete(alarmId);
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
@@ -247,8 +247,8 @@ self.addEventListener('notificationclick', (event) => {
 
   if (event.action === 'cancel' || event.action === 'dismiss') {
     const tag = event.notification.tag || '';
-    if (tag.startsWith('live_alarm_')) {
-      const alarmId = tag.replace('live_alarm_', '');
+    if (tag.startsWith('live_alarm_') || tag.startsWith('bus_alarm_')) {
+      const alarmId = tag.replace('live_alarm_', '').replace('bus_alarm_', '');
       activeAlarms.delete(alarmId);
       clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
         for (const client of clientList) {

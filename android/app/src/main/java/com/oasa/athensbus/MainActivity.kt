@@ -389,6 +389,8 @@ class MainActivity : FragmentActivity() {
         fun dismissAlarm() {
             try {
                 AlarmRingingService.dismiss(context)
+                LiveTrackingService.stop(context)
+                NotificationHelper.clearLiveArrivalNotification(context)
             } catch (e: Exception) {
                 e.printStackTrace()
             }

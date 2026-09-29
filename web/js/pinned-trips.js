@@ -76,16 +76,16 @@ class PinnedTripsManager {
         window.App.triggerHaptic('success');
       }
 
-      // Check if the user has explicitly created an alarm for this stop and line
-      const explicitAlarm = (window.Alarms && Array.isArray(window.Alarms.alarms))
-        ? window.Alarms.alarms.find(a => !a.triggered && String(a.stopCode).trim() === stopCode && String(a.lineId).trim().toUpperCase() === lineId.toUpperCase())
-        : null;
+      // Pinned trips are purely for visual/board monitoring and MUST NEVER set or trigger an alarm
+      const threshold = 0;
+      const ringUntilDismissed = false;
 
-      const threshold = explicitAlarm ? (explicitAlarm.thresholdMinutes || 5) : 0;
-      const ringUntilDismissed = explicitAlarm ? (explicitAlarm.ringUntilDismissed !== false) : false;
+      // Start Android Live Tracking Notification for this pinned bus only if no active alarm is running
+      const hasActiveAlarm = (window.Alarms && Array.isArray(window.Alarms.alarms))
+        ? window.Alarms.alarms.some(a => !a.triggered)
+        : false;
 
-      // Start Android Live Tracking Notification immediately for this pinned bus (silent live tracker, no alarm ringing unless explicitAlarm)
-      if (window.AndroidBridge && typeof window.AndroidBridge.startLiveTracking === 'function') {
+      if (!hasActiveAlarm && window.AndroidBridge && typeof window.AndroidBridge.startLiveTracking === 'function') {
         try {
           const busMins = (arrival && typeof arrival.btime2 === 'number') ? arrival.btime2 : 10;
           let walkMins = 0;
@@ -99,8 +99,8 @@ class PinnedTripsManager {
             String(newItem.stopName),
             String(arrival.destination || arrival.route_descr || ''),
             Number(walkMins),
-            Number(threshold),
-            Boolean(ringUntilDismissed),
+            0,
+            false,
             Number(busMins)
           );
         } catch (e) {
@@ -317,15 +317,21 @@ class PinnedTripsManager {
         navigator.setAppBadge(mins).catch(() => {});
       }
 
-      // Android Bridge Hook if running inside Android APK WebView
+      // Android Bridge Hook if running inside Android APK WebView (only if no active alarm is running)
       if (window.AndroidBridge) {
         try {
           const dest = item.direction || item.destination || item.lineDescr || '';
-          if (typeof window.AndroidBridge.updateLiveArrivalNotification === 'function') {
-            window.AndroidBridge.updateLiveArrivalNotification(item.lineId, mins, item.stopName, dest, item.walkMinutes || 0, item.stopCode, 10);
-          }
-          if (typeof window.AndroidBridge.startLiveTracking === 'function') {
-            window.AndroidBridge.startLiveTracking(item.stopCode, item.lineId, item.routeCode || '', item.stopName, dest, item.walkMinutes || 0, 0, false, mins);
+          const hasActiveAlarm = (window.Alarms && Array.isArray(window.Alarms.alarms))
+            ? window.Alarms.alarms.some(a => !a.triggered)
+            : false;
+
+          if (!hasActiveAlarm) {
+            if (typeof window.AndroidBridge.updateLiveArrivalNotification === 'function') {
+              window.AndroidBridge.updateLiveArrivalNotification(item.lineId, mins, item.stopName, dest, item.walkMinutes || 0, item.stopCode, 10);
+            }
+            if (typeof window.AndroidBridge.startLiveTracking === 'function') {
+              window.AndroidBridge.startLiveTracking(item.stopCode, item.lineId, item.routeCode || '', item.stopName, dest, item.walkMinutes || 0, 0, false, mins);
+            }
           }
         } catch (e) {}
       }

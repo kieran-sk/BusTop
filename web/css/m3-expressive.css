@@ -329,6 +329,7 @@ body {
   text-align: center;
   transition: transform 0.15s ease;
   -webkit-tap-highlight-color: transparent;
+  color: #64748b;
 }
 
 .m3-nav-pill {
@@ -341,36 +342,51 @@ body {
   box-sizing: border-box;
   border: 1px solid #cbd5e1;
   background-color: #f8fafc;
+  color: #64748b;
   transition: background-color var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-spring),
               border-color var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-spring),
+              color var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-spring),
               box-shadow var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-spring),
               transform 0.15s ease;
   position: relative;
 }
 
-.m3-nav-emoji {
-  font-size: 1.35rem;
-  line-height: 1;
+.m3-nav-icon {
+  width: 22px;
+  height: 22px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.08));
   user-select: none;
+}
+
+.m3-nav-icon svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+  stroke: currentColor;
+  transition: stroke 0.15s ease, stroke-width 0.15s ease;
 }
 
 .m3-nav-item:hover .m3-nav-pill {
   border-color: #94a3b8;
+  color: #334155;
 }
 
 .m3-nav-item.active .m3-nav-pill {
-  background-color: var(--md-sys-color-secondary-container);
-  border-color: var(--md-sys-color-primary);
+  background-color: var(--md-sys-color-secondary-container, #d7e3f7);
+  border-color: var(--md-sys-color-primary, #005ac1);
+  color: var(--md-sys-color-primary, #005ac1);
   box-shadow: 0 1px 4px rgba(0, 90, 193, 0.16);
 }
 
-.m3-nav-item.active .m3-nav-emoji {
-  transform: scale(1.18);
+.m3-nav-item.active .m3-nav-icon {
+  transform: scale(1.1);
+}
+
+.m3-nav-item.active .m3-nav-icon svg {
+  stroke-width: 2.3;
 }
 
 .m3-nav-item:active .m3-nav-pill {
@@ -385,8 +401,13 @@ body {
     width: 40px;
     height: 30px;
   }
-  .m3-nav-emoji {
-    font-size: 1.15rem;
+  .m3-nav-icon {
+    width: 20px;
+    height: 20px;
+  }
+  .m3-nav-icon svg {
+    width: 20px;
+    height: 20px;
   }
 }
 

@@ -35,8 +35,8 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
   <!-- Stylesheets (Relative paths with cache-busting for PWA updates) -->
-  <link rel="stylesheet" href="css/m3-expressive.css?v=20260929_1818">
-  <link rel="stylesheet" href="css/airport-ticker.css?v=20260929_1818">
+  <link rel="stylesheet" href="css/m3-expressive.css?v=20260929_2250">
+  <link rel="stylesheet" href="css/airport-ticker.css?v=20260929_2250">
 </head>
 <body>
 
@@ -578,37 +578,69 @@
     </div>
   </div>
 
-  <!-- Bottom Navigation Bar (Relative Emoji Icons) -->
+  <!-- Bottom Navigation Bar (Clean SVG Outline Icons) -->
   <nav class="m3-nav-bar" aria-label="Κύρια πλοήγηση">
     <div class="m3-nav-item active" data-tab="search" onclick="window.App.switchTab('search')" title="Κοντά μου (Στάσεις &amp; Χάρτης)" aria-label="Κοντά μου">
       <div class="m3-nav-pill">
-        <span class="m3-nav-emoji">📍</span>
+        <span class="m3-nav-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
+            <circle cx="12" cy="10" r="3"></circle>
+          </svg>
+        </span>
       </div>
     </div>
     <div class="m3-nav-item" data-tab="journey" onclick="window.App.switchTab('journey')" title="Πλοήγηση (Α ➔ Β)" aria-label="Πλοήγηση">
       <div class="m3-nav-pill">
-        <span class="m3-nav-emoji">🧭</span>
+        <span class="m3-nav-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
+          </svg>
+        </span>
       </div>
     </div>
     <div class="m3-nav-item" data-tab="ticker" onclick="window.App.switchTab('ticker')" title="Δρομολόγια &amp; Αφίξεις" aria-label="Δρομολόγια">
       <div class="m3-nav-pill">
-        <span class="m3-nav-emoji">🚌</span>
+        <span class="m3-nav-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="3" width="16" height="15" rx="3"></rect>
+            <line x1="4" y1="9" x2="20" y2="9"></line>
+            <circle cx="8" cy="14" r="1.5"></circle>
+            <circle cx="16" cy="14" r="1.5"></circle>
+            <path d="M6 18v2M18 18v2"></path>
+          </svg>
+        </span>
       </div>
     </div>
     <div class="m3-nav-item" data-tab="notifications" onclick="window.App.switchTab('notifications')" title="Ειδοποιήσεις &amp; Ξυπνητήρια" aria-label="Ειδοποιήσεις">
       <div class="m3-nav-pill" style="position: relative;">
-        <span class="m3-nav-emoji">🔔</span>
+        <span class="m3-nav-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+        </span>
         <span id="nav-alarms-badge" style="display: none; position: absolute; top: -3px; right: -4px; background: #dc2626; color: #ffffff; font-size: 0.62rem; font-weight: 900; padding: 1px 5px; border-radius: 9999px; border: 1.5px solid #ffffff;">0</span>
       </div>
     </div>
     <div class="m3-nav-item" data-tab="pinned" onclick="window.App.switchTab('pinned')" title="Καρφιτσωμένα Δρομολόγια" aria-label="Καρφίτσες">
       <div class="m3-nav-pill">
-        <span class="m3-nav-emoji">📌</span>
+        <span class="m3-nav-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="17" x2="12" y2="22"></line>
+            <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
+          </svg>
+        </span>
       </div>
     </div>
     <div class="m3-nav-item" data-tab="favorites" onclick="window.App.switchTab('favorites')" title="Αγαπημένες Στάσεις &amp; Γραμμές" aria-label="Αγαπημένα">
       <div class="m3-nav-pill">
-        <span class="m3-nav-emoji">⭐</span>
+        <span class="m3-nav-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+          </svg>
+        </span>
       </div>
     </div>
   </nav>

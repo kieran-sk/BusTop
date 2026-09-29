@@ -440,10 +440,31 @@ class AlarmManager {
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({ type: 'CANCEL_ALARM', id });
     }
+    if (window.AndroidBridge && typeof window.AndroidBridge.dismissAlarm === 'function') {
+      try { window.AndroidBridge.dismissAlarm(); } catch (e) {}
+    }
     this.alarms = this.alarms.filter(a => a.id !== id);
     this.save();
     if (window.App && typeof window.App.triggerHaptic === 'function') {
       window.App.triggerHaptic('light');
+    }
+  }
+
+  clearAllAlarms() {
+    this.stopAlarmRinging();
+    this.alarms.forEach(a => {
+      this.clearLiveNotification(a.id);
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'CANCEL_ALARM', id: a.id });
+      }
+    });
+    if (window.AndroidBridge && typeof window.AndroidBridge.dismissAlarm === 'function') {
+      try { window.AndroidBridge.dismissAlarm(); } catch (e) {}
+    }
+    this.alarms = [];
+    this.save();
+    if (window.App && typeof window.App.triggerHaptic === 'function') {
+      window.App.triggerHaptic('medium');
     }
   }
 
@@ -695,10 +716,13 @@ class AlarmManager {
                       </div>
                     </div>
                   </div>
-                  <div style="text-align: right; flex-shrink: 0;">
+                  <div style="display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0;">
                     <span class="m3-badge" style="background: ${a.triggered ? '#fee2e2' : '#e0f2fe'}; color: ${a.triggered ? '#b91c1c' : '#005ac1'}; font-size: 0.72rem; font-weight: 800; padding: 2px 7px;">
                       ${a.triggered ? '🚨 Συναγερμός' : `⏳ ~${formattedTime}`}
                     </span>
+                    <button class="m3-icon-btn" onclick="event.stopPropagation(); window.Alarms.removeAlarm('${a.id}')" title="Απόρριψη ειδοποίησης" style="width: 28px; height: 28px; border: 1px solid var(--md-sys-color-outline-variant); background: #ffffff; border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: #64748b;">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                    </button>
                   </div>
                 </div>
                 <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px dashed var(--md-sys-color-outline-variant); padding-top: 0.5rem; font-size: 0.8rem; color: var(--md-sys-color-outline);">
@@ -707,7 +731,7 @@ class AlarmManager {
                   </div>
                   <div style="display: flex; gap: 0.5rem;">
                     <button class="m3-btn m3-btn-tonal" onclick="event.stopPropagation(); window.Alarms.removeAlarm('${a.id}')" style="padding: 0.3rem 0.75rem; font-size: 0.78rem; border-radius: 9999px;">
-                      ${a.triggered ? 'Διαγραφή' : 'Ακύρωση'}
+                      ✕ Απόρριψη
                     </button>
                   </div>
                 </div>

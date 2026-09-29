@@ -125,7 +125,14 @@ class LiveTrackingService : Service() {
 
         val newStop = intent?.getStringExtra(EXTRA_STOP_CODE) ?: ""
         val newLine = intent?.getStringExtra(EXTRA_LINE_ID) ?: ""
+        val newThreshold = intent?.getIntExtra(EXTRA_THRESHOLD, 0) ?: 0
         val isSameTrip = (newStop.isNotBlank() && newStop == stopCode && newLine.equals(lineId, ignoreCase = true))
+
+        // If currently monitoring an active alarm (thresholdMinutes > 0), do not allow
+        // a passive pinned trip poll (newThreshold == 0) to displace or overwrite the alarm!
+        if (this.thresholdMinutes > 0 && newThreshold == 0 && !isSameTrip) {
+            return START_STICKY
+        }
 
         stopCode = newStop
         lineId = newLine
@@ -133,14 +140,9 @@ class LiveTrackingService : Service() {
         stopName = intent?.getStringExtra(EXTRA_STOP_NAME) ?: "Στάση ΟΑΣΑ"
         destination = intent?.getStringExtra(EXTRA_DESTINATION) ?: ""
         walkMinutes = intent?.getIntExtra(EXTRA_WALK_MINUTES, 0) ?: 0
-        val newThreshold = intent?.getIntExtra(EXTRA_THRESHOLD, 0) ?: 0
-        if (!isSameTrip || newThreshold > 0) {
-            thresholdMinutes = newThreshold
-        }
+        thresholdMinutes = newThreshold
         val newRing = intent?.getBooleanExtra(EXTRA_RING_UNTIL_DISMISSED, false) ?: false
-        if (!isSameTrip || newRing) {
-            ringUntilDismissed = newRing
-        }
+        ringUntilDismissed = newRing
         val newInitMins = intent?.getIntExtra(EXTRA_INITIAL_MINS, 10) ?: 10
         if (!isSameTrip) {
             initialMinutes = newInitMins
@@ -349,7 +351,9 @@ class LiveTrackingService : Service() {
             .setContentText(content)
             .setSubText(shortText)
             .setProgress(maxMins, progress, false)
-            .setOngoing(true)
+            .setOngoing(false)
+            .setAutoCancel(true)
+            .setDeleteIntent(pStop)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
