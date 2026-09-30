@@ -89,13 +89,13 @@ object NotificationHelper {
         notificationManager.notify(notifId, notification)
     }
 
-    const val LIVE_CHANNEL_ID = "oasa_bus_live_channel_v5"
+    const val LIVE_CHANNEL_ID = "oasa_bus_live_channel_v6"
     const val LIVE_CHANNEL_NAME = "Live Bus Tracking"
     const val LIVE_NOTIF_ID = 2001
 
     fun createLiveNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(LIVE_CHANNEL_ID, LIVE_CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH).apply {
+            val channel = NotificationChannel(LIVE_CHANNEL_ID, LIVE_CHANNEL_NAME, NotificationManager.IMPORTANCE_LOW).apply {
                 description = "Rich Ongoing Live Activity pill showing bus arrival countdown, stop, and status"
                 setShowBadge(true)
                 setSound(null, null)
@@ -174,7 +174,7 @@ object NotificationHelper {
             .setAutoCancel(true)
             .setDeleteIntent(pStop)
             .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setColor(accentColor)

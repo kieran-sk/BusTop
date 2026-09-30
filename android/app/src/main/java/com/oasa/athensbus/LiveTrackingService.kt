@@ -128,12 +128,6 @@ class LiveTrackingService : Service() {
         val newThreshold = intent?.getIntExtra(EXTRA_THRESHOLD, 0) ?: 0
         val isSameTrip = (newStop.isNotBlank() && newStop == stopCode && newLine.equals(lineId, ignoreCase = true))
 
-        // If currently monitoring an active alarm (thresholdMinutes > 0), do not allow
-        // a passive pinned trip poll (newThreshold == 0) to displace or overwrite the alarm!
-        if (this.thresholdMinutes > 0 && newThreshold == 0 && !isSameTrip) {
-            return START_STICKY
-        }
-
         stopCode = newStop
         lineId = newLine
         routeCode = intent?.getStringExtra(EXTRA_ROUTE_CODE) ?: ""
@@ -144,7 +138,14 @@ class LiveTrackingService : Service() {
         val newRing = intent?.getBooleanExtra(EXTRA_RING_UNTIL_DISMISSED, false) ?: false
         ringUntilDismissed = newRing
         val newInitMins = intent?.getIntExtra(EXTRA_INITIAL_MINS, 10) ?: 10
-        if (!isSameTrip) {
+
+        if (newThreshold <= 0) {
+            // Strictly passive pinned trip tracking: 100% silent, alarm triggers permanently disabled
+            thresholdMinutes = 0
+            ringUntilDismissed = false
+            isAlarmTriggered = true
+            AlarmRingingService.dismiss(this)
+        } else if (!isSameTrip) {
             initialMinutes = newInitMins
             startedAtMs = System.currentTimeMillis()
             isAlarmTriggered = false
@@ -355,7 +356,7 @@ class LiveTrackingService : Service() {
             .setAutoCancel(true)
             .setDeleteIntent(pStop)
             .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setColor(accentColor)

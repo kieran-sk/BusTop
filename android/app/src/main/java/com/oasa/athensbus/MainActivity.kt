@@ -392,6 +392,26 @@ class MainActivity : FragmentActivity() {
             initialMinutes: Double = 10.0
         ) {
             try {
+                if (thresholdMinutes <= 0.0) {
+                    try {
+                        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+                        val intent = Intent(context, AlarmReceiver::class.java)
+                        val pendingIntent = PendingIntent.getBroadcast(
+                            context,
+                            lineId.hashCode(),
+                            intent,
+                            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_NO_CREATE
+                        )
+                        if (pendingIntent != null) {
+                            alarmManager.cancel(pendingIntent)
+                            pendingIntent.cancel()
+                        }
+                        AlarmRingingService.dismiss(context)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+
                 LiveTrackingService.start(
                     context,
                     stopCode,

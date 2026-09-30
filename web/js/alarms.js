@@ -226,7 +226,11 @@ class AlarmManager {
     await this.requestPermission();
 
     const id = 'alarm_' + Date.now();
-    const threshold = options.thresholdMinutes || 5;
+    const threshold = typeof options.thresholdMinutes === 'number' ? options.thresholdMinutes : 5;
+    if (threshold <= 0) {
+      console.log('Skipping alarm creation: threshold is 0 or negative (passive tracking)');
+      return;
+    }
     const initialMins = options.targetMinutes || 10;
     const destination = options.destination || '';
     const walkMinutes = options.walkMinutes || 0;
@@ -515,7 +519,7 @@ class AlarmManager {
       this.save();
     }
 
-    const active = this.alarms.filter(a => !a.triggered);
+    const active = this.alarms.filter(a => !a.triggered && typeof a.thresholdMinutes === 'number' && a.thresholdMinutes > 0);
     if (active.length === 0) return;
 
     for (const alarm of active) {
@@ -561,8 +565,8 @@ class AlarmManager {
       alarm.currentMinutes = currentMins;
       alarm.lastUpdated = now;
 
-      // 3. Trigger alarm if threshold is reached!
-      if (typeof currentMins === 'number' && currentMins <= alarm.thresholdMinutes) {
+      // 3. Trigger alarm if threshold is reached! (Strict threshold > 0 guard)
+      if (typeof currentMins === 'number' && typeof alarm.thresholdMinutes === 'number' && alarm.thresholdMinutes > 0 && currentMins <= alarm.thresholdMinutes) {
         this.triggerAlarm(alarm, currentMins);
       } else {
         // Update live notification with updated countdown

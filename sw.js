@@ -3,7 +3,7 @@
  * Background alarm notification scheduler and offline caching
  */
 
-const CACHE_NAME = 'oasa-bus-v60';
+const CACHE_NAME = 'oasa-bus-v62';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -63,6 +63,11 @@ let alarmTickerInterval = null;
 function tickServiceWorkerAlarms() {
   const now = Date.now();
   for (const [id, alarm] of activeAlarms.entries()) {
+    if (!alarm.thresholdMinutes || alarm.thresholdMinutes <= 0) {
+      activeAlarms.delete(id);
+      continue;
+    }
+
     const elapsedMins = Math.floor((now - alarm.createdAt) / 60000);
     const remainingMins = Math.max(0, alarm.initialMinutes - elapsedMins);
 
@@ -130,12 +135,17 @@ self.addEventListener('message', (event) => {
 
   if (event.data.type === 'SCHEDULE_ALARM') {
     const { id, lineId, stopName, initialMinutes, thresholdMinutes, createdAt } = event.data;
+    const threshold = typeof thresholdMinutes === 'number' ? thresholdMinutes : 5;
+    
+    // Pinned trips or zero threshold must NEVER be registered as active ringing alarms
+    if (threshold <= 0) return;
+
     activeAlarms.set(id, {
       id,
       lineId,
       stopName,
       initialMinutes: initialMinutes || 10,
-      thresholdMinutes: thresholdMinutes || 5,
+      thresholdMinutes: threshold,
       createdAt: createdAt || Date.now()
     });
 
@@ -145,7 +155,7 @@ self.addEventListener('message', (event) => {
 
     // Show initial live notification immediately
     self.registration.showNotification(`🚍 ${lineId} σε ${initialMinutes || 10}'`, {
-      body: `Στάση: ${stopName} • Ειδοποίηση στα ${thresholdMinutes || 5}'`,
+      body: `Στάση: ${stopName} • Ειδοποίηση στα ${threshold}'`,
       tag: `live_alarm_${id}`,
       icon: '/assets/icon-192.png',
       badge: '/assets/icon-192.png',

@@ -80,9 +80,14 @@ class PinnedTripsManager {
       const threshold = 0;
       const ringUntilDismissed = false;
 
+      // Disarm and remove any active or pending alarm for this line & stop so pinning is 100% passive
+      if (window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
+        window.Alarms.removeAlarmByStopAndLine(stopCode, lineId);
+      }
+
       // Start Android Live Tracking Notification for this pinned bus only if no active alarm is running
       const hasActiveAlarm = (window.Alarms && Array.isArray(window.Alarms.alarms))
-        ? window.Alarms.alarms.some(a => !a.triggered)
+        ? window.Alarms.alarms.some(a => !a.triggered && typeof a.thresholdMinutes === 'number' && a.thresholdMinutes > 0)
         : false;
 
       if (!hasActiveAlarm && window.AndroidBridge && typeof window.AndroidBridge.startLiveTracking === 'function') {
@@ -322,7 +327,7 @@ class PinnedTripsManager {
         try {
           const dest = item.direction || item.destination || item.lineDescr || '';
           const hasActiveAlarm = (window.Alarms && Array.isArray(window.Alarms.alarms))
-            ? window.Alarms.alarms.some(a => !a.triggered)
+            ? window.Alarms.alarms.some(a => !a.triggered && typeof a.thresholdMinutes === 'number' && a.thresholdMinutes > 0)
             : false;
 
           if (!hasActiveAlarm) {

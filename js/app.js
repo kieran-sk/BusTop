@@ -19,7 +19,7 @@ class AppController {
     this.mapManager = null;
     this.ticker = null;
     this.currentStopRequestId = 0;
-    this.stopNotifActive = new Set(JSON.parse(localStorage.getItem('OASA_STOP_NOTIF') || '[]'));
+    try { localStorage.removeItem('OASA_STOP_NOTIF'); } catch (e) {}
     this.notifiedBuses = new Set();
     this.navHistory = [];
     this.arrivalsTargetDay = 'today';
@@ -1151,26 +1151,6 @@ class AppController {
 
       // Update Airport Ticker with fresh arrivals for this exact stop
       this.ticker.setStopAndArrivals(this.currentStop, arrivals);
-
-      // Check Live Stop Notifications
-      if (this.stopNotifActive.has(this.currentStop.StopCode) && 'Notification' in window && Notification.permission === 'granted') {
-        for (const arr of arrivals) {
-          const mins = arr.btime2;
-          const busKey = `${this.currentStop.StopCode}_${arr.line_id}_${arr.veh_code || 'bus'}_${mins}`;
-          if (mins <= 5 && !this.notifiedBuses.has(busKey)) {
-            this.notifiedBuses.add(busKey);
-            this.showPushNotification(`Το Λεωφορείο ${arr.line_id} πλησιάζει!`, {
-              body: `Η γραμμή ${arr.line_id} (${arr.route_descr || ''}) απέχει ${mins} λεπτά από τη στάση ${this.currentStop.StopDescr}.`,
-              tag: `live_stop_bus_${busKey}`,
-              vibrate: [300, 150, 300, 150, 400],
-              renotify: true
-            });
-            if (window.Alarms) {
-              window.Alarms.playChime();
-            }
-          }
-        }
-      }
     } catch (err) {
       console.warn('Failed to refresh arrivals:', err);
       const connBanner = document.getElementById('connection-status-banner');
