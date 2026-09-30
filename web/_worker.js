@@ -541,7 +541,7 @@ export default {
           return jsonRes([]);
         }
 
-        // Point-to-Point Journey Planner (A to B Transit Routing)
+        // Point-to-Point Journey Planner (A to B Transit Routing with Bus & Metro)
         if (path === '/api/routing/journey') {
           const oLat = parseFloat(url.searchParams.get('originLat')), oLng = parseFloat(url.searchParams.get('originLng'));
           const dLat = parseFloat(url.searchParams.get('destLat')), dLng = parseFloat(url.searchParams.get('destLng'));
@@ -564,21 +564,23 @@ export default {
               directDistanceMeters: directDist,
               itineraries: [{
                 type: 'walk_only',
-                durationMinutes: walkMin,
-                walkingMeters: directDist,
+                totalDurationMinutes: walkMin,
+                transitMinutes: 0,
+                totalWalkMeters: directDist,
                 summary: `Απευθείας περπάτημα (${directDist}μ • ~${walkMin}')`,
                 steps: [{ kind: 'walk', instruction: 'Περπατήστε απευθείας στον προορισμό σας', meters: directDist, minutes: walkMin }]
               }]
             });
           }
 
+          // 1. Candidate stops discovery
           const [s1, s2] = await Promise.all([
             oasaRequest('getClosestStops', { p1: oLat, p2: oLng }, 60).catch(() => []),
             oasaRequest('getClosestStops', { p1: dLat, p2: dLng }, 60).catch(() => [])
           ]);
 
-          const oStops = (Array.isArray(s1) ? s1 : []).slice(0, 4);
-          const dStops = (Array.isArray(s2) ? s2 : []).slice(0, 4);
+          const oStops = (Array.isArray(s1) ? s1 : []).slice(0, 6);
+          const dStops = (Array.isArray(s2) ? s2 : []).slice(0, 6);
 
           const oRoutesPromises = oStops.map(s => oasaRequest('webRoutesForStop', { p1: s.StopCode }, 1800).catch(() => []));
           const dRoutesPromises = dStops.map(s => oasaRequest('webRoutesForStop', { p1: s.StopCode }, 1800).catch(() => []));
@@ -599,6 +601,8 @@ export default {
           });
 
           const itineraries = [];
+
+          // 2. Direct Bus / Trolley Lines
           for (const [lineId, oEntry] of oLineMap.entries()) {
             if (dLineMap.has(lineId)) {
               const dEntry = dLineMap.get(lineId);
@@ -628,8 +632,126 @@ export default {
               });
             }
           }
+
+          // 3. Athens Metro Network (Lines 1, 2, 3 & Tram)
+          const METRO_STATIONS = [
+            { id: 'm1-peiraias', name: 'Πειραιάς', lat: 37.9482, lng: 23.6428, lines: ['M1', 'M3', 'TRAM'] },
+            { id: 'm1-faliro', name: 'Φάληρο', lat: 37.9450, lng: 23.6669, lines: ['M1', 'TRAM'] },
+            { id: 'm1-moschato', name: 'Μοσχάτο', lat: 37.9553, lng: 23.6800, lines: ['M1'] },
+            { id: 'm1-kallithea', name: 'Καλλιθέα', lat: 37.9608, lng: 23.6969, lines: ['M1'] },
+            { id: 'm1-tavros', name: 'Ταύρος', lat: 37.9637, lng: 23.7052, lines: ['M1'] },
+            { id: 'm1-petralona', name: 'Πετράλωνα', lat: 37.9685, lng: 23.7093, lines: ['M1'] },
+            { id: 'm1-thiseio', name: 'Θησείο', lat: 37.9770, lng: 23.7208, lines: ['M1'] },
+            { id: 'm1-monastiraki', name: 'Μοναστηράκι', lat: 37.9763, lng: 23.7256, lines: ['M1', 'M3'] },
+            { id: 'm1-omonoia', name: 'Ομόνοια', lat: 37.9842, lng: 23.7280, lines: ['M1', 'M2'] },
+            { id: 'm1-victoria', name: 'Βικτώρια', lat: 37.9931, lng: 23.7300, lines: ['M1'] },
+            { id: 'm1-attiki', name: 'Αττική', lat: 37.9989, lng: 23.7225, lines: ['M1', 'M2'] },
+            { id: 'm1-agios-nikolaos', name: 'Άγιος Νικόλαος', lat: 38.0068, lng: 23.7277, lines: ['M1'] },
+            { id: 'm1-kato-patisia', name: 'Κάτω Πατήσια', lat: 38.0119, lng: 23.7288, lines: ['M1'] },
+            { id: 'm1-agios-eleftherios', name: 'Άγιος Ελευθέριος', lat: 38.0201, lng: 23.7321, lines: ['M1'] },
+            { id: 'm1-ano-patisia', name: 'Άνω Πατήσια', lat: 38.0235, lng: 23.7359, lines: ['M1'] },
+            { id: 'm1-perissos', name: 'Περισσός', lat: 38.0328, lng: 23.7450, lines: ['M1'] },
+            { id: 'm1-pefkakia', name: 'Πευκάκια', lat: 38.0369, lng: 23.7508, lines: ['M1'] },
+            { id: 'm1-nea-ionia', name: 'Νέα Ιωνία', lat: 38.0403, lng: 23.7558, lines: ['M1'] },
+            { id: 'm1-irakleio', name: 'Ηράκλειο', lat: 38.0461, lng: 23.7661, lines: ['M1'] },
+            { id: 'm1-eirini', name: 'Ειρήνη', lat: 38.0433, lng: 23.7844, lines: ['M1'] },
+            { id: 'm1-neratziotissa', name: 'Νερατζιώτισσα', lat: 38.0450, lng: 23.7936, lines: ['M1'] },
+            { id: 'm1-marousi', name: 'Μαρούσι', lat: 38.0561, lng: 23.8050, lines: ['M1'] },
+            { id: 'm1-kat', name: 'ΚΑΤ', lat: 38.0664, lng: 23.8067, lines: ['M1'] },
+            { id: 'm1-kifisia', name: 'Κηφισιά', lat: 38.0736, lng: 23.8081, lines: ['M1'] },
+            { id: 'm2-anthoupoli', name: 'Ανθούπολη', lat: 38.0175, lng: 23.6925, lines: ['M2'] },
+            { id: 'm2-peristeri', name: 'Περιστέρι', lat: 38.0133, lng: 23.6917, lines: ['M2'] },
+            { id: 'm2-agios-antonios', name: 'Άγιος Αντώνιος', lat: 38.0069, lng: 23.6997, lines: ['M2'] },
+            { id: 'm2-sepolia', name: 'Σεπόλια', lat: 38.0019, lng: 23.7087, lines: ['M2'] },
+            { id: 'm2-stathmos-larisis', name: 'Σταθμός Λαρίσης', lat: 37.9924, lng: 23.7210, lines: ['M2'] },
+            { id: 'm2-metaxourgeio', name: 'Μεταξουργείο', lat: 37.9859, lng: 23.7211, lines: ['M2'] },
+            { id: 'm2-panepistimio', name: 'Πανεπιστήμιο', lat: 37.9804, lng: 23.7332, lines: ['M2'] },
+            { id: 'm2-syntagma', name: 'Σύνταγμα', lat: 37.9753, lng: 23.7348, lines: ['M2', 'M3', 'TRAM'] },
+            { id: 'm2-akropoli', name: 'Ακρόπολη', lat: 37.9690, lng: 23.7297, lines: ['M2'] },
+            { id: 'm2-syngrou-fix', name: 'Συγγρού-Φιξ', lat: 37.9647, lng: 23.7269, lines: ['M2', 'TRAM'] },
+            { id: 'm2-neos-kosmos', name: 'Νέος Κόσμος', lat: 37.9582, lng: 23.7284, lines: ['M2', 'TRAM'] },
+            { id: 'm2-agios-ioannis', name: 'Άγιος Ιωάννης', lat: 37.9569, lng: 23.7350, lines: ['M2'] },
+            { id: 'm2-dafni', name: 'Δάφνη', lat: 37.9497, lng: 23.7378, lines: ['M2'] },
+            { id: 'm2-agios-dimitrios', name: 'Άγιος Δημήτριος', lat: 37.9405, lng: 23.7408, lines: ['M2'] },
+            { id: 'm2-ilioupoli', name: 'Ηλιούπολη', lat: 37.9308, lng: 23.7461, lines: ['M2'] },
+            { id: 'm2-alimos', name: 'Άλιμος', lat: 37.9189, lng: 23.7439, lines: ['M2'] },
+            { id: 'm2-argyroupoli', name: 'Αργυρούπολη', lat: 37.9108, lng: 23.7481, lines: ['M2'] },
+            { id: 'm2-elliniko', name: 'Ελληνικό', lat: 37.8994, lng: 23.7447, lines: ['M2'] },
+            { id: 'm3-dimotiko-theatro', name: 'Δημοτικό Θέατρο', lat: 37.9431, lng: 23.6469, lines: ['M3', 'TRAM'] },
+            { id: 'm3-maniatika', name: 'Μανιάτικα', lat: 37.9575, lng: 23.6536, lines: ['M3'] },
+            { id: 'm3-nikaia', name: 'Νίκαια', lat: 37.9658, lng: 23.6467, lines: ['M3'] },
+            { id: 'm3-korydallos', name: 'Κορυδαλλός', lat: 37.9772, lng: 23.6508, lines: ['M3'] },
+            { id: 'm3-agia-varvara', name: 'Αγία Βαρβάρα', lat: 37.9897, lng: 23.6594, lines: ['M3'] },
+            { id: 'm3-agia-marina', name: 'Αγία Μαρίνα', lat: 37.9972, lng: 23.6681, lines: ['M3'] },
+            { id: 'm3-egaleo', name: 'Αιγάλεω', lat: 37.9922, lng: 23.6814, lines: ['M3'] },
+            { id: 'm3-elaionas', name: 'Ελαιώνας', lat: 37.9877, lng: 23.6941, lines: ['M3'] },
+            { id: 'm3-kerameikos', name: 'Κεραμεικός', lat: 37.9787, lng: 23.7112, lines: ['M3'] },
+            { id: 'm3-evangelismos', name: 'Ευαγγελισμός', lat: 37.9764, lng: 23.7480, lines: ['M3'] },
+            { id: 'm3-megaro-mousikis', name: 'Μέγαρο Μουσικής', lat: 37.9796, lng: 23.7545, lines: ['M3'] },
+            { id: 'm3-ambelokipi', name: 'Αμπελόκηποι', lat: 37.9870, lng: 23.7568, lines: ['M3'] },
+            { id: 'm3-panormou', name: 'Πανόρμου', lat: 37.9934, lng: 23.7637, lines: ['M3'] },
+            { id: 'm3-katehaki', name: 'Κατεχάκη', lat: 37.9932, lng: 23.7763, lines: ['M3'] },
+            { id: 'm3-ethniki-amyna', name: 'Εθνική Άμυνα', lat: 38.0006, lng: 23.7859, lines: ['M3'] },
+            { id: 'm3-holargos', name: 'Χολαργός', lat: 38.0047, lng: 23.7947, lines: ['M3'] },
+            { id: 'm3-nomismatokopio', name: 'Νομισματοκοπείο', lat: 38.0089, lng: 23.8058, lines: ['M3'] },
+            { id: 'm3-agia-paraskevi', name: 'Αγία Παρασκευή', lat: 38.0174, lng: 23.8127, lines: ['M3'] },
+            { id: 'm3-chalandri', name: 'Χαλάνδρι', lat: 38.0217, lng: 23.8211, lines: ['M3'] },
+            { id: 'm3-doukissis-plakentias', name: 'Δουκίσσης Πλακεντίας', lat: 38.0247, lng: 23.8331, lines: ['M3'] },
+            { id: 'm3-pallini', name: 'Παλλήνη', lat: 37.9925, lng: 23.8839, lines: ['M3'] },
+            { id: 'm3-paiania-kantza', name: 'Παιανία-Κάντζα', lat: 37.9358, lng: 23.8703, lines: ['M3'] },
+            { id: 'm3-koropi', name: 'Κορωπί', lat: 37.9125, lng: 23.8725, lines: ['M3'] },
+            { id: 'm3-aerodromio', name: 'Αεροδρόμιο', lat: 37.9367, lng: 23.9450, lines: ['M3'] },
+            { id: 'tram-syntagma', name: 'Σύνταγμα', lat: 37.9749, lng: 23.7356, lines: ['TRAM', 'M2', 'M3'] },
+            { id: 'tram-sef', name: 'ΣΕΦ', lat: 37.9452, lng: 23.6661, lines: ['TRAM', 'M1'] },
+            { id: 'tram-pikrodafni', name: 'Πικροδάφνη', lat: 37.9174, lng: 23.7029, lines: ['TRAM'] },
+            { id: 'tram-asklipiio-voulas', name: 'Ασκληπιείο Βούλας', lat: 37.8476, lng: 23.7535, lines: ['TRAM'] }
+          ];
+
+          const nearOStations = METRO_STATIONS
+            .map(st => ({ ...st, dist: calcDist(oLat, oLng, st.lat, st.lng) }))
+            .filter(st => st.dist <= 1200)
+            .sort((a, b) => a.dist - b.dist)
+            .slice(0, 3);
+
+          const nearDStations = METRO_STATIONS
+            .map(st => ({ ...st, dist: calcDist(dLat, dLng, st.lat, st.lng) }))
+            .filter(st => st.dist <= 1200)
+            .sort((a, b) => a.dist - b.dist)
+            .slice(0, 3);
+
+          for (const st1 of nearOStations) {
+            for (const st2 of nearDStations) {
+              if (st1.id === st2.id) continue;
+              const commonLines = (st1.lines || []).filter(l => (st2.lines || []).includes(l));
+              if (commonLines.length > 0) {
+                const lineName = commonLines[0];
+                const walk1Min = Math.ceil(st1.dist / 80) + 1;
+                const walk2Min = Math.ceil(st2.dist / 80) + 1;
+                const metroDist = calcDist(st1.lat, st1.lng, st2.lat, st2.lng);
+                const metroRideMin = Math.max(3, Math.round(metroDist / 530));
+                const totalDuration = walk1Min + 4 + metroRideMin + walk2Min;
+                const lineLabel = lineName === 'M1' ? 'Γραμμή 1 (ΗΣΑΠ)' : (lineName === 'M2' ? 'Γραμμή 2 (Κόκκινη)' : (lineName === 'M3' ? 'Γραμμή 3 (Μπλε)' : 'Τραμ'));
+
+                itineraries.push({
+                  type: 'direct_metro',
+                  lineId: lineName,
+                  totalDurationMinutes: totalDuration,
+                  transitMinutes: metroRideMin,
+                  totalWalkMeters: st1.dist + st2.dist,
+                  departureStop: { code: st1.id, name: `Σταθμός ${st1.name}`, lat: st1.lat, lng: st1.lng, walkMeters: st1.dist, walkMinutes: walk1Min },
+                  arrivalStop: { code: st2.id, name: `Σταθμός ${st2.name}`, lat: st2.lat, lng: st2.lng, walkMeters: st2.dist, walkMinutes: walk2Min },
+                  steps: [
+                    { kind: 'walk', instruction: `Περπατήστε ${walk1Min}' (${st1.dist}μ) μέχρι τον σταθμό Μετρό ${st1.name}`, meters: st1.dist, minutes: walk1Min },
+                    { kind: 'transit', mode: 'metro', lineId: lineName, lineDescr: lineLabel, direction: `Προς ${st2.name}`, fromStop: st1.name, toStop: st2.name, durationMinutes: metroRideMin, distanceMeters: metroDist },
+                    { kind: 'walk', instruction: `Περπατήστε ${walk2Min}' (${st2.dist}μ) από τον σταθμό ${st2.name} στον προορισμό σας`, meters: st2.dist, minutes: walk2Min }
+                  ]
+                });
+              }
+            }
+          }
+
           itineraries.sort((a, b) => a.totalDurationMinutes - b.totalDurationMinutes);
-          return jsonRes({ origin: { lat: oLat, lng: oLng }, destination: { lat: dLat, lng: dLng }, directDistanceMeters: directDist, itineraries: itineraries.slice(0, 5) });
+          return jsonRes({ origin: { lat: oLat, lng: oLng }, destination: { lat: dLat, lng: dLng }, directDistanceMeters: directDist, itineraries: itineraries.slice(0, 6) });
         }
 
         // Web Push VAPID Configuration & Registration Endpoints

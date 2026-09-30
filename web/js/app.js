@@ -1382,9 +1382,9 @@ class AppController {
   }
 
   /**
-   * Launch external Google Maps turn-by-turn navigation / directions to the selected stop coordinates
+   * Launch external Google Maps turn-by-turn navigation / directions
    */
-  navigateToGoogleMaps(lat, lng, label = 'Στάση') {
+  navigateToGoogleMaps(lat, lng, label = '', originLat = null, originLng = null, travelMode = 'walking') {
     let pLat = parseFloat(lat);
     let pLng = parseFloat(lng);
 
@@ -1404,9 +1404,10 @@ class AppController {
       return;
     }
 
-    // Universal Google Maps directions URL for walking/transit
-    const encodedLabel = encodeURIComponent(label || 'Στάση ΟΑΣΑ');
-    const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${pLat},${pLng}&travelmode=walking`;
+    let mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${pLat},${pLng}&travelmode=${travelMode}`;
+    if (originLat && originLng && !isNaN(originLat) && !isNaN(originLng)) {
+      mapsUrl += `&origin=${originLat},${originLng}`;
+    }
 
     // If running inside Android WebView bridge
     if (window.AndroidBridge && typeof window.AndroidBridge.openExternalUrl === 'function') {
@@ -1416,8 +1417,11 @@ class AppController {
       } catch (e) {}
     }
 
-    // Standard web browser fallback
-    window.open(mapsUrl, '_blank', 'noopener,noreferrer');
+    // Standard web browser fallback with popup blocker bypass
+    const win = window.open(mapsUrl, '_blank', 'noopener,noreferrer');
+    if (!win || win.closed || typeof win.closed === 'undefined') {
+      window.location.href = mapsUrl;
+    }
   }
 
   /**
