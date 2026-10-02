@@ -14,6 +14,8 @@ class AirportTicker {
     this.timerInterval = null;
     this.previousDigitsMap = new Map();
     this.hiddenLines = new Set();
+    this.selectedLineFilter = null;
+    this.groupSummary = true;
     this.showAllStops = false;
     this.modeFilter = 'all'; // 'all', 'live', 'scheduled'
     this.activeView = 'stops'; // 'stops' or 'lines'
@@ -235,6 +237,7 @@ class AirportTicker {
   setStopAndArrivals(stopInfo, arrivals = []) {
     if (this.currentStop && stopInfo && String(this.currentStop.StopCode) !== String(stopInfo.StopCode)) {
       this.hiddenLines.clear();
+      this.selectedLineFilter = null;
     }
     this.currentStop = stopInfo;
     this.arrivals = arrivals;
@@ -350,12 +353,13 @@ class AirportTicker {
    * Explains whether user has plenty of time (+), should leave immediately (0λ / 1-4λ), or if bus will arrive before user reaches the stop (-).
    */
   getCommuteAdvice(busMinutes, walkMinutes) {
-    if (walkMinutes === null || typeof busMinutes !== 'number') {
+    if (walkMinutes === null || typeof busMinutes !== 'number' || walkMinutes > 45) {
       return {
-        label: '--',
-        displayLabel: '--',
-        tooltip: 'Άγνωστη απόσταση στάσης',
-        className: 'commute-relax',
+        label: '',
+        displayLabel: '',
+        shortLabel: '',
+        tooltip: '',
+        className: 'commute-none',
         buffer: null
       };
     }
@@ -461,6 +465,15 @@ class AirportTicker {
 
     const walkMins = (walk && typeof walk.minutes === 'number') ? walk.minutes : null;
 
+    let laterDeparturesHtml = '';
+    if (Array.isArray(arr.later_departures) && arr.later_departures.length > 0) {
+      laterDeparturesHtml = `
+        <div class="ticker-later-departures">
+          <span class="ticker-later-label">Μετά</span> ${arr.later_departures.join(', ')}
+        </div>
+      `;
+    }
+
     return `
       <div class="ticker-row" onclick="if(window.App && window.App.triggerHaptic) window.App.triggerHaptic('tick'); window.App.openLineTimetableBothDirections('${arr.line_code}', '${arr.line_id}', '${safeDescr}')" title="Κλικ για προβολή πλήρους δρομολογίου και στάσεων">
         <!-- Top Section: Line Badge, Destination, Direction, GPS Status & Labeled Arrival Countdown -->
@@ -488,6 +501,7 @@ class AirportTicker {
               `}
               ${lineDescr && arr.destination && lineDescr !== arr.destination ? `<span style="font-size: 0.7rem; color: #94a3b8;">• ${lineDescr}</span>` : ''}
             </div>
+            ${laterDeparturesHtml}
           </div>
           <div class="ticker-cell-due" title="Εκτιμώμενος χρόνος άφιξης στη στάση">
             <span class="ticker-due-sublabel">Άφιξη</span>
@@ -846,14 +860,37 @@ class AirportTicker {
     // Extract unique line IDs for interactive show/hide filtering
     const uniqueLines = Array.from(new Set(this.arrivals.map(a => String(a.line_id || '').trim()).filter(Boolean)));
     
-    // Filter arrivals by line visibility
-    let visibleArrivals = this.arrivals.filter(a => !this.hiddenLines.has(String(a.line_id || '').trim()));
+    // Filter arrivals by line visibility (or selectedLineFilter)
+    let visibleArrivals = this.arrivals.filter(a => {
+      const lid = String(a.line_id || '').trim();
+      if (this.selectedLineFilter) return lid === this.selectedLineFilter;
+      return !this.hiddenLines.has(lid);
+    });
     
     // Filter arrivals by live vs scheduled mode
     if (this.modeFilter === 'live') {
       visibleArrivals = visibleArrivals.filter(a => a.is_live);
     } else if (this.modeFilter === 'scheduled') {
       visibleArrivals = visibleArrivals.filter(a => !a.is_live);
+    }
+
+    // Group arrivals by distinct service/destination so each line branch displays its next departure + subsequent departures ("Μετά XX:XX, YY:YY")
+    let displayArrivals = visibleArrivals;
+    if (this.groupSummary !== false) {
+      const seenRouteService = new Set();
+      displayArrivals = [];
+      for (const a of visibleArrivals) {
+        const k = `${a.line_id}_${a.destination || a.route_code}`;
+        if (a.is_live) {
+          displayArrivals.push(a);
+          seenRouteService.add(k);
+        } else {
+          if (!seenRouteService.has(k)) {
+            seenRouteService.add(k);
+            displayArrivals.push(a);
+          }
+        }
+      }
     }
 
     let rowsHtml = '';
@@ -887,29 +924,36 @@ class AirportTicker {
         </div>
       `;
     } else {
-      // Clean, ungrouped chronological arrival rows as modern cards
-      rowsHtml = visibleArrivals.map((arr, arrIdx) => this.renderArrivalRow(arr, arrIdx, walk)).join('');
+      // Clean, grouped arrival rows matching official OASA app with subsequent departures preview
+      rowsHtml = displayArrivals.map((arr, arrIdx) => this.renderArrivalRow(arr, arrIdx, walk)).join('');
     }
 
     // Filter bar HTML when multiple lines serve this stop
     let filterBarHtml = '';
     if (uniqueLines.length > 1) {
+      const isAllActive = !this.selectedLineFilter && this.hiddenLines.size === 0;
       filterBarHtml = `
         <div class="ticker-filter-bar">
           <span class="ticker-filter-label">Γραμμές:</span>
           <div class="ticker-filter-pills">
+            <button class="ticker-filter-pill ${isAllActive ? 'is-active' : 'is-hidden'}" 
+              onclick="event.stopPropagation(); window.App.ticker.showAllLines()"
+              title="Εμφάνιση όλων των γραμμών">
+              <span class="ticker-filter-dot" style="background: ${isAllActive ? '#005ac1' : '#94a3b8'};"></span>
+              Όλες
+            </button>
             ${uniqueLines.map(lid => {
-              const isHidden = this.hiddenLines.has(lid);
+              const isSelected = this.selectedLineFilter === lid || (!this.selectedLineFilter && !this.hiddenLines.has(lid));
               return `
-                <button class="ticker-filter-pill ${isHidden ? 'is-hidden' : 'is-active'}" 
-                  onclick="event.stopPropagation(); window.App.ticker.toggleLine('${lid}')"
-                  title="${isHidden ? 'Κάντε κλικ για εμφάνιση της γραμμής ' + lid : 'Κάντε κλικ για απόκρυψη της γραμμής ' + lid}">
-                  <span class="ticker-filter-dot" style="background: ${isHidden ? '#94a3b8' : '#005ac1'};"></span>
+                <button class="ticker-filter-pill ${isSelected ? 'is-active' : 'is-hidden'}" 
+                  onclick="event.stopPropagation(); window.App.ticker.selectLineFilter('${lid}')"
+                  title="Φιλτράρισμα γραμμής ${lid}">
+                  <span class="ticker-filter-dot" style="background: ${isSelected ? '#005ac1' : '#94a3b8'};"></span>
                   ${lid}
                 </button>
               `;
             }).join('')}
-            ${this.hiddenLines.size > 0 ? `
+            ${(!isAllActive) ? `
               <button class="ticker-filter-reset" onclick="event.stopPropagation(); window.App.ticker.showAllLines()">
                 Εμφάνιση Όλων
               </button>
@@ -932,17 +976,23 @@ class AirportTicker {
     this.startClock();
   }
 
-  toggleLine(lineId) {
+  selectLineFilter(lineId) {
     const lid = String(lineId).trim();
-    if (this.hiddenLines.has(lid)) {
-      this.hiddenLines.delete(lid);
+    if (this.selectedLineFilter === lid) {
+      this.selectedLineFilter = null;
     } else {
-      this.hiddenLines.add(lid);
+      this.selectedLineFilter = lid;
+      this.hiddenLines.clear();
     }
     this.render();
   }
 
+  toggleLine(lineId) {
+    this.selectLineFilter(lineId);
+  }
+
   showAllLines() {
+    this.selectedLineFilter = null;
     this.hiddenLines.clear();
     this.render();
   }

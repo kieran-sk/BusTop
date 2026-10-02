@@ -425,6 +425,30 @@
   flex-wrap: wrap;
 }
 
+.ticker-later-departures {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #e8f0fe;
+  color: #1e3a8a;
+  padding: 3px 9px;
+  border-radius: 8px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  border: 1px solid #bfdbfe;
+  margin-top: 5px;
+  width: fit-content;
+}
+
+.ticker-later-departures .ticker-later-label {
+  color: #2563eb;
+  font-weight: 800;
+}
+
+.commute-none {
+  display: none !important;
+}
+
 .ticker-cell-due {
   display: flex;
   flex-direction: column;

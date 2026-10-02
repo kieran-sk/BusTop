@@ -132,12 +132,11 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
     }
   }
 
-  // Helper to prioritize active operational routes over defunct/school/variant lines
+  // Helper to prioritize active operational routes over defunct/school routes without penalizing branch variants (e.g. Γ*, Β*)
   const routeScore = (r) => {
     const descr = r.RouteDescr || '';
     let score = 100;
-    if (descr.startsWith('***')) score -= 60;
-    if (/^[Α-ΩA-Z]\*|^\*/.test(descr)) score -= 40;
+    if (descr.startsWith('***')) score -= 50;
     if (/σχολικ/i.test(descr)) score -= 30;
     if (/νυχτεριν/i.test(descr)) score -= 10;
     const lc = parseInt(r.LineCode, 10);
@@ -145,7 +144,7 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
     return score;
   };
 
-  // Group candidate routes by line_id so every line is represented
+  // Group candidate routes by line_id so every line and its distinct destination branches are represented
   const lineRoutesMap = new Map();
   for (const r of stopRoutes) {
     const lid = String(r.LineID || 'BUS').trim();
@@ -159,7 +158,7 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
     let count = 0;
     for (const r of routes) {
       const lc = String(r.LineCode);
-      if (!seenLineCodes.has(lc) && count < 2) {
+      if (!seenLineCodes.has(lc) && count < 4) {
         seenLineCodes.add(lc);
         candidateRoutes.push(r);
         count++;
@@ -225,16 +224,43 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
     } catch(e) {}
   }));
 
-  // Deduplicate exact line departures
+  // Deduplicate exact line departures without overwriting distinct route branches
   const deduplicatedMap = new Map();
   for (const a of results) {
     const key = a.is_live
       ? `${a.line_id}_live_${a.veh_code || a.route_code}_${a.btime2}`
-      : `${a.line_id}_sched_${a.departure_time}`;
+      : `${a.line_id}_sched_${a.route_code}_${a.departure_time}`;
     if (!deduplicatedMap.has(key)) deduplicatedMap.set(key, a);
   }
   const finalResults = Array.from(deduplicatedMap.values());
   finalResults.sort((a, b) => a.btime2 - b.btime2);
+
+  // Group chronologically by (line_id + destination) to compute subsequent departures ("Μετά XX:XX, YY:YY")
+  const arrivalsByRoute = new Map();
+  for (const a of finalResults) {
+    const dest = a.destination || cleanRouteDestination(a);
+    const key = `${a.line_id}_${dest}`;
+    if (!arrivalsByRoute.has(key)) arrivalsByRoute.set(key, []);
+    arrivalsByRoute.get(key).push(a);
+  }
+
+  for (const [key, arrList] of arrivalsByRoute.entries()) {
+    for (let i = 0; i < arrList.length; i++) {
+      const a = arrList[i];
+      const subsequent = [];
+      const seenTimes = new Set();
+      for (let j = i + 1; j < arrList.length; j++) {
+        const nextTime = arrList[j].estimated_arrival_time || arrList[j].departure_time;
+        if (nextTime && !seenTimes.has(nextTime)) {
+          seenTimes.add(nextTime);
+          subsequent.push(nextTime);
+          if (subsequent.length >= 2) break;
+        }
+      }
+      a.later_departures = subsequent;
+    }
+  }
+
   return { stop_code: stopCode, athens_time: athensNow.formatted, target_day: targetDay, total_arrivals: finalResults.length, arrivals: finalResults };
 }
 

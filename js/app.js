@@ -546,11 +546,6 @@ class AppController {
 
     // Load real-time OASA service disruptions & strike bulletins
     this.loadDisruptions();
-
-    // Initialize Journey Planner if available
-    if (window.JourneyPlanner && typeof window.JourneyPlanner.init === 'function') {
-      window.JourneyPlanner.init();
-    }
   }
 
   initGeolocation() {
@@ -798,13 +793,6 @@ class AppController {
       }
       // In all other tabs, show search bar
       if (searchBar) searchBar.style.display = '';
-    }
-
-    // When switching to Journey / Navigation tab
-    if (tabId === 'journey') {
-      if (window.JourneyPlanner && typeof window.JourneyPlanner.renderTab === 'function') {
-        window.JourneyPlanner.renderTab();
-      }
     }
 
     // Invalidate Leaflet Map size if on search / map tab

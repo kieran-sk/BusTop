@@ -213,10 +213,6 @@ const API = {
 
   async getDisruptions() {
     return this.fetchJson('/api/disruptions');
-  },
-
-  async planJourney(originLat, originLng, destLat, destLng) {
-    return this.fetchJson(`/api/routing/journey?originLat=${originLat}&originLng=${originLng}&destLat=${destLat}&destLng=${destLng}`);
   }
 };
 
