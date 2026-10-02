@@ -14,7 +14,7 @@ class AirportTicker {
     this.timerInterval = null;
     this.previousDigitsMap = new Map();
     this.hiddenLines = new Set();
-    this.selectedLineFilter = null;
+    this.selectedLines = new Set();
     this.showAllStops = false;
     this.modeFilter = 'all'; // 'all', 'live', 'scheduled'
     this.activeView = 'stops'; // 'stops' or 'lines'
@@ -236,7 +236,7 @@ class AirportTicker {
   setStopAndArrivals(stopInfo, arrivals = []) {
     if (this.currentStop && stopInfo && String(this.currentStop.StopCode) !== String(stopInfo.StopCode)) {
       this.hiddenLines.clear();
-      this.selectedLineFilter = null;
+      if (this.selectedLines) this.selectedLines.clear();
     }
     this.currentStop = stopInfo;
     this.arrivals = arrivals;
@@ -456,8 +456,8 @@ class AirportTicker {
       !a.triggered
     );
 
-    // Check if pinned for complex trips
-    const isPinned = window.PinnedTrips && window.PinnedTrips.isPinned(this.currentStop.StopCode, arr.line_id);
+    // Check if pinned for complex trips (specific arrival)
+    const isPinned = window.PinnedTrips && window.PinnedTrips.isArrivalPinned(this.currentStop.StopCode, arr);
 
     // Live location report latency string
     const reportAgo = arr.last_contact_ago_gr || arr.last_contact_ago;
@@ -849,10 +849,12 @@ class AirportTicker {
     // Extract unique line IDs for interactive show/hide filtering
     const uniqueLines = Array.from(new Set(this.arrivals.map(a => String(a.line_id || '').trim()).filter(Boolean)));
     
-    // Filter arrivals by line visibility (or selectedLineFilter)
+    // Filter arrivals by line visibility (multi-line selection)
     let visibleArrivals = this.arrivals.filter(a => {
       const lid = String(a.line_id || '').trim();
-      if (this.selectedLineFilter) return lid === this.selectedLineFilter;
+      if (this.selectedLines && this.selectedLines.size > 0) {
+        return this.selectedLines.has(lid);
+      }
       return !this.hiddenLines.has(lid);
     });
     
@@ -898,27 +900,28 @@ class AirportTicker {
       rowsHtml = visibleArrivals.map((arr, arrIdx) => this.renderArrivalRow(arr, arrIdx, walk)).join('');
     }
 
-    // Filter bar HTML when multiple lines serve this stop
+    // Filter bar HTML when multiple lines serve this stop (Multi-Line Selection)
     let filterBarHtml = '';
     if (uniqueLines.length > 1) {
-      const isAllActive = !this.selectedLineFilter && this.hiddenLines.size === 0;
+      const hasSelection = this.selectedLines && this.selectedLines.size > 0;
+      const isAllActive = !hasSelection && this.hiddenLines.size === 0;
       filterBarHtml = `
         <div class="ticker-filter-bar">
           <span class="ticker-filter-label">Γραμμές:</span>
           <div class="ticker-filter-pills">
-            <button class="ticker-filter-pill ${isAllActive ? 'is-active' : 'is-hidden'}" 
+            <button class="ticker-filter-pill ${isAllActive ? 'is-active' : ''}" 
               onclick="event.stopPropagation(); window.App.ticker.showAllLines()"
               title="Εμφάνιση όλων των γραμμών">
               <span class="ticker-filter-dot" style="background: ${isAllActive ? '#005ac1' : '#94a3b8'};"></span>
               Όλες
             </button>
             ${uniqueLines.map(lid => {
-              const isSelected = this.selectedLineFilter === lid || (!this.selectedLineFilter && !this.hiddenLines.has(lid));
+              const isSelected = hasSelection ? this.selectedLines.has(lid) : false;
               return `
-                <button class="ticker-filter-pill ${isSelected ? 'is-active' : 'is-hidden'}" 
-                  onclick="event.stopPropagation(); window.App.ticker.selectLineFilter('${lid}')"
-                  title="Φιλτράρισμα γραμμής ${lid}">
-                  <span class="ticker-filter-dot" style="background: ${isSelected ? '#005ac1' : '#94a3b8'};"></span>
+                <button class="ticker-filter-pill ${isSelected ? 'is-active' : (hasSelection ? 'is-hidden' : '')}" 
+                  onclick="event.stopPropagation(); window.App.ticker.toggleLineFilter('${lid}')"
+                  title="Επιλογή / Αποεπιλογή γραμμής ${lid}">
+                  <span class="ticker-filter-dot" style="background: ${isSelected ? '#005ac1' : (isAllActive ? '#005ac1' : '#94a3b8')};"></span>
                   ${lid}
                 </button>
               `;
@@ -946,23 +949,28 @@ class AirportTicker {
     this.startClock();
   }
 
-  selectLineFilter(lineId) {
+  toggleLineFilter(lineId) {
     const lid = String(lineId).trim();
-    if (this.selectedLineFilter === lid) {
-      this.selectedLineFilter = null;
+    if (!this.selectedLines) this.selectedLines = new Set();
+    if (this.selectedLines.has(lid)) {
+      this.selectedLines.delete(lid);
     } else {
-      this.selectedLineFilter = lid;
-      this.hiddenLines.clear();
+      this.selectedLines.add(lid);
     }
+    this.hiddenLines.clear();
     this.render();
   }
 
+  selectLineFilter(lineId) {
+    this.toggleLineFilter(lineId);
+  }
+
   toggleLine(lineId) {
-    this.selectLineFilter(lineId);
+    this.toggleLineFilter(lineId);
   }
 
   showAllLines() {
-    this.selectedLineFilter = null;
+    if (this.selectedLines) this.selectedLines.clear();
     this.hiddenLines.clear();
     this.render();
   }

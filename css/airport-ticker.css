@@ -313,15 +313,15 @@
 .ticker-filter-pill {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
+  gap: 5px;
+  padding: 4px 10px;
   border-radius: 9999px;
-  font-size: 0.75rem;
-  font-weight: 800;
+  font-size: 0.78rem;
+  font-weight: 700;
   cursor: pointer;
   background: #ffffff;
   color: #475569;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #cbd5e1;
   transition: all 0.15s ease;
   white-space: nowrap;
 }
@@ -329,13 +329,15 @@
 .ticker-filter-pill.is-active {
   background: #eff6ff;
   color: #005ac1;
-  border-color: #bfdbfe;
+  border-color: #005ac1;
+  font-weight: 800;
+  box-shadow: 0 1px 3px rgba(0, 90, 193, 0.15);
 }
 
 .ticker-filter-pill.is-hidden {
-  background: #f1f5f9;
+  background: #f8fafc;
   color: #94a3b8;
-  text-decoration: line-through;
+  border-color: #e2e8f0;
   opacity: 0.65;
 }
 

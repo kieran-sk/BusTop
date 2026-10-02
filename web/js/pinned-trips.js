@@ -18,6 +18,77 @@ class PinnedTripsManager {
     this.renderUI();
   }
 
+  getArrivalKey(stopCode, arr) {
+    if (!arr) return '';
+    const sCode = String(stopCode || '').trim();
+    const lId = String(arr.line_id || arr.LineID || 'BUS').trim().toUpperCase();
+    const rCode = String(arr.route_code || arr.RouteCode || '').trim();
+
+    if (arr.is_live && arr.veh_code) {
+      return `${sCode}_${lId}_${rCode}_veh_${arr.veh_code}`;
+    }
+    const clockTime = arr.departure_time || arr.estimated_arrival_time;
+    if (clockTime) {
+      return `${sCode}_${lId}_${rCode}_t_${clockTime}`;
+    }
+    const mins = typeof arr.btime2 === 'number' ? arr.btime2 : 0;
+    return `${sCode}_${lId}_${rCode}_m_${mins}`;
+  }
+
+  matchArrival(item, arr) {
+    if (!item || !arr) return false;
+    const sCode = String(item.stopCode || '').trim();
+    const lId = String(item.lineId || '').trim().toUpperCase();
+    const arrLid = String(arr.line_id || arr.LineID || '').trim().toUpperCase();
+    if (lId !== arrLid) return false;
+
+    // Check routeCode if both have it
+    if (item.routeCode && arr.route_code && String(item.routeCode).trim() !== String(arr.route_code).trim()) {
+      return false;
+    }
+
+    // 1. Vehicle code match (definite live GPS vehicle match)
+    if (item.vehCode && arr.veh_code && String(item.vehCode).trim() === String(arr.veh_code).trim()) {
+      return true;
+    }
+
+    // 2. Exact departure time match (scheduled departure)
+    if (item.departureTime && arr.departure_time && item.departureTime === arr.departure_time) {
+      return true;
+    }
+
+    // 3. Exact estimated arrival time match
+    if (item.estimatedArrivalTime && arr.estimated_arrival_time && item.estimatedArrivalTime === arr.estimated_arrival_time) {
+      return true;
+    }
+
+    // 4. Exact arrivalKey match
+    const arrKey = this.getArrivalKey(sCode, arr);
+    if (item.arrivalKey && arrKey && item.arrivalKey === arrKey) {
+      return true;
+    }
+
+    // 5. Target arrival timestamp proximity (within 3.5 minutes) for live GPS without vehCode
+    if (typeof arr.btime2 === 'number' && item.targetArrivalTimestamp) {
+      const currentEst = Date.now() + (arr.btime2 * 60 * 1000);
+      const diffMs = Math.abs(item.targetArrivalTimestamp - currentEst);
+      if (diffMs <= 3.5 * 60 * 1000) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  isArrivalPinned(stopCode, arrival) {
+    if (!stopCode || !arrival) return false;
+    const sCode = String(stopCode).trim();
+    return this.pinnedItems.some(item =>
+      String(item.stopCode).trim() === sCode &&
+      this.matchArrival(item, arrival)
+    );
+  }
+
   isPinned(stopCode, lineId) {
     if (!stopCode || !lineId) return false;
     const sCode = String(stopCode).trim();
@@ -34,15 +105,16 @@ class PinnedTripsManager {
     const lineId = String(arrival.line_id || arrival.LineID || 'BUS').trim();
     const routeCode = String(arrival.route_code || arrival.RouteCode || '').trim();
 
+    // Find if this SPECIFIC arrival is already pinned
     const existingIdx = this.pinnedItems.findIndex(item =>
       String(item.stopCode).trim() === stopCode &&
-      String(item.lineId).trim().toUpperCase() === lineId.toUpperCase()
+      this.matchArrival(item, arrival)
     );
 
     if (existingIdx !== -1) {
       const removed = this.pinnedItems.splice(existingIdx, 1)[0];
       this.save();
-      this.showToast(`Ξεκαρφιτσώθηκε η γραμμή ${lineId}`);
+      this.showToast(`Ξεκαρφιτσώθηκε η άφιξη ${lineId}`);
       if (window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
         window.Alarms.removeAlarmByStopAndLine(stopCode, lineId);
       }
@@ -56,8 +128,12 @@ class PinnedTripsManager {
       }
       this.updateLiveAndroidNotification();
     } else {
+      const busMins = (arrival && typeof arrival.btime2 === 'number') ? arrival.btime2 : 10;
+      const arrivalKey = this.getArrivalKey(stopCode, arrival);
+      const targetArrivalTimestamp = Date.now() + (Math.max(0, busMins) * 60 * 1000);
+
       const newItem = {
-        id: 'pin_' + Date.now(),
+        id: 'pin_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
         stopCode,
         stopName: stopInfo.StopDescr || `Στάση #${stopCode}`,
         stopStreet: stopInfo.StopStreet || '',
@@ -67,11 +143,20 @@ class PinnedTripsManager {
         lineDescr: arrival.route_descr || arrival.line_descr || '',
         routeCode,
         direction: arrival.direction || 'Μετάβαση',
+        destination: arrival.destination || arrival.route_descr || '',
+        vehCode: arrival.veh_code || null,
+        departureTime: arrival.departure_time || null,
+        estimatedArrivalTime: arrival.estimated_arrival_time || null,
+        isLive: !!arrival.is_live,
+        targetArrivalTimestamp,
+        arrivalKey,
         pinnedAt: Date.now()
       };
       this.pinnedItems.push(newItem);
       this.save();
-      this.showToast(`📌 Ζωντανή παρακολούθηση: ${lineId} (${newItem.stopName})`);
+
+      const timeLabel = arrival.departure_time ? ` (${arrival.departure_time})` : (busMins ? ` (σε ${busMins}')` : '');
+      this.showToast(`📌 Καρφιτσώθηκε: ${lineId}${timeLabel}`);
       if (window.App && typeof window.App.triggerHaptic === 'function') {
         window.App.triggerHaptic('success');
       }
@@ -92,7 +177,6 @@ class PinnedTripsManager {
 
       if (!hasActiveAlarm && window.AndroidBridge && typeof window.AndroidBridge.startLiveTracking === 'function') {
         try {
-          const busMins = (arrival && typeof arrival.btime2 === 'number') ? arrival.btime2 : 10;
           let walkMins = 0;
           if (stopInfo.distanceMeters) {
             walkMins = Math.ceil(stopInfo.distanceMeters / 80) + 2;
@@ -245,21 +329,56 @@ class PinnedTripsManager {
       }
     }));
 
-    // Auto-dismiss pinned trips when the bus arrives/departs (btime2 <= 0)
+    // Auto-dismiss pinned trips when the specific bus arrives/departs or has passed
     let autoDismissed = false;
+    const now = Date.now();
+
     for (const item of [...this.pinnedItems]) {
       const arrs = this.liveArrivals.get(item.stopCode) || [];
-      const match = arrs.find(a => 
-        String(a.line_id || a.LineID).trim().toUpperCase() === String(item.lineId).trim().toUpperCase() &&
-        (!item.routeCode || String(a.route_code) === String(item.routeCode))
-      );
-      if (match && typeof match.btime2 === 'number' && match.btime2 <= 0) {
+      const stopFetched = !this.failedStops.has(item.stopCode);
+      const match = arrs.find(a => this.matchArrival(item, a));
+
+      let shouldUnpin = false;
+
+      if (match) {
+        if (typeof match.btime2 === 'number') {
+          item.targetArrivalTimestamp = now + (match.btime2 * 60 * 1000);
+          if (match.veh_code) item.vehCode = match.veh_code;
+          if (match.is_live) item.isLive = true;
+          // Bus countdown reached 0 or less -> Arrived / Departed!
+          if (match.btime2 <= 0) {
+            shouldUnpin = true;
+          }
+        }
+      } else if (stopFetched) {
+        // Stop was successfully queried, but this specific bus is no longer in upcoming arrivals.
+        // Check if its expected arrival time has passed (give 30s grace period):
+        const expectedPassed = item.targetArrivalTimestamp && (now >= item.targetArrivalTimestamp - 30000);
+        const staleTimeout = (now - item.pinnedAt) > 45 * 60 * 1000;
+        if (expectedPassed || staleTimeout) {
+          shouldUnpin = true;
+        }
+      } else {
+        // If fetch failed but over 10 minutes past target arrival:
+        if (item.targetArrivalTimestamp && now > (item.targetArrivalTimestamp + 10 * 60 * 1000)) {
+          shouldUnpin = true;
+        }
+      }
+
+      if (shouldUnpin) {
+        console.log(`Auto-unpinning passed arrival: ${item.lineId} at stop ${item.stopCode}`);
         this.pinnedItems = this.pinnedItems.filter(p => p.id !== item.id);
         autoDismissed = true;
       }
     }
+
     if (autoDismissed) {
       this.save();
+      if (this.pinnedItems.length === 0) {
+        if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
+          try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
+        }
+      }
       if (window.App && window.App.ticker) {
         window.App.ticker.render();
       }
@@ -267,6 +386,31 @@ class PinnedTripsManager {
 
     this.renderUI();
     this.updateLiveAndroidNotification();
+  }
+
+  checkExpiredPins() {
+    if (this.pinnedItems.length === 0) return;
+    const now = Date.now();
+    let changed = false;
+    for (const item of [...this.pinnedItems]) {
+      const arrs = this.liveArrivals.get(item.stopCode);
+      if (Array.isArray(arrs) && !arrs.some(a => this.matchArrival(item, a)) && item.targetArrivalTimestamp && now >= item.targetArrivalTimestamp) {
+        this.pinnedItems = this.pinnedItems.filter(p => p.id !== item.id);
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.save();
+      if (this.pinnedItems.length === 0) {
+        if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
+          try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
+        }
+      }
+      if (window.App && window.App.ticker) {
+        window.App.ticker.render();
+      }
+      this.updateLiveAndroidNotification();
+    }
   }
 
   updateLiveAndroidNotification() {
@@ -289,10 +433,7 @@ class PinnedTripsManager {
 
     for (const item of this.pinnedItems) {
       const arrs = this.liveArrivals.get(item.stopCode) || [];
-      const match = arrs.find(a => 
-        String(a.line_id || a.LineID) === String(item.lineId) &&
-        (!item.routeCode || String(a.route_code) === String(item.routeCode))
-      );
+      const match = arrs.find(a => this.matchArrival(item, a));
       if (match && typeof match.btime2 === 'number') {
         if (match.btime2 < minMins) {
           minMins = match.btime2;
@@ -345,6 +486,7 @@ class PinnedTripsManager {
 
   startPolling() {
     if (this.timerInterval) clearInterval(this.timerInterval);
+    if (this.localCheckInterval) clearInterval(this.localCheckInterval);
     this.fetchAllPinnedArrivals();
     const isBatterySaver = window.App && typeof window.App.isBatterySaverEnabled === 'function' 
       ? window.App.isBatterySaverEnabled() 
@@ -355,12 +497,21 @@ class PinnedTripsManager {
         this.fetchAllPinnedArrivals();
       }
     }, intervalMs);
+    this.localCheckInterval = setInterval(() => {
+      if (!document.hidden) {
+        this.checkExpiredPins();
+      }
+    }, 5000);
   }
 
   stopPolling() {
     if (this.timerInterval) {
       clearInterval(this.timerInterval);
       this.timerInterval = null;
+    }
+    if (this.localCheckInterval) {
+      clearInterval(this.localCheckInterval);
+      this.localCheckInterval = null;
     }
   }
 
@@ -425,10 +576,7 @@ class PinnedTripsManager {
 
     const itemsHtml = this.pinnedItems.map((item, idx) => {
       const arrivalsForStop = this.liveArrivals.get(item.stopCode) || [];
-      const matchingArr = arrivalsForStop.find(a => 
-        String(a.line_id || a.LineID) === String(item.lineId) &&
-        (!item.routeCode || String(a.route_code) === String(item.routeCode))
-      );
+      const matchingArr = arrivalsForStop.find(a => this.matchArrival(item, a));
 
       let dueBadgeHtml = '';
       let walkMins = 3;
@@ -449,12 +597,16 @@ class PinnedTripsManager {
         walkMins = Math.ceil(walkDistanceM / 75) + 2;
       }
 
-      const isLive = matchingArr && matchingArr.is_live;
+      const isLive = matchingArr ? matchingArr.is_live : item.isLive;
       const isUrgent = (matchingArr && typeof matchingArr.btime2 === 'number' && matchingArr.btime2 <= 5);
       const cleanStopName = (item.stopName || '').replace(/'/g, "\\'");
       const cleanLineDescr = (item.lineDescr || '').replace(/'/g, "\\'");
       const displayMinutes = (matchingArr && typeof matchingArr.btime2 === 'number') ? matchingArr.btime2 : null;
-      const formattedTime = displayMinutes !== null ? this.formatMinutesHuman(displayMinutes) : (matchingArr && matchingArr.estimated_arrival_time ? matchingArr.estimated_arrival_time : '--');
+      const formattedTime = displayMinutes !== null 
+        ? this.formatMinutesHuman(displayMinutes) 
+        : (matchingArr && matchingArr.estimated_arrival_time 
+            ? matchingArr.estimated_arrival_time 
+            : (item.departureTime || item.estimatedArrivalTime || '--'));
 
       return `
         <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem; margin-bottom: 0; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-left: 4px solid ${isUrgent ? '#ea580c' : 'var(--md-sys-color-primary)'}; cursor: pointer;" onclick="window.App.switchTab('ticker'); window.App.selectStop('${item.stopCode}', '${cleanStopName}', ${item.stopLat || 'null'}, ${item.stopLng || 'null'});">
@@ -466,13 +618,13 @@ class PinnedTripsManager {
               <div style="min-width: 0; flex: 1;">
                 <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: normal; overflow-wrap: normal; hyphens: none;">${item.stopName}</div>
                 <div style="font-size: 0.76rem; color: var(--md-sys-color-outline); margin-top: 2px;">
-                  ${item.direction ? `<strong style="color: var(--md-sys-color-primary); margin-right: 4px;">${item.direction}</strong> • ` : ''}Στάση #${item.stopCode} • <span style="color: var(--md-sys-color-primary); text-decoration: underline;">Προβολή στάσης ➜</span>
+                  ${item.direction ? `<strong style="color: var(--md-sys-color-primary); margin-right: 4px;">${item.direction}</strong> • ` : ''}${item.departureTime ? `<strong style="color: #475569; margin-right: 4px;">🕒 Αναχώρηση: ${item.departureTime}</strong> • ` : ''}Στάση #${item.stopCode} • <span style="color: var(--md-sys-color-primary); text-decoration: underline;">Προβολή στάσης ➜</span>
                 </div>
               </div>
             </div>
             <div style="text-align: right; flex-shrink: 0;">
               <span class="m3-badge" style="background: ${isLive ? '#dcfce7' : '#e0f2fe'}; color: ${isLive ? '#15803d' : '#005ac1'}; font-size: 0.72rem; font-weight: 800; padding: 2px 7px;">
-                ${isLive ? `⚡ ~${formattedTime}` : (displayMinutes !== null ? `🕒 ~${formattedTime}` : '⏳ Αναμονή')}
+                ${isLive ? `⚡ ~${formattedTime}` : (displayMinutes !== null ? `🕒 ~${formattedTime}` : (item.departureTime ? `🕒 ${item.departureTime}` : '⏳ Αναμονή'))}
               </span>
             </div>
           </div>
