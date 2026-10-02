@@ -15,7 +15,6 @@ class AirportTicker {
     this.previousDigitsMap = new Map();
     this.hiddenLines = new Set();
     this.selectedLineFilter = null;
-    this.groupSummary = true;
     this.showAllStops = false;
     this.modeFilter = 'all'; // 'all', 'live', 'scheduled'
     this.activeView = 'stops'; // 'stops' or 'lines'
@@ -465,15 +464,6 @@ class AirportTicker {
 
     const walkMins = (walk && typeof walk.minutes === 'number') ? walk.minutes : null;
 
-    let laterDeparturesHtml = '';
-    if (Array.isArray(arr.later_departures) && arr.later_departures.length > 0) {
-      laterDeparturesHtml = `
-        <div class="ticker-later-departures">
-          <span class="ticker-later-label">Μετά</span> ${arr.later_departures.join(', ')}
-        </div>
-      `;
-    }
-
     return `
       <div class="ticker-row" onclick="if(window.App && window.App.triggerHaptic) window.App.triggerHaptic('tick'); window.App.openLineTimetableBothDirections('${arr.line_code}', '${arr.line_id}', '${safeDescr}')" title="Κλικ για προβολή πλήρους δρομολογίου και στάσεων">
         <!-- Top Section: Line Badge, Destination, Direction, GPS Status & Labeled Arrival Countdown -->
@@ -501,7 +491,6 @@ class AirportTicker {
               `}
               ${lineDescr && arr.destination && lineDescr !== arr.destination ? `<span style="font-size: 0.7rem; color: #94a3b8;">• ${lineDescr}</span>` : ''}
             </div>
-            ${laterDeparturesHtml}
           </div>
           <div class="ticker-cell-due" title="Εκτιμώμενος χρόνος άφιξης στη στάση">
             <span class="ticker-due-sublabel">Άφιξη</span>
@@ -874,25 +863,6 @@ class AirportTicker {
       visibleArrivals = visibleArrivals.filter(a => !a.is_live);
     }
 
-    // Group arrivals by distinct service/destination so each line branch displays its next departure + subsequent departures ("Μετά XX:XX, YY:YY")
-    let displayArrivals = visibleArrivals;
-    if (this.groupSummary !== false) {
-      const seenRouteService = new Set();
-      displayArrivals = [];
-      for (const a of visibleArrivals) {
-        const k = `${a.line_id}_${a.destination || a.route_code}`;
-        if (a.is_live) {
-          displayArrivals.push(a);
-          seenRouteService.add(k);
-        } else {
-          if (!seenRouteService.has(k)) {
-            seenRouteService.add(k);
-            displayArrivals.push(a);
-          }
-        }
-      }
-    }
-
     let rowsHtml = '';
     if (this.arrivals.length === 0) {
       rowsHtml = `
@@ -924,8 +894,8 @@ class AirportTicker {
         </div>
       `;
     } else {
-      // Clean, grouped arrival rows matching official OASA app with subsequent departures preview
-      rowsHtml = displayArrivals.map((arr, arrIdx) => this.renderArrivalRow(arr, arrIdx, walk)).join('');
+      // Show upcoming lines and departures as separate arrivals in chronological order
+      rowsHtml = visibleArrivals.map((arr, arrIdx) => this.renderArrivalRow(arr, arrIdx, walk)).join('');
     }
 
     // Filter bar HTML when multiple lines serve this stop
