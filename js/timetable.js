@@ -131,10 +131,10 @@ class TimetableManager {
             <span style="font-family: 'Roboto Mono', monospace; font-size: 1.05rem; font-weight: 800; color: ${isNext ? '#005ac1' : '#0f172a'};">
               ${formatted}
             </span>
-            ${isNext ? `<span class="m3-badge m3-badge-live" style="font-size: 0.68rem; padding: 1px 6px;">Επόμενο σε ${diff}λ</span>` : ''}
+            ${isNext ? `<span class="m3-badge m3-badge-live" style="font-size: 0.68rem; padding: 1px 6px;">Επόμενο σε ${diff}'</span>` : ''}
           </div>
           <div style="font-size: 0.78rem; font-weight: 600; color: ${isNext ? '#005ac1' : '#64748b'};">
-            ${isPast ? 'Αναχώρησε' : isNext ? 'Επικείμενο' : `Σε ${diff}λ`}
+            ${isPast ? 'Αναχώρησε' : isNext ? 'Επικείμενο' : `Σε ${diff}'`}
           </div>
         </div>
       `;

@@ -348,7 +348,7 @@ class LiveTrackingService : Service() {
         )
 
         val timeFormatted = NotificationHelper.formatMinutesHuman(mins)
-        val shortText = if (mins <= 0) "ΤΩΡΑ" else "${mins}λ"
+        val shortText = if (mins <= 0) "ΤΩΡΑ" else "${mins}'"
         val dirPart = if (destination.isNotBlank()) " προς $destination" else ""
         val title = if (mins <= 0) "🚨 $lineId$dirPart • ΕΦΤΑΣΕ!" else "🚍 $lineId$dirPart • σε $timeFormatted"
         val content = "📍 Στάση: $stopName"
@@ -371,19 +371,24 @@ class LiveTrackingService : Service() {
         val targetTimestamp = System.currentTimeMillis() + (mins * 60 * 1000L)
 
         val builder = NotificationCompat.Builder(this, NotificationHelper.LIVE_CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification_bus)
             .setContentTitle(title)
             .setContentText(content)
             .setSubText(shortText)
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .bigText("$content\n$title")
+                    .setSummaryText(shortText)
+            )
             .setProgress(maxMins, progress, false)
-            .setOngoing(false)
-            .setAutoCancel(true)
-            .setDeleteIntent(pDismiss)
+            .setOngoing(true)
+            .setAutoCancel(false)
             .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setColor(accentColor)
+            .setColorized(true)
             .setContentIntent(pLaunch)
             .setWhen(targetTimestamp)
             .setShowWhen(true)
@@ -393,14 +398,20 @@ class LiveTrackingService : Service() {
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "🛑 Τερματισμός", pStop)
 
         try {
+            val mPromote = builder.javaClass.getMethod("setRequestPromotedOngoing", Boolean::class.javaPrimitiveType)
+            mPromote.invoke(builder, true)
+        } catch (e: Throwable) {}
+
+        try {
             val method = builder.javaClass.getMethod("setShortCriticalText", CharSequence::class.java)
             method.invoke(builder, shortText)
         } catch (e: Throwable) {}
 
         val notif = builder.build()
         try {
-            notif.extras.putCharSequence("android.shortCriticalText", shortText)
             notif.extras.putBoolean("android.requestPromotedOngoing", true)
+            notif.extras.putCharSequence("android.shortCriticalText", shortText)
+            notif.extras.putCharSequence("android.substName", shortText)
         } catch (e: Throwable) {}
 
         return notif

@@ -360,7 +360,7 @@ class MetroManager {
           <div style="display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: #64748b; margin-top: 4px;">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"/><circle cx="12" cy="10" r="3"/></svg>
             <span>${distMeters > 1000 ? (distMeters / 1000).toFixed(1) + ' χλμ.' : distMeters + ' μ.'}</span>
-            <span>• ~${walkMins}λ. με τα πόδια</span>
+            <span>• ~${walkMins}' με τα πόδια</span>
           </div>
         `;
       }

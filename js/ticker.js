@@ -366,7 +366,7 @@ class AirportTicker {
     const buffer = busMinutes - walkMinutes;
     const absBuf = Math.abs(buffer);
     const formattedBuf = this.formatMinutesHuman(absBuf);
-    const sign = buffer > 0 ? `+${formattedBuf}` : (buffer < 0 ? `-${formattedBuf}` : '0λ');
+    const sign = buffer > 0 ? `+${formattedBuf}` : (buffer < 0 ? `-${formattedBuf}` : "0'");
 
     if (buffer >= 5) {
       return {
@@ -391,7 +391,7 @@ class AirportTicker {
         label: sign,
         displayLabel: `⚠️ ${sign}`,
         shortLabel: `⚠️ ${sign}`,
-        tooltip: `Το λεωφορείο αναμένεται ${formattedBuf} πριν φτάσετε στη στάση (χρειάζεστε ${walkMinutes}λ περπάτημα).`,
+        tooltip: `Το λεωφορείο αναμένεται ${formattedBuf} πριν φτάσετε στη στάση (χρειάζεστε ${walkMinutes}' περπάτημα).`,
         className: 'commute-hurry',
         buffer
       };
@@ -426,7 +426,7 @@ class AirportTicker {
       if (busMins >= 60) {
         timeText = this.formatMinutesHuman(busMins);
       } else {
-        timeText = `${String(busMins).padStart(2, '0')}λ`;
+        timeText = String(busMins).padStart(2, '0');
       }
 
       if (busMins <= 3) {
@@ -755,7 +755,7 @@ class AirportTicker {
               const sStreet = s.StopStreet || '';
               const walk = this.getWalkMinutes(s.StopLat, s.StopLng);
               const distText = s.distanceMeters ? `${Math.round(s.distanceMeters)}m` : (s.Distance ? `${Math.round(s.Distance)}m` : (walk ? `${walk.meters}m` : ''));
-              const walkText = walk ? `~${walk.minutes}λ` : '';
+              const walkText = walk ? `~${walk.minutes}'` : '';
               
               const hasRoutes = Array.isArray(s.serving_lines) && s.serving_lines.length > 0;
               let linesPills = '';

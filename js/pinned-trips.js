@@ -455,7 +455,7 @@ class PinnedTripsManager {
 
     if (closestItem) {
       const { item, match, mins } = closestItem;
-      const title = `🚌 ${item.lineId}: Άφιξη σε ${mins}λ`;
+      const title = `🚌 ${item.lineId}: Άφιξη σε ${mins}'`;
       const body = `${item.stopName} • ${item.lineDescr || 'Διαδρομή'}${match.is_live ? ' (Ζωντανό GPS)' : ''}`;
 
       // Update Service Worker Live Ongoing Notification

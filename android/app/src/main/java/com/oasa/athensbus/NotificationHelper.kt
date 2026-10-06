@@ -15,10 +15,10 @@ object NotificationHelper {
     const val CHANNEL_NAME = "Bus Proximity Alarms"
 
     fun formatMinutesHuman(mins: Int): String {
-        if (mins < 60) return "${mins}λ"
+        if (mins < 60) return "${mins}'"
         val hours = mins / 60
         val rem = mins % 60
-        return if (rem > 0) "${hours}ω ${rem}λ" else "${hours}ω"
+        return if (rem > 0) "${hours}ω ${rem}'" else "${hours}ω"
     }
 
     fun createNotificationChannel(context: Context) {
@@ -89,20 +89,24 @@ object NotificationHelper {
         notificationManager.notify(notifId, notification)
     }
 
-    const val LIVE_CHANNEL_ID = "oasa_bus_live_channel_v6"
+    const val LIVE_CHANNEL_ID = "oasa_bus_live_channel_v7"
     const val LIVE_CHANNEL_NAME = "Live Bus Tracking"
     const val LIVE_NOTIF_ID = 2001
 
     fun createLiveNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(LIVE_CHANNEL_ID, LIVE_CHANNEL_NAME, NotificationManager.IMPORTANCE_LOW).apply {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            try {
+                notificationManager.deleteNotificationChannel("oasa_bus_live_channel_v6")
+            } catch (e: Exception) {}
+
+            val channel = NotificationChannel(LIVE_CHANNEL_ID, LIVE_CHANNEL_NAME, NotificationManager.IMPORTANCE_DEFAULT).apply {
                 description = "Rich Ongoing Live Activity pill showing bus arrival countdown, stop, and status"
                 setShowBadge(true)
                 setSound(null, null)
                 enableVibration(false)
                 lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
             }
-            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
         }
     }
@@ -142,7 +146,7 @@ object NotificationHelper {
         )
 
         val timeFormatted = formatMinutesHuman(minutesAway)
-        val shortText = if (minutesAway <= 0) "ΤΩΡΑ" else "${minutesAway}λ"
+        val shortText = if (minutesAway <= 0) "ΤΩΡΑ" else "${minutesAway}'"
         val dirPart = if (destination.isNotBlank()) " προς $destination" else ""
         val title = if (minutesAway <= 0) "🚨 $lineId$dirPart • ΕΦΤΑΣΕ!" else "🚍 $lineId$dirPart • σε $timeFormatted"
         val content = "📍 Στάση: $stopName"
@@ -165,19 +169,24 @@ object NotificationHelper {
         val targetTimestamp = System.currentTimeMillis() + (minutesAway * 60 * 1000L)
 
         val builder = NotificationCompat.Builder(context, LIVE_CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification_bus)
             .setContentTitle(title)
             .setContentText(content)
             .setSubText(shortText)
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .bigText("$content\n$title")
+                    .setSummaryText(shortText)
+            )
             .setProgress(maxMins, progress, false)
-            .setOngoing(false)
-            .setAutoCancel(true)
-            .setDeleteIntent(pStop)
+            .setOngoing(true)
+            .setAutoCancel(false)
             .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setColor(accentColor)
+            .setColorized(true)
             .setContentIntent(pendingIntent)
             .setWhen(targetTimestamp)
             .setShowWhen(true)
@@ -187,14 +196,20 @@ object NotificationHelper {
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "🛑 Τερματισμός", pStop)
 
         try {
+            val mPromote = builder.javaClass.getMethod("setRequestPromotedOngoing", Boolean::class.javaPrimitiveType)
+            mPromote.invoke(builder, true)
+        } catch (e: Throwable) {}
+
+        try {
             val method = builder.javaClass.getMethod("setShortCriticalText", CharSequence::class.java)
             method.invoke(builder, shortText)
         } catch (e: Throwable) {}
 
         val notification = builder.build()
         try {
-            notification.extras.putCharSequence("android.shortCriticalText", shortText)
             notification.extras.putBoolean("android.requestPromotedOngoing", true)
+            notification.extras.putCharSequence("android.shortCriticalText", shortText)
+            notification.extras.putCharSequence("android.substName", shortText)
         } catch (e: Throwable) {}
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
