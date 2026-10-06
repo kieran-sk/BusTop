@@ -405,6 +405,18 @@
 
       <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.25rem;">
 
+        <!-- Android Live Updates / Status Bar Chip Settings -->
+        <div id="android-live-chip-card" style="display: none; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 12px; padding: 0.9rem;">
+          <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); display: flex; align-items: center; gap: 6px; margin-bottom: 0.3rem;">
+            <span>💊 Status Bar System Chip (Pixel / Android)</span>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--md-sys-color-outline); margin-bottom: 0.75rem; line-height: 1.4;">
+            Για να εμφανίζεται η αντίστροφη μέτρηση ως <strong>System Chip (χαπάκι)</strong> δίπλα στο ρολόι της γραμμής κατάστασης, βεβαιωθείτε ότι είναι ενεργοποιημένη η επιλογή <strong>«Ζωντανές ενημερώσεις / Live updates»</strong> στις ρυθμίσεις του Android.
+          </div>
+          <button class="m3-btn m3-btn-tonal" onclick="if(window.AndroidBridge && window.AndroidBridge.openLiveUpdatesSettings) window.AndroidBridge.openLiveUpdatesSettings()" style="width: 100%; font-size: 0.8rem; justify-content: center; padding: 0.5rem;">
+            ⚙️ Άνοιγμα Ρυθμίσεων Ειδοποιήσεων Android
+          </button>
+        </div>
 
         <!-- Battery Saver Mode for Live Tracking -->
         <div style="background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-radius: 12px; padding: 0.9rem;">
@@ -559,14 +571,14 @@
   </nav>
 
   <!-- Scripts (Cache-busted with defer for non-blocking execution) -->
-  <script defer src="js/api.js?v=20261006_1030"></script>
-  <script defer src="js/map-manager.js?v=20261006_1030"></script>
-  <script defer src="js/ticker.js?v=20261006_1030"></script>
-  <script defer src="js/alarms.js?v=20261006_1030"></script>
-  <script defer src="js/pinned-trips.js?v=20261006_1030"></script>
-  <script defer src="js/timetable.js?v=20261006_1030"></script>
-  <script defer src="js/search.js?v=20261006_1030"></script>
-  <script defer src="js/favorites.js?v=20261006_1030"></script>
-  <script defer src="js/app.js?v=20261006_1030"></script>
+  <script defer src="js/api.js?v=20261006_2245"></script>
+  <script defer src="js/map-manager.js?v=20261006_2245"></script>
+  <script defer src="js/ticker.js?v=20261006_2245"></script>
+  <script defer src="js/alarms.js?v=20261006_2245"></script>
+  <script defer src="js/pinned-trips.js?v=20261006_2245"></script>
+  <script defer src="js/timetable.js?v=20261006_2245"></script>
+  <script defer src="js/search.js?v=20261006_2245"></script>
+  <script defer src="js/favorites.js?v=20261006_2245"></script>
+  <script defer src="js/app.js?v=20261006_2245"></script>
 </body>
 </html>

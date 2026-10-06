@@ -67,6 +67,10 @@ class AppController {
       this.syncBatterySaverUI();
       this.updateOfflineCacheCount();
       this.updateBackButtonsVisibility();
+      const chipCard = document.getElementById('android-live-chip-card');
+      if (chipCard && window.AndroidBridge) {
+        chipCard.style.display = 'block';
+      }
     }
   }
 

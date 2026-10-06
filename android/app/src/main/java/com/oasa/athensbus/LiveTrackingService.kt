@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.graphics.drawable.Icon
 import androidx.core.app.NotificationCompat
 import android.os.PowerManager
 import kotlinx.coroutines.CoroutineScope
@@ -360,6 +361,7 @@ class LiveTrackingService : Service() {
             putBoolean("android.requestPromotedOngoing", true)
             putCharSequence("android.shortCriticalText", shortText)
             putCharSequence("android.substName", shortText)
+            putString("android.template", "android.app.Notification\$BigTextStyle")
         }
 
         val accentColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -370,48 +372,82 @@ class LiveTrackingService : Service() {
 
         val targetTimestamp = System.currentTimeMillis() + (mins * 60 * 1000L)
 
-        val builder = NotificationCompat.Builder(this, NotificationHelper.LIVE_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_notification_bus)
-            .setContentTitle(title)
-            .setContentText(content)
-            .setSubText(shortText)
-            .setStyle(
-                NotificationCompat.BigTextStyle()
-                    .bigText("$content\n$title")
-                    .setSummaryText(shortText)
-            )
-            .setProgress(maxMins, progress, false)
-            .setOngoing(true)
-            .setAutoCancel(false)
-            .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setCategory(NotificationCompat.CATEGORY_STATUS)
-            .setColor(accentColor)
-            .setColorized(true)
-            .setContentIntent(pLaunch)
-            .setWhen(targetTimestamp)
-            .setShowWhen(true)
-            .setUsesChronometer(mins > 0)
-            .setChronometerCountDown(true)
-            .addExtras(extras)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "🛑 Τερματισμός", pStop)
+        val notif: Notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val nBuilder = Notification.Builder(this, NotificationHelper.LIVE_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification_bus)
+                .setContentTitle(title)
+                .setContentText(content)
+                .setSubText(shortText)
+                .setStyle(Notification.BigTextStyle().bigText("$content\n$title").setSummaryText(shortText))
+                .setProgress(maxMins, progress, false)
+                .setOngoing(true)
+                .setAutoCancel(false)
+                .setOnlyAlertOnce(true)
+                .setColor(accentColor)
+                .setColorized(true)
+                .setContentIntent(pLaunch)
+                .setWhen(targetTimestamp)
+                .setShowWhen(true)
+                .setUsesChronometer(mins > 0)
+                .setChronometerCountDown(true)
+                .setCategory(Notification.CATEGORY_STATUS)
+                .setVisibility(Notification.VISIBILITY_PUBLIC)
+                .addExtras(extras)
+                .addAction(
+                    Notification.Action.Builder(
+                        Icon.createWithResource(this, android.R.drawable.ic_menu_close_clear_cancel),
+                        "🛑 Τερματισμός",
+                        pStop
+                    ).build()
+                )
 
-        try {
-            val mPromote = builder.javaClass.getMethod("setRequestPromotedOngoing", Boolean::class.javaPrimitiveType)
-            mPromote.invoke(builder, true)
-        } catch (e: Throwable) {}
+            try {
+                val mPromote = nBuilder.javaClass.getMethod("setRequestPromotedOngoing", Boolean::class.javaPrimitiveType)
+                mPromote.invoke(nBuilder, true)
+            } catch (e: Throwable) {}
 
-        try {
-            val method = builder.javaClass.getMethod("setShortCriticalText", CharSequence::class.java)
-            method.invoke(builder, shortText)
-        } catch (e: Throwable) {}
+            try {
+                val method = nBuilder.javaClass.getMethod("setShortCriticalText", CharSequence::class.java)
+                method.invoke(nBuilder, shortText)
+            } catch (e: Throwable) {}
 
-        val notif = builder.build()
+            nBuilder.build()
+        } else {
+            val builder = NotificationCompat.Builder(this, NotificationHelper.LIVE_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification_bus)
+                .setContentTitle(title)
+                .setContentText(content)
+                .setSubText(shortText)
+                .setStyle(
+                    NotificationCompat.BigTextStyle()
+                        .bigText("$content\n$title")
+                        .setSummaryText(shortText)
+                )
+                .setProgress(maxMins, progress, false)
+                .setOngoing(true)
+                .setAutoCancel(false)
+                .setOnlyAlertOnce(true)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setCategory(NotificationCompat.CATEGORY_STATUS)
+                .setColor(accentColor)
+                .setColorized(true)
+                .setContentIntent(pLaunch)
+                .setWhen(targetTimestamp)
+                .setShowWhen(true)
+                .setUsesChronometer(mins > 0)
+                .setChronometerCountDown(true)
+                .addExtras(extras)
+                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "🛑 Τερματισμός", pStop)
+
+            builder.build()
+        }
+
         try {
             notif.extras.putBoolean("android.requestPromotedOngoing", true)
             notif.extras.putCharSequence("android.shortCriticalText", shortText)
             notif.extras.putCharSequence("android.substName", shortText)
+            notif.extras.putString("android.template", "android.app.Notification\$BigTextStyle")
         } catch (e: Throwable) {}
 
         return notif

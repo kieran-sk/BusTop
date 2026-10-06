@@ -555,6 +555,38 @@ class MainActivity : FragmentActivity() {
                 "{}"
             }
         }
+
+        @JavascriptInterface
+        fun canPostPromotedNotifications(): Boolean {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            return try {
+                val method = nm.javaClass.getMethod("canPostPromotedNotifications")
+                method.invoke(nm) as? Boolean ?: true
+            } catch (e: Throwable) {
+                true
+            }
+        }
+
+        @JavascriptInterface
+        fun openLiveUpdatesSettings() {
+            runOnUiThread {
+                val intentList = listOf(
+                    Intent("android.settings.APP_NOTIFICATION_PROMOTION_SETTINGS").apply {
+                        putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                    },
+                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                        putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                    }
+                )
+                for (intent in intentList) {
+                    try {
+                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        context.startActivity(intent)
+                        return@runOnUiThread
+                    } catch (e: Exception) {}
+                }
+            }
+        }
     }
 
     @Deprecated("Deprecated in Java")
