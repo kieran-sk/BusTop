@@ -802,9 +802,12 @@ class AppController {
       }, 150);
     }
 
-    // Handle Pinned Trips Polling
+    // Handle Pinned Trips Polling & Immediate UI Render
     if (tabId === 'pinned') {
-      if (window.PinnedTrips) window.PinnedTrips.startPolling();
+      if (window.PinnedTrips) {
+        window.PinnedTrips.renderUI();
+        window.PinnedTrips.startPolling();
+      }
     } else {
       if (window.PinnedTrips) window.PinnedTrips.stopPolling();
     }

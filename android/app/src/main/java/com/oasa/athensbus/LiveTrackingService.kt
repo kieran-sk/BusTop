@@ -46,6 +46,7 @@ class LiveTrackingService : Service() {
     companion object {
         const val ACTION_START = "ACTION_START_LIVE_TRACKING"
         const val ACTION_STOP = "ACTION_STOP_LIVE_TRACKING"
+        const val ACTION_STOP_SERVICE_ONLY = "ACTION_STOP_LIVE_TRACKING_SERVICE_ONLY"
 
         const val EXTRA_STOP_CODE = "EXTRA_STOP_CODE"
         const val EXTRA_LINE_ID = "EXTRA_LINE_ID"
@@ -121,6 +122,15 @@ class LiveTrackingService : Service() {
             return START_NOT_STICKY
         }
 
+        if (intent?.action == ACTION_STOP_SERVICE_ONLY) {
+            pollingJob?.cancel()
+            pollingJob = null
+            releaseWakeLock()
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
         acquireWakeLock()
 
         val newStop = intent?.getStringExtra(EXTRA_STOP_CODE) ?: ""
@@ -145,10 +155,14 @@ class LiveTrackingService : Service() {
             ringUntilDismissed = false
             isAlarmTriggered = true
             AlarmRingingService.dismiss(this)
-        } else if (!isSameTrip) {
+        }
+
+        if (!isSameTrip) {
             initialMinutes = newInitMins
             startedAtMs = System.currentTimeMillis()
-            isAlarmTriggered = false
+            if (newThreshold > 0) {
+                isAlarmTriggered = false
+            }
         }
 
         NotificationHelper.createLiveNotificationChannel(this)
@@ -323,6 +337,16 @@ class LiveTrackingService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
+        val dismissIntent = Intent(this, LiveTrackingService::class.java).apply {
+            action = ACTION_STOP_SERVICE_ONLY
+        }
+        val pDismiss = PendingIntent.getService(
+            this,
+            2,
+            dismissIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
         val timeFormatted = NotificationHelper.formatMinutesHuman(mins)
         val shortText = if (mins <= 0) "ΤΩΡΑ" else "${mins}λ"
         val dirPart = if (destination.isNotBlank()) " προς $destination" else ""
@@ -354,7 +378,7 @@ class LiveTrackingService : Service() {
             .setProgress(maxMins, progress, false)
             .setOngoing(false)
             .setAutoCancel(true)
-            .setDeleteIntent(pStop)
+            .setDeleteIntent(pDismiss)
             .setOnlyAlertOnce(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)

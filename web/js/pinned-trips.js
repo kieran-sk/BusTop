@@ -53,12 +53,12 @@ class PinnedTripsManager {
     }
 
     // 2. Exact departure time match (scheduled departure)
-    if (item.departureTime && arr.departure_time && item.departureTime === arr.departure_time) {
+    if (item.departureTime && arr.departure_time && String(item.departureTime).trim() === String(arr.departure_time).trim()) {
       return true;
     }
 
     // 3. Exact estimated arrival time match
-    if (item.estimatedArrivalTime && arr.estimated_arrival_time && item.estimatedArrivalTime === arr.estimated_arrival_time) {
+    if (item.estimatedArrivalTime && arr.estimated_arrival_time && String(item.estimatedArrivalTime).trim() === String(arr.estimated_arrival_time).trim()) {
       return true;
     }
 
@@ -68,11 +68,12 @@ class PinnedTripsManager {
       return true;
     }
 
-    // 5. Target arrival timestamp proximity (within 3.5 minutes) for live GPS without vehCode
+    // 5. Target arrival timestamp proximity (within 8 minutes) for live GPS without vehCode or shifting ETA
     if (typeof arr.btime2 === 'number' && item.targetArrivalTimestamp) {
-      const currentEst = Date.now() + (arr.btime2 * 60 * 1000);
+      const now = Date.now();
+      const currentEst = now + (arr.btime2 * 60 * 1000);
       const diffMs = Math.abs(item.targetArrivalTimestamp - currentEst);
-      if (diffMs <= 3.5 * 60 * 1000) {
+      if (diffMs <= 8 * 60 * 1000) {
         return true;
       }
     }
@@ -100,8 +101,9 @@ class PinnedTripsManager {
   }
 
   togglePin(arrival, stopInfo) {
-    if (!stopInfo || !arrival) return;
-    const stopCode = String(stopInfo.StopCode).trim();
+    const currentStop = stopInfo || (window.App && window.App.ticker && window.App.ticker.currentStop) || (window.App && window.App.currentStop);
+    if (!currentStop || !arrival) return;
+    const stopCode = String(currentStop.StopCode || currentStop.code || '').trim();
     const lineId = String(arrival.line_id || arrival.LineID || 'BUS').trim();
     const routeCode = String(arrival.route_code || arrival.RouteCode || '').trim();
 
@@ -130,15 +132,16 @@ class PinnedTripsManager {
     } else {
       const busMins = (arrival && typeof arrival.btime2 === 'number') ? arrival.btime2 : 10;
       const arrivalKey = this.getArrivalKey(stopCode, arrival);
-      const targetArrivalTimestamp = Date.now() + (Math.max(0, busMins) * 60 * 1000);
+      const now = Date.now();
+      const targetArrivalTimestamp = now + (Math.max(0, busMins) * 60 * 1000);
 
       const newItem = {
-        id: 'pin_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        id: 'pin_' + now + '_' + Math.random().toString(36).substr(2, 5),
         stopCode,
-        stopName: stopInfo.StopDescr || `Στάση #${stopCode}`,
-        stopStreet: stopInfo.StopStreet || '',
-        stopLat: stopInfo.StopLat,
-        stopLng: stopInfo.StopLng,
+        stopName: currentStop.StopDescr || currentStop.name || `Στάση #${stopCode}`,
+        stopStreet: currentStop.StopStreet || '',
+        stopLat: currentStop.StopLat || currentStop.lat,
+        stopLng: currentStop.StopLng || currentStop.lng,
         lineId,
         lineDescr: arrival.route_descr || arrival.line_descr || '',
         routeCode,
@@ -148,14 +151,15 @@ class PinnedTripsManager {
         departureTime: arrival.departure_time || null,
         estimatedArrivalTime: arrival.estimated_arrival_time || null,
         isLive: !!arrival.is_live,
+        initialMinutes: Math.max(0, busMins),
         targetArrivalTimestamp,
         arrivalKey,
-        pinnedAt: Date.now()
+        pinnedAt: now
       };
       this.pinnedItems.push(newItem);
       this.save();
 
-      const timeLabel = arrival.departure_time ? ` (${arrival.departure_time})` : (busMins ? ` (σε ${busMins}')` : '');
+      const timeLabel = arrival.departure_time ? ` (${arrival.departure_time})` : (typeof busMins === 'number' ? (busMins === 0 ? ' (ΤΩΡΑ)' : ` (σε ${busMins}')`) : '');
       this.showToast(`📌 Καρφιτσώθηκε: ${lineId}${timeLabel}`);
       if (window.App && typeof window.App.triggerHaptic === 'function') {
         window.App.triggerHaptic('success');
@@ -178,8 +182,8 @@ class PinnedTripsManager {
       if (!hasActiveAlarm && window.AndroidBridge && typeof window.AndroidBridge.startLiveTracking === 'function') {
         try {
           let walkMins = 0;
-          if (stopInfo.distanceMeters) {
-            walkMins = Math.ceil(stopInfo.distanceMeters / 80) + 2;
+          if (currentStop.distanceMeters) {
+            walkMins = Math.ceil(currentStop.distanceMeters / 80) + 2;
           }
           window.AndroidBridge.startLiveTracking(
             String(stopCode),
@@ -342,25 +346,28 @@ class PinnedTripsManager {
 
       if (match) {
         if (typeof match.btime2 === 'number') {
-          item.targetArrivalTimestamp = now + (match.btime2 * 60 * 1000);
+          // Keep targetArrivalTimestamp updated with live telematics
+          item.targetArrivalTimestamp = now + (Math.max(0, match.btime2) * 60 * 1000);
           if (match.veh_code) item.vehCode = match.veh_code;
           if (match.is_live) item.isLive = true;
-          // Bus countdown reached 0 or less -> Arrived / Departed!
-          if (match.btime2 <= 0) {
+          if (match.estimated_arrival_time) item.estimatedArrivalTime = match.estimated_arrival_time;
+
+          // Only auto-unpin if the bus is explicitly recorded as departed / negative
+          if (match.btime2 < 0) {
             shouldUnpin = true;
           }
         }
       } else if (stopFetched) {
         // Stop was successfully queried, but this specific bus is no longer in upcoming arrivals.
-        // Check if its expected arrival time has passed (give 30s grace period):
-        const expectedPassed = item.targetArrivalTimestamp && (now >= item.targetArrivalTimestamp - 30000);
-        const staleTimeout = (now - item.pinnedAt) > 45 * 60 * 1000;
+        // It has truly departed if its expected arrival time plus 90 seconds grace period has elapsed.
+        const expectedPassed = item.targetArrivalTimestamp && (now >= item.targetArrivalTimestamp + 90000);
+        const staleTimeout = (now - item.pinnedAt) > 90 * 60 * 1000;
         if (expectedPassed || staleTimeout) {
           shouldUnpin = true;
         }
       } else {
-        // If fetch failed but over 10 minutes past target arrival:
-        if (item.targetArrivalTimestamp && now > (item.targetArrivalTimestamp + 10 * 60 * 1000)) {
+        // If fetch failed, allow up to 15 minutes past target arrival before dismissing
+        if (item.targetArrivalTimestamp && now > (item.targetArrivalTimestamp + 15 * 60 * 1000)) {
           shouldUnpin = true;
         }
       }
@@ -394,9 +401,13 @@ class PinnedTripsManager {
     let changed = false;
     for (const item of [...this.pinnedItems]) {
       const arrs = this.liveArrivals.get(item.stopCode);
-      if (Array.isArray(arrs) && !arrs.some(a => this.matchArrival(item, a)) && item.targetArrivalTimestamp && now >= item.targetArrivalTimestamp) {
-        this.pinnedItems = this.pinnedItems.filter(p => p.id !== item.id);
-        changed = true;
+      const stopFetched = !this.failedStops.has(item.stopCode);
+      // Only expire if stop was queried, arrival is absent, and 90s grace period after target arrival passed
+      if (stopFetched && Array.isArray(arrs) && arrs.length > 0 && !arrs.some(a => this.matchArrival(item, a))) {
+        if (item.targetArrivalTimestamp && now >= (item.targetArrivalTimestamp + 90000)) {
+          this.pinnedItems = this.pinnedItems.filter(p => p.id !== item.id);
+          changed = true;
+        }
       }
     }
     if (changed) {
@@ -602,11 +613,14 @@ class PinnedTripsManager {
       const cleanStopName = (item.stopName || '').replace(/'/g, "\\'");
       const cleanLineDescr = (item.lineDescr || '').replace(/'/g, "\\'");
       const displayMinutes = (matchingArr && typeof matchingArr.btime2 === 'number') ? matchingArr.btime2 : null;
-      const formattedTime = displayMinutes !== null 
-        ? this.formatMinutesHuman(displayMinutes) 
-        : (matchingArr && matchingArr.estimated_arrival_time 
-            ? matchingArr.estimated_arrival_time 
-            : (item.departureTime || item.estimatedArrivalTime || '--'));
+      const isDueNow = displayMinutes === 0;
+      const formattedTime = isDueNow
+        ? 'ΤΩΡΑ'
+        : (displayMinutes !== null 
+            ? this.formatMinutesHuman(displayMinutes) 
+            : (matchingArr && matchingArr.estimated_arrival_time 
+                ? matchingArr.estimated_arrival_time 
+                : (item.departureTime || item.estimatedArrivalTime || '--')));
 
       return `
         <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem; margin-bottom: 0; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-left: 4px solid ${isUrgent ? '#ea580c' : 'var(--md-sys-color-primary)'}; cursor: pointer;" onclick="window.App.switchTab('ticker'); window.App.selectStop('${item.stopCode}', '${cleanStopName}', ${item.stopLat || 'null'}, ${item.stopLng || 'null'});">
@@ -624,7 +638,7 @@ class PinnedTripsManager {
             </div>
             <div style="text-align: right; flex-shrink: 0;">
               <span class="m3-badge" style="background: ${isLive ? '#dcfce7' : '#e0f2fe'}; color: ${isLive ? '#15803d' : '#005ac1'}; font-size: 0.72rem; font-weight: 800; padding: 2px 7px;">
-                ${isLive ? `⚡ ~${formattedTime}` : (displayMinutes !== null ? `🕒 ~${formattedTime}` : (item.departureTime ? `🕒 ${item.departureTime}` : '⏳ Αναμονή'))}
+                ${isLive ? `⚡ ${isDueNow ? 'ΤΩΡΑ' : `~${formattedTime}`}` : (displayMinutes !== null ? `🕒 ${isDueNow ? 'ΤΩΡΑ' : `~${formattedTime}`}` : (item.departureTime ? `🕒 ${item.departureTime}` : '⏳ Αναμονή'))}
               </span>
             </div>
           </div>

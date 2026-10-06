@@ -518,7 +518,7 @@ class AirportTicker {
             </div>
 
             <div class="ticker-cell-pin">
-              <button class="ticker-pin-btn ${isPinned ? 'active' : ''}" title="${isPinned ? 'Καρφιτσωμένο (κλικ για αφαίρεση)' : 'Καρφίτσωμα άφιξης στις Καρφίτσες'}" onclick="event.stopPropagation(); window.PinnedTrips.togglePin(${JSON.stringify(arr).replace(/"/g, '&quot;')}, window.App.currentStop)">
+              <button class="ticker-pin-btn ${isPinned ? 'active' : ''}" title="${isPinned ? 'Καρφιτσωμένο (κλικ για αφαίρεση)' : 'Καρφίτσωμα άφιξης στις Καρφίτσες'}" onclick="event.stopPropagation(); window.App.ticker.togglePinArrival(${arrIdx})">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="${isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <line x1="12" y1="17" x2="12" y2="22"></line>
                   <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
@@ -897,6 +897,7 @@ class AirportTicker {
       `;
     } else {
       // Show upcoming lines and departures as separate arrivals in chronological order
+      this.renderedArrivals = visibleArrivals;
       rowsHtml = visibleArrivals.map((arr, arrIdx) => this.renderArrivalRow(arr, arrIdx, walk)).join('');
     }
 
@@ -947,6 +948,14 @@ class AirportTicker {
     `;
 
     this.startClock();
+  }
+
+  togglePinArrival(arrIdx) {
+    const list = this.renderedArrivals || this.arrivals || [];
+    const arr = list[arrIdx];
+    if (arr && window.PinnedTrips) {
+      window.PinnedTrips.togglePin(arr, this.currentStop);
+    }
   }
 
   toggleLineFilter(lineId) {
