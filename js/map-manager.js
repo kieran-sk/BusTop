@@ -227,9 +227,13 @@ class MapManager {
 
   scheduleLoadBusesForNearbyStops(stops) {
     if (this.busLoadTimer) clearTimeout(this.busLoadTimer);
+    // Only schedule if search/map tab is currently active to avoid background battery/network waste
+    if (window.App && window.App.activeTab !== 'search' && window.App.activeTab !== 'map') return;
+    if (this.map && this.map.getZoom() < 14) return;
+
     this.busLoadTimer = setTimeout(() => {
       this.loadBusesForNearbyStops(stops);
-    }, 900);
+    }, 2000);
   }
 
   /**
@@ -237,16 +241,19 @@ class MapManager {
    */
   async loadBusesForNearbyStops(stops = []) {
     if (!this.map || !this.busLayer) return;
+    if (window.App && window.App.activeTab !== 'search' && window.App.activeTab !== 'map') return;
+    if (this.map.getZoom() < 14) return;
+
     try {
       const linesToQuery = new Set();
-      for (const s of stops.slice(0, 10)) {
+      for (const s of stops.slice(0, 8)) {
         if (Array.isArray(s.serving_lines)) {
           for (const l of s.serving_lines) {
             if (l.line_id) linesToQuery.add(l.line_id);
-            if (linesToQuery.size >= 6) break;
+            if (linesToQuery.size >= 3) break;
           }
         }
-        if (linesToQuery.size >= 6) break;
+        if (linesToQuery.size >= 3) break;
       }
 
       if (linesToQuery.size === 0) return;

@@ -723,9 +723,12 @@ class AppController {
     const optBar = document.getElementById('arrivals-options-bar');
     if (optBar) optBar.style.display = 'none';
 
-    // Show search bar when viewing all stops / lines
+    // Show search bar only if on the first two tabs
     const searchBar = document.querySelector('.m3-search-container');
-    if (searchBar) searchBar.style.display = '';
+    if (searchBar) {
+      const isFirstTwo = (this.activeTab === 'ticker' || this.activeTab === 'search' || this.activeTab === 'map');
+      searchBar.style.display = isFirstTwo ? '' : 'none';
+    }
 
     if (this.ticker) {
       this.ticker.currentStop = null;
@@ -772,7 +775,7 @@ class AppController {
 
     const searchBar = document.querySelector('.m3-search-container');
 
-    // When switching to Arrivals / Stops & Lines tab
+    // Restriction: The search bar is shown ONLY in the first two tabs (search/map, and ticker)
     if (tabId === 'ticker') {
       const banner = document.getElementById('selected-stop-banner');
       const optBar = document.getElementById('arrivals-options-bar');
@@ -789,14 +792,24 @@ class AppController {
         if (optBar) optBar.style.display = 'flex';
         if (searchBar) searchBar.style.display = 'none';
       }
+    } else if (tabId === 'search' || tabId === 'map') {
+      // Clear arrivals polling when leaving ticker tab to save battery
+      if (this.pollInterval) {
+        clearInterval(this.pollInterval);
+        this.pollInterval = null;
+      }
+      if (searchBar) searchBar.style.display = '';
     } else {
       // Clear arrivals polling when leaving ticker tab to save battery
       if (this.pollInterval) {
         clearInterval(this.pollInterval);
         this.pollInterval = null;
       }
-      // In all other tabs, show search bar
-      if (searchBar) searchBar.style.display = '';
+      // Strictly hide search bar on all other tabs (notifications, pinned, favorites, timetable, etc.)
+      if (searchBar) searchBar.style.display = 'none';
+      if (window.Search && typeof window.Search.hideDropdown === 'function') {
+        window.Search.hideDropdown();
+      }
     }
 
     // Invalidate Leaflet Map size if on search / map tab

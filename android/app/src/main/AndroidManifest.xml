@@ -56,6 +56,16 @@
             android:enabled="true"
             android:exported="false" />
 
+        <!-- Receiver for Live Tracking Notification Actions (e.g. Stop / Dismiss) -->
+        <receiver
+            android:name=".NotificationActionReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.oasa.athensbus.ACTION_STOP_TRACKING" />
+            </intent-filter>
+        </receiver>
+
         <!-- Foreground Service for Live Lock Screen Notifications & Real-Time Tracking -->
         <service
             android:name=".LiveTrackingService"

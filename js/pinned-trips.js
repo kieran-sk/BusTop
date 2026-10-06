@@ -7,6 +7,7 @@ class PinnedTripsManager {
   constructor(containerId = 'pinned-trips-container') {
     this.containerId = containerId;
     this.pinnedItems = JSON.parse(localStorage.getItem('OASA_PINNED_ARRIVALS') || '[]');
+    this.activePinId = localStorage.getItem('OASA_ACTIVE_PIN_ID') || null;
     this.liveArrivals = new Map(); // key -> arrival info
     this.failedStops = new Set(); // track stops with fetch errors
     this.timerInterval = null;
@@ -15,7 +16,23 @@ class PinnedTripsManager {
 
   save() {
     localStorage.setItem('OASA_PINNED_ARRIVALS', JSON.stringify(this.pinnedItems));
+    if (this.activePinId) {
+      localStorage.setItem('OASA_ACTIVE_PIN_ID', this.activePinId);
+    } else {
+      localStorage.removeItem('OASA_ACTIVE_PIN_ID');
+    }
     this.renderUI();
+  }
+
+  setActivePin(pinId) {
+    if (!pinId) return;
+    this.activePinId = pinId;
+    this.save();
+    this.updateLiveAndroidNotification();
+    const item = this.pinnedItems.find(p => p.id === pinId);
+    if (item) {
+      this.showToast(`Ενεργή παρακολούθηση: ${item.lineId}`);
+    }
   }
 
   getArrivalKey(stopCode, arr) {
@@ -115,6 +132,9 @@ class PinnedTripsManager {
 
     if (existingIdx !== -1) {
       const removed = this.pinnedItems.splice(existingIdx, 1)[0];
+      if (this.activePinId === removed.id) {
+        this.activePinId = this.pinnedItems.length > 0 ? this.pinnedItems[this.pinnedItems.length - 1].id : null;
+      }
       this.save();
       this.showToast(`Ξεκαρφιτσώθηκε η άφιξη ${lineId}`);
       if (window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
@@ -157,6 +177,7 @@ class PinnedTripsManager {
         pinnedAt: now
       };
       this.pinnedItems.push(newItem);
+      this.activePinId = newItem.id;
       this.save();
 
       const timeLabel = arrival.departure_time ? ` (${arrival.departure_time})` : (typeof busMins === 'number' ? (busMins === 0 ? ' (ΤΩΡΑ)' : ` (σε ${busMins}')`) : '');
@@ -224,11 +245,17 @@ class PinnedTripsManager {
   removePin(pinId) {
     const item = this.pinnedItems.find(p => p.id === pinId);
     this.pinnedItems = this.pinnedItems.filter(p => p.id !== pinId);
+    if (this.activePinId === pinId) {
+      this.activePinId = this.pinnedItems.length > 0 ? this.pinnedItems[this.pinnedItems.length - 1].id : null;
+    }
     this.save();
     this.showToast('Το σκέλος αφαιρέθηκε');
     if (this.pinnedItems.length === 0) {
       if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
         try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
+      }
+      if (window.AndroidBridge && typeof window.AndroidBridge.clearLiveArrivalNotification === 'function') {
+        try { window.AndroidBridge.clearLiveArrivalNotification(); } catch (e) {}
       }
     }
     this.updateLiveAndroidNotification();
@@ -241,12 +268,24 @@ class PinnedTripsManager {
     const normStop = String(stopCode || '').trim();
     const normLine = String(lineId || '').trim().toUpperCase();
     const initialCount = this.pinnedItems.length;
-    this.pinnedItems = this.pinnedItems.filter(p => !(String(p.stopCode).trim() === normStop && String(p.lineId).trim().toUpperCase() === normLine));
+    this.pinnedItems = this.pinnedItems.filter(p => {
+      const match = (String(p.stopCode).trim() === normStop && String(p.lineId).trim().toUpperCase() === normLine);
+      if (match && this.activePinId === p.id) {
+        this.activePinId = null;
+      }
+      return !match;
+    });
+    if (!this.activePinId && this.pinnedItems.length > 0) {
+      this.activePinId = this.pinnedItems[this.pinnedItems.length - 1].id;
+    }
     if (this.pinnedItems.length !== initialCount) {
       this.save();
       if (this.pinnedItems.length === 0) {
         if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
           try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
+        }
+        if (window.AndroidBridge && typeof window.AndroidBridge.clearLiveArrivalNotification === 'function') {
+          try { window.AndroidBridge.clearLiveArrivalNotification(); } catch (e) {}
         }
       }
       this.updateLiveAndroidNotification();
@@ -261,6 +300,7 @@ class PinnedTripsManager {
     if (confirm('Θέλετε να αφαιρέσετε όλες τις καρφιτσωμένες αφίξεις;')) {
       const removedItems = [...this.pinnedItems];
       this.pinnedItems = [];
+      this.activePinId = null;
       this.save();
       if (window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
         removedItems.forEach(item => {
@@ -269,6 +309,9 @@ class PinnedTripsManager {
       }
       if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
         try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
+      }
+      if (window.AndroidBridge && typeof window.AndroidBridge.clearLiveArrivalNotification === 'function') {
+        try { window.AndroidBridge.clearLiveArrivalNotification(); } catch (e) {}
       }
       this.updateLiveAndroidNotification();
       if (window.App && window.App.ticker) {
@@ -281,6 +324,7 @@ class PinnedTripsManager {
     if (this.pinnedItems.length === 0) return;
     const removedItems = [...this.pinnedItems];
     this.pinnedItems = [];
+    this.activePinId = null;
     this.save();
     if (window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
       removedItems.forEach(item => {
@@ -289,6 +333,9 @@ class PinnedTripsManager {
     }
     if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
       try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
+    }
+    if (window.AndroidBridge && typeof window.AndroidBridge.clearLiveArrivalNotification === 'function') {
+      try { window.AndroidBridge.clearLiveArrivalNotification(); } catch (e) {}
     }
     this.updateLiveAndroidNotification();
     if (window.App && window.App.ticker) {
@@ -426,6 +473,9 @@ class PinnedTripsManager {
 
   updateLiveAndroidNotification() {
     if (this.pinnedItems.length === 0) {
+      if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
+        try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
+      }
       if (window.AndroidBridge && typeof window.AndroidBridge.clearLiveArrivalNotification === 'function') {
         try { window.AndroidBridge.clearLiveArrivalNotification(); } catch (e) {}
       }
@@ -438,25 +488,34 @@ class PinnedTripsManager {
       return;
     }
 
-    // Find the closest upcoming pinned arrival
-    let closestItem = null;
-    let minMins = 9999;
+    // Prioritize active pinned arrival or the most recently pinned arrival
+    let targetItem = null;
+    let targetMatch = null;
+    let targetMins = null;
 
-    for (const item of this.pinnedItems) {
-      const arrs = this.liveArrivals.get(item.stopCode) || [];
-      const match = arrs.find(a => this.matchArrival(item, a));
+    const preferredPin = (this.activePinId && this.pinnedItems.find(p => p.id === this.activePinId))
+      || this.pinnedItems[this.pinnedItems.length - 1];
+
+    if (preferredPin) {
+      targetItem = preferredPin;
+      const arrs = this.liveArrivals.get(preferredPin.stopCode) || [];
+      const match = arrs.find(a => this.matchArrival(preferredPin, a));
       if (match && typeof match.btime2 === 'number') {
-        if (match.btime2 < minMins) {
-          minMins = match.btime2;
-          closestItem = { item, match, mins: match.btime2 };
-        }
+        targetMatch = match;
+        targetMins = match.btime2;
+      } else {
+        targetMins = typeof preferredPin.initialMinutes === 'number' ? preferredPin.initialMinutes : 10;
       }
     }
 
-    if (closestItem) {
-      const { item, match, mins } = closestItem;
-      const title = `🚌 ${item.lineId}: Άφιξη σε ${mins}'`;
-      const body = `${item.stopName} • ${item.lineDescr || 'Διαδρομή'}${match.is_live ? ' (Ζωντανό GPS)' : ''}`;
+    if (targetItem) {
+      const item = targetItem;
+      const match = targetMatch;
+      const mins = targetMins;
+      const isDueNow = mins === 0;
+      const timeStr = isDueNow ? 'ΤΩΡΑ' : `σε ${mins}'`;
+      const title = `🚌 ${item.lineId}: Άφιξη ${timeStr}`;
+      const body = `${item.stopName} • ${item.lineDescr || 'Διαδρομή'}${match && match.is_live ? ' (Ζωντανό GPS)' : ''}`;
 
       // Update Service Worker Live Ongoing Notification
       if (navigator.serviceWorker && navigator.serviceWorker.controller) {
@@ -622,15 +681,20 @@ class PinnedTripsManager {
                 ? matchingArr.estimated_arrival_time 
                 : (item.departureTime || item.estimatedArrivalTime || '--')));
 
+      const isActiveTracked = (item.id === this.activePinId) || (!this.activePinId && idx === this.pinnedItems.length - 1);
+
       return `
-        <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem; margin-bottom: 0; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-left: 4px solid ${isUrgent ? '#ea580c' : 'var(--md-sys-color-primary)'}; cursor: pointer;" onclick="window.App.switchTab('ticker'); window.App.selectStop('${item.stopCode}', '${cleanStopName}', ${item.stopLat || 'null'}, ${item.stopLng || 'null'});">
+        <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem; margin-bottom: 0; background: ${isActiveTracked ? '#f0fdf4' : 'var(--md-sys-color-surface-container)'}; border: 1px solid ${isActiveTracked ? '#86efac' : 'var(--md-sys-color-outline-variant)'}; border-left: 4px solid ${isActiveTracked ? '#16a34a' : (isUrgent ? '#ea580c' : 'var(--md-sys-color-primary)')}; cursor: pointer;" onclick="window.App.switchTab('ticker'); window.App.selectStop('${item.stopCode}', '${cleanStopName}', ${item.stopLat || 'null'}, ${item.stopLng || 'null'});">
           <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
             <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
-              <span class="ticker-line-badge" style="font-size: 1rem; min-width: 48px; flex-shrink: 0;">
+              <span class="ticker-line-badge" style="font-size: 1rem; min-width: 48px; flex-shrink: 0; ${isActiveTracked ? 'background: #15803d;' : ''}">
                 ${item.lineId}
               </span>
               <div style="min-width: 0; flex: 1;">
-                <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: normal; overflow-wrap: normal; hyphens: none;">${item.stopName}</div>
+                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                  <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: normal; overflow-wrap: normal; hyphens: none;">${item.stopName}</div>
+                  ${isActiveTracked ? `<span class="m3-badge" style="background: #dcfce7; color: #166534; font-size: 0.68rem; font-weight: 800; padding: 1px 6px; border: 1px solid #bbf7d0;">🔔 Σε παρακολούθηση</span>` : ''}
+                </div>
                 <div style="font-size: 0.76rem; color: var(--md-sys-color-outline); margin-top: 2px;">
                   ${item.direction ? `<strong style="color: var(--md-sys-color-primary); margin-right: 4px;">${item.direction}</strong> • ` : ''}${item.departureTime ? `<strong style="color: #475569; margin-right: 4px;">🕒 Αναχώρηση: ${item.departureTime}</strong> • ` : ''}Στάση #${item.stopCode} • <span style="color: var(--md-sys-color-primary); text-decoration: underline;">Προβολή στάσης ➜</span>
                 </div>
@@ -646,8 +710,13 @@ class PinnedTripsManager {
             <div>
               🚶 <strong style="color: var(--md-sys-color-on-surface);">${walkMins}'</strong> (${walkDistanceM}μ. περπάτημα)
             </div>
-            <div style="display: flex; gap: 0.5rem;">
-              <button class="m3-btn m3-btn-tonal" onclick="event.stopPropagation(); window.PinnedTrips.removePin('${item.id}')" style="padding: 0.3rem 0.75rem; font-size: 0.78rem; border-radius: 9999px;">
+            <div style="display: flex; gap: 0.4rem; align-items: center;">
+              ${!isActiveTracked ? `
+                <button class="m3-btn m3-btn-outlined" onclick="event.stopPropagation(); window.PinnedTrips.setActivePin('${item.id}')" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; border-radius: 9999px; border-color: #10b981; color: #047857;" title="Εμφάνιση αυτής της γραμμής στην ειδοποίηση Android">
+                  🔔 Παρακολούθηση
+                </button>
+              ` : ''}
+              <button class="m3-btn m3-btn-tonal" onclick="event.stopPropagation(); window.PinnedTrips.removePin('${item.id}')" style="padding: 0.25rem 0.7rem; font-size: 0.74rem; border-radius: 9999px;">
                 Ξεκαρφίτσωμα
               </button>
             </div>

@@ -6,25 +6,34 @@ const API = {
   // Can be pointed to any hosted backend URL (e.g. Render, Railway, Localtunnel, etc.)
   baseUrl: localStorage.getItem('OASA_API_BASE_URL') || window.location.origin,
 
-  // Local Offline Stop & Schedule Storage
+  // In-memory cache with debounced storage persist for zero main-thread freezing
+  _memCache: null,
+  _persistTimer: null,
+
   getOfflineCache() {
+    if (this._memCache) return this._memCache;
     try {
-      return JSON.parse(localStorage.getItem('OASA_OFFLINE_STOPS_CACHE') || '{}');
+      this._memCache = JSON.parse(localStorage.getItem('OASA_OFFLINE_STOPS_CACHE') || '{}');
     } catch (e) {
-      return {};
+      this._memCache = {};
     }
+    return this._memCache;
   },
 
   saveOfflineCache(key, data) {
     try {
       const cache = this.getOfflineCache();
       cache[key] = { data, timestamp: Date.now() };
-      // Keep most recent 250 items to conserve storage
       const keys = Object.keys(cache);
-      if (keys.length > 250) {
+      if (keys.length > 150) {
         delete cache[keys[0]];
       }
-      localStorage.setItem('OASA_OFFLINE_STOPS_CACHE', JSON.stringify(cache));
+      if (this._persistTimer) clearTimeout(this._persistTimer);
+      this._persistTimer = setTimeout(() => {
+        try {
+          localStorage.setItem('OASA_OFFLINE_STOPS_CACHE', JSON.stringify(cache));
+        } catch (e) {}
+      }, 4000);
     } catch (e) {}
   },
 

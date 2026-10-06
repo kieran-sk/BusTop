@@ -114,10 +114,16 @@ class LiveTrackingService : Service() {
             val lineToUnpin = intent.getStringExtra(EXTRA_LINE_ID) ?: lineId
             if (stopToUnpin.isNotBlank() && lineToUnpin.isNotBlank()) {
                 MainActivity.currentInstance?.unpinAndDismiss(stopToUnpin, lineToUnpin)
+            } else {
+                MainActivity.currentInstance?.unpinAllAndDismiss()
             }
             pollingJob?.cancel()
             pollingJob = null
             releaseWakeLock()
+            try {
+                val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                manager.cancel(NotificationHelper.LIVE_NOTIF_ID)
+            } catch (_: Exception) {}
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             return START_NOT_STICKY
@@ -127,6 +133,10 @@ class LiveTrackingService : Service() {
             pollingJob?.cancel()
             pollingJob = null
             releaseWakeLock()
+            try {
+                val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                manager.cancel(NotificationHelper.LIVE_NOTIF_ID)
+            } catch (_: Exception) {}
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             return START_NOT_STICKY
@@ -164,6 +174,9 @@ class LiveTrackingService : Service() {
             if (newThreshold > 0) {
                 isAlarmTriggered = false
             }
+            // Cancel previous polling loop so newly pinned line begins polling immediately
+            pollingJob?.cancel()
+            pollingJob = null
         }
 
         NotificationHelper.createLiveNotificationChannel(this)
@@ -326,12 +339,12 @@ class LiveTrackingService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val stopIntent = Intent(this, LiveTrackingService::class.java).apply {
-            action = ACTION_STOP
-            putExtra(EXTRA_STOP_CODE, stopCode)
-            putExtra(EXTRA_LINE_ID, lineId)
+        val stopIntent = Intent(this, NotificationActionReceiver::class.java).apply {
+            action = NotificationActionReceiver.ACTION_STOP_TRACKING
+            putExtra(NotificationActionReceiver.EXTRA_STOP_CODE, stopCode)
+            putExtra(NotificationActionReceiver.EXTRA_LINE_ID, lineId)
         }
-        val pStop = PendingIntent.getService(
+        val pStop = PendingIntent.getBroadcast(
             this,
             1,
             stopIntent,

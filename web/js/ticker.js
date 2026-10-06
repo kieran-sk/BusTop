@@ -179,7 +179,13 @@ class AirportTicker {
       const stops = await window.API.getAllStops();
       if (Array.isArray(stops) && stops.length > 0) {
         this.allStops = stops;
-        if (!this.currentStop) {
+        this._allStopsCodesSet = new Set(stops.map(s => String(s.StopCode)));
+        stops.forEach(s => {
+          s._normName = (s.StopDescr || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+          s._normStreet = (s.StopStreet || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+          s._code = String(s.StopCode || '');
+        });
+        if (!this.currentStop && window.App && window.App.activeTab === 'ticker') {
           this.render();
         }
       }
@@ -652,16 +658,20 @@ class AirportTicker {
       }
 
       // STOPS VIEW
-      // Merge all master stops (~9,425) with enriched nearby stops so nearby stops retain
-      // their walking distances and serving lines while allowing the user to browse every stop in Athens.
-      const nearbyMap = new Map(rawStops.map(s => [String(s.StopCode), s]));
+      // Merge all master stops (~9,425) with enriched nearby stops using fast Map & Set lookups
+      const nearbyMap = new Map();
+      for (let i = 0; i < rawStops.length; i++) {
+        nearbyMap.set(String(rawStops[i].StopCode), rawStops[i]);
+      }
+      const allCodesSet = this._allStopsCodesSet || (this._allStopsCodesSet = new Set((this.allStops || []).map(s => String(s.StopCode))));
       
       let masterStopsList = [];
       if (this.allStops && this.allStops.length > 0) {
         masterStopsList = this.allStops.map(s => nearbyMap.get(String(s.StopCode)) || s);
-        // Include any rawStops that might not be in allStops
-        for (const ns of rawStops) {
-          if (!this.allStops.some(s => String(s.StopCode) === String(ns.StopCode))) {
+        // Include any rawStops that might not be in allStops (O(1) Set check)
+        for (let i = 0; i < rawStops.length; i++) {
+          const ns = rawStops[i];
+          if (!allCodesSet.has(String(ns.StopCode))) {
             masterStopsList.unshift(ns);
           }
         }
@@ -674,10 +684,10 @@ class AirportTicker {
       if (this.stopsFilterQuery && this.stopsFilterQuery.trim().length > 0) {
         const normQ = this.stopsFilterQuery.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
         stopsToDisplay = masterStopsList.filter(s => {
-          const sCode = String(s.StopCode || '');
-          const sName = (s.StopDescr || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-          const sStreet = (s.StopStreet || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-          const sEng = (s.StopDescrEng || '').toLowerCase();
+          const sCode = s._code || String(s.StopCode || '');
+          const sName = s._normName || (s.StopDescr || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+          const sStreet = s._normStreet || (s.StopStreet || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+          const sEng = s._normEng || (s.StopDescrEng || '').toLowerCase();
           return sCode.includes(normQ) || sName.includes(normQ) || sStreet.includes(normQ) || sEng.includes(normQ);
         });
       }
@@ -695,17 +705,21 @@ class AirportTicker {
           if (!isFavA && isFavB) return 1;
 
           if (sortBy === 'alpha') {
-            return (a.StopDescr || '').localeCompare(b.StopDescr || '', 'el');
+            const na = a.StopDescr || '';
+            const nb = b.StopDescr || '';
+            return na < nb ? -1 : (na > nb ? 1 : 0);
           } else if (sortBy === 'numeric') {
-            const numA = parseInt(a.StopCode || 0, 10) || 0;
-            const numB = parseInt(b.StopCode || 0, 10) || 0;
+            const numA = a._numCode || (a._numCode = parseInt(a.StopCode || 0, 10) || 0);
+            const numB = b._numCode || (b._numCode = parseInt(b.StopCode || 0, 10) || 0);
             return numA - numB;
           } else {
             // Default: distance
             const aDist = typeof a.distanceMeters === 'number' ? a.distanceMeters : (typeof a.Distance === 'number' ? a.Distance : 999999);
             const bDist = typeof b.distanceMeters === 'number' ? b.distanceMeters : (typeof b.Distance === 'number' ? b.Distance : 999999);
             if (aDist !== bDist) return aDist - bDist;
-            return (a.StopDescr || '').localeCompare(b.StopDescr || '', 'el');
+            const na = a.StopDescr || '';
+            const nb = b.StopDescr || '';
+            return na < nb ? -1 : (na > nb ? 1 : 0);
           }
         });
         this._sortedStopsCacheKey = cacheKey;

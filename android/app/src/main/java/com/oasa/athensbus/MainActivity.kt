@@ -210,6 +210,24 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    fun unpinAllAndDismiss() {
+        runOnUiThread {
+            if (this::webView.isInitialized) {
+                val js = """
+                    (function() {
+                        if (window.PinnedTrips && typeof window.PinnedTrips.clearAllSilently === 'function') {
+                            window.PinnedTrips.clearAllSilently();
+                        }
+                        if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
+                            try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
+                        }
+                    })();
+                """.trimIndent()
+                webView.evaluateJavascript(js, null)
+            }
+        }
+    }
+
     companion object {
         const val EXTRA_STOP_CODE = "EXTRA_STOP_CODE"
         const val EXTRA_STOP_NAME = "EXTRA_STOP_NAME"

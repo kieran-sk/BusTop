@@ -296,18 +296,54 @@ class SearchManager {
     if (!Array.isArray(stopsSource) || stopsSource.length === 0) return [];
 
     const stopsWithDist = [];
-    for (const s of stopsSource) {
-      const sLat = parseFloat(s.StopLat);
-      const sLng = parseFloat(s.StopLng);
+    const cosLat = Math.cos(userLat * Math.PI / 180);
+    const boxLat = 0.04;
+    const boxLng = 0.05;
+
+    for (let i = 0; i < stopsSource.length; i++) {
+      const s = stopsSource[i];
+      const sLat = typeof s._parsedLat === 'number' ? s._parsedLat : parseFloat(s.StopLat);
+      const sLng = typeof s._parsedLng === 'number' ? s._parsedLng : parseFloat(s.StopLng);
       if (isNaN(sLat) || isNaN(sLng)) continue;
+      s._parsedLat = sLat;
+      s._parsedLng = sLng;
+
+      // Fast bounding box reject (~100x faster than full city distance calculation)
+      const dLatDeg = Math.abs(sLat - userLat);
+      if (dLatDeg > boxLat) continue;
+      const dLngDeg = Math.abs(sLng - userLng);
+      if (dLngDeg > boxLng) continue;
+
       const dLat = (sLat - userLat) * 111139;
-      const dLng = (sLng - userLng) * (111139 * Math.cos(userLat * Math.PI / 180));
-      const dist = Math.sqrt(dLat * dLat + dLng * dLng);
+      const dLng = (sLng - userLng) * (111139 * cosLat);
+      const distSq = dLat * dLat + dLng * dLng;
+
       stopsWithDist.push({
         ...s,
-        distanceMeters: Math.round(dist)
+        distanceMeters: Math.round(Math.sqrt(distSq))
       });
     }
+
+    // Fallback if user is outside Athens or sparse region
+    if (stopsWithDist.length < limit) {
+      for (let i = 0; i < stopsSource.length; i++) {
+        const s = stopsSource[i];
+        const sLat = s._parsedLat || parseFloat(s.StopLat);
+        const sLng = s._parsedLng || parseFloat(s.StopLng);
+        if (isNaN(sLat) || isNaN(sLng)) continue;
+        const dLatDeg = Math.abs(sLat - userLat);
+        const dLngDeg = Math.abs(sLng - userLng);
+        if (dLatDeg <= boxLat && dLngDeg <= boxLng) continue; // Already added
+        if (dLatDeg > 0.15 || dLngDeg > 0.18) continue;
+        const dLat = (sLat - userLat) * 111139;
+        const dLng = (sLng - userLng) * (111139 * cosLat);
+        stopsWithDist.push({
+          ...s,
+          distanceMeters: Math.round(Math.sqrt(dLat * dLat + dLng * dLng))
+        });
+      }
+    }
+
     stopsWithDist.sort((a, b) => a.distanceMeters - b.distanceMeters);
     return stopsWithDist.slice(0, limit);
   }
@@ -330,7 +366,7 @@ class SearchManager {
       if (window.App && window.App.mapManager) {
         window.App.mapManager.renderNearbyStops(this.nearbyStops);
       }
-      if (window.App && window.App.ticker && !window.App.currentStop) {
+      if (window.App && window.App.ticker && !window.App.currentStop && window.App.activeTab === 'ticker') {
         window.App.ticker.render();
       }
     }
@@ -503,7 +539,7 @@ class SearchManager {
       if (window.App && window.App.mapManager) {
         window.App.mapManager.renderNearbyStops(this.nearbyStops);
       }
-      if (window.App && window.App.ticker && !window.App.currentStop) {
+      if (window.App && window.App.ticker && !window.App.currentStop && window.App.activeTab === 'ticker') {
         window.App.ticker.render();
       }
     }
@@ -519,7 +555,7 @@ class SearchManager {
         if (window.App && window.App.mapManager) {
           window.App.mapManager.renderNearbyStops(this.nearbyStops);
         }
-        if (window.App && window.App.ticker && !window.App.currentStop) {
+        if (window.App && window.App.ticker && !window.App.currentStop && window.App.activeTab === 'ticker') {
           window.App.ticker.render();
         }
       }

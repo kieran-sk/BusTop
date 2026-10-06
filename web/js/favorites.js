@@ -78,63 +78,6 @@ class FavoritesManager {
     }
   }
 
-  exportBackup() {
-    const data = {
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      stops: this.favStops,
-      lines: this.favLines
-    };
-    const jsonStr = JSON.stringify(data, null, 2);
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `bustop_favorites_backup_${new Date().toISOString().slice(0,10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    if (window.App && typeof window.App.showPushNotification === 'function') {
-      window.App.triggerHaptic('success');
-    }
-  }
-
-  importBackup(file) {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const parsed = JSON.parse(e.target.result);
-        if (Array.isArray(parsed.stops) || Array.isArray(parsed.lines)) {
-          if (Array.isArray(parsed.stops)) {
-            // Merge deduplicated stops (validate structure)
-            parsed.stops.forEach(s => {
-              if (s && s.code && (s.name || s.StopDescr) && !this.isStopFav(s.code)) {
-                this.favStops.push({ code: s.code, name: s.name || s.StopDescr, lat: s.lat || null, lng: s.lng || null });
-              }
-            });
-          }
-          if (Array.isArray(parsed.lines)) {
-            // Merge deduplicated lines (validate structure)
-            parsed.lines.forEach(l => {
-              if (l && l.code && (l.id || l.LineID) && !this.isLineFav(l.code)) {
-                this.favLines.push({ code: l.code, id: l.id || l.LineID, descr: l.descr || l.LineDescr || '' });
-              }
-            });
-          }
-          this.save();
-          alert(`Επιτυχής επαναφορά! Αποθηκευμένες: ${this.favStops.length} στάσεις, ${this.favLines.length} γραμμές.`);
-        } else {
-          alert('Μη έγκυρη μορφή αντιγράφου ασφαλείας.');
-        }
-      } catch (err) {
-        alert('Σφάλμα κατά την ανάγνωση του αρχείου.');
-      }
-    };
-    reader.readAsText(file);
-  }
-
   setFilter(filter) {
     this.activeFilter = filter;
     this.render();
@@ -231,7 +174,7 @@ class FavoritesManager {
     const totalLines = this.favLines.length;
     const totalAll = totalStops + totalLines;
 
-    // Segmented tab selector header differentiating Lines and Stops, plus Backup / Restore tools
+    // Segmented tab selector header differentiating Lines and Stops
     const tabsHeaderHtml = `
       <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.25rem;">
         <div style="display: flex; gap: 0.4rem; background: var(--md-sys-color-surface-container); padding: 4px; border-radius: 9999px; max-width: 420px; flex: 1;">
@@ -244,16 +187,6 @@ class FavoritesManager {
           <button class="m3-btn ${this.activeFilter === 'lines' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="flex: 1; padding: 0.4rem 0.6rem; font-size: 0.8rem; border-radius: 9999px;" onclick="window.Favorites.setFilter('lines')">
             🚌 Γραμμές (${totalLines})
           </button>
-        </div>
-
-        <div style="display: flex; gap: 0.4rem; align-items: center;">
-          <button class="m3-btn m3-btn-tonal" style="font-size: 0.75rem; padding: 0.35rem 0.75rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px;" onclick="window.Favorites.exportBackup()" title="Εξαγωγή αντιγράφου ασφαλείας σε αρχείο .json">
-            📤 Αντίγραφο
-          </button>
-          <label class="m3-btn m3-btn-tonal" style="font-size: 0.75rem; padding: 0.35rem 0.75rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; margin-bottom: 0;" title="Επαναφορά από αρχείο αντιγράφου">
-            📥 Επαναφορά
-            <input type="file" accept=".json" style="display: none;" onchange="if (this.files[0]) window.Favorites.importBackup(this.files[0])">
-          </label>
         </div>
       </div>
     `;
