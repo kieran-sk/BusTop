@@ -91,7 +91,7 @@ object NotificationHelper {
         notificationManager.notify(notifId, notification)
     }
 
-    const val LIVE_CHANNEL_ID = "oasa_bus_live_channel_v8"
+    const val LIVE_CHANNEL_ID = "oasa_bus_live_channel_v9"
     const val LIVE_CHANNEL_NAME = "Live Bus Tracking"
     const val LIVE_NOTIF_ID = 2001
 
@@ -116,6 +116,7 @@ object NotificationHelper {
                 notificationManager.deleteNotificationChannel("oasa_bus_live_channel_v5")
                 notificationManager.deleteNotificationChannel("oasa_bus_live_channel_v6")
                 notificationManager.deleteNotificationChannel("oasa_bus_live_channel_v7")
+                notificationManager.deleteNotificationChannel("oasa_bus_live_channel_v8")
             } catch (e: Exception) {}
 
             val channel = NotificationChannel(LIVE_CHANNEL_ID, LIVE_CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH).apply {
@@ -123,7 +124,7 @@ object NotificationHelper {
                 setShowBadge(true)
                 setSound(null, null)
                 enableVibration(false)
-                lockscreenVisibility = NotificationCompat.VISIBILITY_PUBLIC
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
             notificationManager.createNotificationChannel(channel)
         }
@@ -179,6 +180,7 @@ object NotificationHelper {
             putBoolean("android.requestPromotedOngoing", true)
             putCharSequence("android.shortCriticalText", shortText)
             putCharSequence("android.substName", shortText)
+            putString("android.template", "android.app.Notification\$BigTextStyle")
         }
 
         val accentColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -189,43 +191,86 @@ object NotificationHelper {
 
         val targetTimestamp = System.currentTimeMillis() + (minutesAway * 60 * 1000L)
 
-        val builder = NotificationCompat.Builder(context, LIVE_CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
-            .setContentTitle(title)
-            .setContentText(content)
-            .setSubText(shortText)
-            .setProgress(maxMins, progress, false)
-            .setOngoing(true)
-            .setAutoCancel(false)
-            .setOnlyAlertOnce(true)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
-            .setColor(accentColor)
-            .setColorized(true)
-            .setContentIntent(pendingIntent)
-            .setWhen(targetTimestamp)
-            .setShowWhen(true)
-            .setUsesChronometer(minutesAway > 0)
-            .setChronometerCountDown(true)
-            .addExtras(extras)
-            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "🛑 Τερματισμός", pStop)
+        val notification: Notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val nBuilder = Notification.Builder(context, LIVE_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification_bus)
+                .setContentTitle(title)
+                .setContentText(content)
+                .setSubText(shortText)
+                .setStyle(
+                    Notification.BigTextStyle()
+                        .bigText("$content\n$title")
+                        .setSummaryText(shortText)
+                )
+                .setProgress(maxMins, progress, false)
+                .setOngoing(true)
+                .setAutoCancel(false)
+                .setOnlyAlertOnce(true)
+                .setColor(accentColor)
+                .setColorized(true)
+                .setContentIntent(pendingIntent)
+                .setWhen(targetTimestamp)
+                .setShowWhen(true)
+                .setUsesChronometer(minutesAway > 0)
+                .setChronometerCountDown(true)
+                .setCategory(Notification.CATEGORY_STATUS)
+                .setVisibility(Notification.VISIBILITY_PUBLIC)
+                .addExtras(extras)
+                .addAction(
+                    Notification.Action.Builder(
+                        Icon.createWithResource(context, android.R.drawable.ic_menu_close_clear_cancel),
+                        "🛑 Τερματισμός",
+                        pStop
+                    ).build()
+                )
 
-        try {
-            val method = builder.javaClass.getMethod("setShortCriticalText", CharSequence::class.java)
-            method.invoke(builder, shortText)
-        } catch (e: Throwable) {}
+            try {
+                val mPromote = nBuilder.javaClass.getMethod("setRequestPromotedOngoing", Boolean::class.javaPrimitiveType)
+                mPromote.invoke(nBuilder, true)
+            } catch (e: Throwable) {}
 
-        try {
-            val mPromote = builder.javaClass.getMethod("setRequestPromotedOngoing", Boolean::class.javaPrimitiveType)
-            mPromote.invoke(builder, true)
-        } catch (e: Throwable) {}
+            try {
+                val mShort = nBuilder.javaClass.getMethod("setShortCriticalText", CharSequence::class.java)
+                mShort.invoke(nBuilder, shortText)
+            } catch (e: Throwable) {}
 
-        val notification = builder.build()
+            nBuilder.build()
+        } else {
+            val builder = NotificationCompat.Builder(context, LIVE_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification_bus)
+                .setContentTitle(title)
+                .setContentText(content)
+                .setSubText(shortText)
+                .setStyle(
+                    NotificationCompat.BigTextStyle()
+                        .bigText("$content\n$title")
+                        .setSummaryText(shortText)
+                )
+                .setProgress(maxMins, progress, false)
+                .setOngoing(true)
+                .setAutoCancel(false)
+                .setOnlyAlertOnce(true)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setCategory(NotificationCompat.CATEGORY_STATUS)
+                .setColor(accentColor)
+                .setColorized(true)
+                .setContentIntent(pendingIntent)
+                .setWhen(targetTimestamp)
+                .setShowWhen(true)
+                .setUsesChronometer(minutesAway > 0)
+                .setChronometerCountDown(true)
+                .addExtras(extras)
+                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "🛑 Τερματισμός", pStop)
+
+            builder.build()
+        }
+
         try {
             notification.extras.putBoolean("android.requestPromotedOngoing", true)
             notification.extras.putCharSequence("android.shortCriticalText", shortText)
             notification.extras.putCharSequence("android.substName", shortText)
+            notification.extras.putString("android.template", "android.app.Notification\$BigTextStyle")
         } catch (e: Throwable) {}
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

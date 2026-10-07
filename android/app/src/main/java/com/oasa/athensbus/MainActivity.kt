@@ -591,9 +591,17 @@ class MainActivity : FragmentActivity() {
                 val intentList = listOf(
                     Intent("android.settings.APP_NOTIFICATION_PROMOTION_SETTINGS").apply {
                         putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                        putExtra("android.provider.extra.APP_PACKAGE", packageName)
+                        putExtra("app_package", packageName)
                     },
                     Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
                         putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
+                        putExtra("android.provider.extra.APP_PACKAGE", packageName)
+                        putExtra("app_package", packageName)
+                        putExtra("app_uid", applicationInfo.uid)
+                    },
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.parse("package:$packageName")
                     }
                 )
                 for (intent in intentList) {

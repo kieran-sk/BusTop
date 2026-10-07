@@ -736,6 +736,26 @@ class PinnedTripsManager {
       `;
     }).join('');
 
+    let chipNoticeHtml = '';
+    if (window.AndroidBridge && typeof window.AndroidBridge.canPostPromotedNotifications === 'function') {
+      try {
+        const canPromote = window.AndroidBridge.canPostPromotedNotifications();
+        if (!canPromote) {
+          chipNoticeHtml = `
+            <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 0.75rem 0.9rem; margin-bottom: 0.85rem; display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;">
+              <div style="font-size: 0.78rem; color: #1e3a8a; line-height: 1.35;">
+                <strong>💊 System Status Bar Chip:</strong><br>
+                Για να εμφανίζεται η αντίστροφη μέτρηση δίπλα στο ρολόι, ενεργοποιήστε τις <em>«Ζωντανές ενημερώσεις»</em> στο Android.
+              </div>
+              <button class="m3-btn m3-btn-primary" style="font-size: 0.75rem; padding: 0.35rem 0.75rem; border-radius: 9999px; white-space: nowrap; flex-shrink: 0;" onclick="event.stopPropagation(); window.AndroidBridge.openLiveUpdatesSettings();">
+                Ενεργοποίηση ⚙️
+              </button>
+            </div>
+          `;
+        }
+      } catch (e) {}
+    }
+
     container.innerHTML = `
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.5rem;">
         <div>
@@ -748,6 +768,7 @@ class PinnedTripsManager {
           </button>
         </div>
       </div>
+      ${chipNoticeHtml}
       <div style="display: grid; gap: 0.65rem;">
         ${itemsHtml}
       </div>
