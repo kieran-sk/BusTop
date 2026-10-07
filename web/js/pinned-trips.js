@@ -117,6 +117,16 @@ class PinnedTripsManager {
     );
   }
 
+  getCleanDestination(item) {
+    if (!item) return '';
+    let d = item.destination || item.departure_terminal || item.lineDescr || item.route_descr || item.line_descr || '';
+    d = d.replace(/[⬅️➡️←→🔄▲▼]/g, '').trim();
+    if (d === 'Μετάβαση' || d === 'Επιστροφή' || d === 'Τέρμα') {
+      d = (item.lineDescr || item.route_descr || item.line_descr || '').replace(/[⬅️➡️←→🔄▲▼]/g, '').trim();
+    }
+    return d;
+  }
+
   togglePin(arrival, stopInfo) {
     const currentStop = stopInfo || (window.App && window.App.ticker && window.App.ticker.currentStop) || (window.App && window.App.currentStop);
     if (!currentStop || !arrival) return;
@@ -154,6 +164,7 @@ class PinnedTripsManager {
       const arrivalKey = this.getArrivalKey(stopCode, arrival);
       const now = Date.now();
       const targetArrivalTimestamp = now + (Math.max(0, busMins) * 60 * 1000);
+      const cleanDest = this.getCleanDestination(arrival) || arrival.route_descr || '';
 
       const newItem = {
         id: 'pin_' + now + '_' + Math.random().toString(36).substr(2, 5),
@@ -166,7 +177,7 @@ class PinnedTripsManager {
         lineDescr: arrival.route_descr || arrival.line_descr || '',
         routeCode,
         direction: arrival.direction || 'Μετάβαση',
-        destination: arrival.destination || arrival.route_descr || '',
+        destination: cleanDest,
         vehCode: arrival.veh_code || null,
         departureTime: arrival.departure_time || null,
         estimatedArrivalTime: arrival.estimated_arrival_time || null,
@@ -211,7 +222,7 @@ class PinnedTripsManager {
             String(lineId),
             String(routeCode || ''),
             String(newItem.stopName),
-            String(arrival.destination || arrival.route_descr || ''),
+            String(cleanDest),
             Number(walkMins),
             0,
             false,
@@ -536,7 +547,7 @@ class PinnedTripsManager {
       // Android Bridge Hook if running inside Android APK WebView (only if no active alarm is running)
       if (window.AndroidBridge) {
         try {
-          const dest = item.direction || item.destination || item.lineDescr || '';
+          const dest = this.getCleanDestination(item);
           const hasActiveAlarm = (window.Alarms && Array.isArray(window.Alarms.alarms))
             ? window.Alarms.alarms.some(a => !a.triggered && typeof a.thresholdMinutes === 'number' && a.thresholdMinutes > 0)
             : false;

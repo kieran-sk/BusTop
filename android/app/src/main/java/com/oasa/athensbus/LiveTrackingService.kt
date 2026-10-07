@@ -219,19 +219,21 @@ class LiveTrackingService : Service() {
         if (pollingJob?.isActive == true) return
         pollingJob = serviceScope.launch {
             while (isActive) {
+                var remainingMins = initialMinutes
                 try {
                     // Try fetching live GPS telemetry from API
-                    var remainingMins = fetchLiveArrivalMinutes()
+                    val liveMins = fetchLiveArrivalMinutes()
 
-                    // Fallback to elapsed time if GPS is temporarily absent or network drops
-                    if (remainingMins == null) {
+                    if (liveMins != null) {
+                        remainingMins = liveMins
+                    } else {
+                        // Fallback to elapsed time if GPS is temporarily absent or network drops
                         val elapsedMins = ((System.currentTimeMillis() - startedAtMs) / 60000L).toInt()
                         remainingMins = kotlin.math.max(0, initialMinutes - elapsedMins)
                     }
 
                     updateNotification(remainingMins)
 
-                    var minsForDelay = remainingMins
                     if (thresholdMinutes > 0 && remainingMins <= thresholdMinutes && !isAlarmTriggered) {
                         isAlarmTriggered = true
                         triggerAlarmWakeup(remainingMins)
@@ -240,19 +242,11 @@ class LiveTrackingService : Service() {
                     e.printStackTrace()
                 }
 
-                val currentMins = (initialMinutes) // fallback
-                // Adaptive background polling delay: Save battery when far, increase frequency when close
-                val delayMins = try {
-                    fetchLiveArrivalMinutes() ?: initialMinutes
-                } catch (_: Exception) {
-                    initialMinutes
-                }
-
+                // High-frequency responsive polling for real-time live notification shade & status chip validation
                 val pollDelayMs = when {
-                    delayMins > 20 -> 45000L  // Far (>20m away): 45s (massive battery saving)
-                    delayMins > 8  -> 25000L  // Approaching (8-20m away): 25s
-                    delayMins > 3  -> 15000L  // Close (3-8m away): 15s
-                    else           -> 10000L  // Arriving now (<=3m away): 10s for high precision
+                    remainingMins > 15 -> 15000L  // Far (>15m away): 15s
+                    remainingMins > 5  -> 10000L  // Approaching (5-15m away): 10s
+                    else               -> 6000L   // Arriving now (<=5m away): 6s for maximum real-time precision
                 }
                 delay(pollDelayMs)
             }
@@ -265,8 +259,8 @@ class LiveTrackingService : Service() {
             val url = URL("https://bustop.pages.dev/api/stops/$stopCode/arrivals")
             val conn = url.openConnection() as HttpURLConnection
             conn.requestMethod = "GET"
-            conn.connectTimeout = 8000
-            conn.readTimeout = 8000
+            conn.connectTimeout = 7000
+            conn.readTimeout = 7000
             conn.setRequestProperty("Accept", "application/json")
 
             if (conn.responseCode == 200) {
@@ -277,11 +271,8 @@ class LiveTrackingService : Service() {
                 val json = JSONObject(response)
                 val arrivals = json.optJSONArray("arrivals")
                 if (arrivals != null) {
-                    val elapsedMins = ((System.currentTimeMillis() - startedAtMs) / 60000L).toInt()
-                    val expectedMins = kotlin.math.max(0, initialMinutes - elapsedMins)
-
-                    var bestDiff = Int.MAX_VALUE
-                    var bestArrivalMins: Int? = null
+                    var bestLiveMins: Int? = null
+                    var bestSchedMins: Int? = null
 
                     for (i in 0 until arrivals.length()) {
                         val arr = arrivals.getJSONObject(i)
@@ -291,26 +282,36 @@ class LiveTrackingService : Service() {
                         if (arrLine.equals(lineId, ignoreCase = true) &&
                             (routeCode.isBlank() || arrRoute.isBlank() || arrRoute == routeCode)) {
                             val btime2 = arr.optInt("btime2", -1)
+                            val isLive = arr.optBoolean("is_live", false)
                             if (btime2 >= 0) {
-                                val diff = kotlin.math.abs(btime2 - expectedMins)
-                                // Only consider arrivals within a reasonable window of the expected tracked bus
-                                if (diff < bestDiff && (btime2 <= expectedMins + 20 || diff <= 15)) {
-                                    bestDiff = diff
-                                    bestArrivalMins = btime2
-                                    if (destination.isBlank()) {
+                                if (isLive) {
+                                    // Live GPS arrivals take absolute priority
+                                    if (bestLiveMins == null || btime2 < bestLiveMins) {
+                                        bestLiveMins = btime2
                                         val apiDest = arr.optString("destination", "").ifBlank {
                                             arr.optString("route_descr", "")
                                         }
                                         if (apiDest.isNotBlank()) {
-                                            destination = apiDest
+                                            val cleaned = NotificationHelper.cleanDestination(apiDest)
+                                            if (cleaned.isNotBlank()) destination = cleaned
                                         }
+                                    }
+                                } else {
+                                    // Fallback scheduled timetable estimate
+                                    if (bestSchedMins == null || btime2 < bestSchedMins) {
+                                        bestSchedMins = btime2
                                     }
                                 }
                             }
                         }
                     }
-                    if (bestArrivalMins != null) {
-                        return bestArrivalMins
+
+                    val resultMins = bestLiveMins ?: bestSchedMins
+                    if (resultMins != null) {
+                        // Dynamically update rolling reference so subsequent minutes decay gracefully from actual telematics
+                        initialMinutes = resultMins
+                        startedAtMs = System.currentTimeMillis()
+                        return resultMins
                     }
                 }
             }
@@ -351,19 +352,10 @@ class LiveTrackingService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val dismissIntent = Intent(this, LiveTrackingService::class.java).apply {
-            action = ACTION_STOP_SERVICE_ONLY
-        }
-        val pDismiss = PendingIntent.getService(
-            this,
-            2,
-            dismissIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
         val timeFormatted = NotificationHelper.formatMinutesHuman(mins)
         val shortText = if (mins <= 0) "ΤΩΡΑ" else "${mins}'"
-        val dirPart = if (destination.isNotBlank()) " προς $destination" else ""
+        val cleanDest = NotificationHelper.cleanDestination(destination)
+        val dirPart = if (cleanDest.isNotBlank()) " προς $cleanDest" else ""
         val title = if (mins <= 0) "🚨 $lineId$dirPart • ΕΦΤΑΣΕ!" else "🚍 $lineId$dirPart • σε $timeFormatted"
         val content = "📍 Στάση: $stopName"
 
@@ -374,7 +366,6 @@ class LiveTrackingService : Service() {
             putBoolean("android.requestPromotedOngoing", true)
             putCharSequence("android.shortCriticalText", shortText)
             putCharSequence("android.substName", shortText)
-            putString("android.template", "android.app.Notification\$BigTextStyle")
         }
 
         val accentColor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -385,82 +376,43 @@ class LiveTrackingService : Service() {
 
         val targetTimestamp = System.currentTimeMillis() + (mins * 60 * 1000L)
 
-        val notif: Notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val nBuilder = Notification.Builder(this, NotificationHelper.LIVE_CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_notification_bus)
-                .setContentTitle(title)
-                .setContentText(content)
-                .setSubText(shortText)
-                .setStyle(Notification.BigTextStyle().bigText("$content\n$title").setSummaryText(shortText))
-                .setProgress(maxMins, progress, false)
-                .setOngoing(true)
-                .setAutoCancel(false)
-                .setOnlyAlertOnce(true)
-                .setColor(accentColor)
-                .setColorized(true)
-                .setContentIntent(pLaunch)
-                .setWhen(targetTimestamp)
-                .setShowWhen(true)
-                .setUsesChronometer(mins > 0)
-                .setChronometerCountDown(true)
-                .setCategory(Notification.CATEGORY_STATUS)
-                .setVisibility(Notification.VISIBILITY_PUBLIC)
-                .addExtras(extras)
-                .addAction(
-                    Notification.Action.Builder(
-                        Icon.createWithResource(this, android.R.drawable.ic_menu_close_clear_cancel),
-                        "🛑 Τερματισμός",
-                        pStop
-                    ).build()
-                )
+        val builder = NotificationCompat.Builder(this, NotificationHelper.LIVE_CHANNEL_ID)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(title)
+            .setContentText(content)
+            .setSubText(shortText)
+            .setProgress(maxMins, progress, false)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setColor(accentColor)
+            .setColorized(true)
+            .setContentIntent(pLaunch)
+            .setWhen(targetTimestamp)
+            .setShowWhen(true)
+            .setUsesChronometer(mins > 0)
+            .setChronometerCountDown(true)
+            .addExtras(extras)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "🛑 Τερματισμός", pStop)
 
-            try {
-                val mPromote = nBuilder.javaClass.getMethod("setRequestPromotedOngoing", Boolean::class.javaPrimitiveType)
-                mPromote.invoke(nBuilder, true)
-            } catch (e: Throwable) {}
+        try {
+            val method = builder.javaClass.getMethod("setShortCriticalText", CharSequence::class.java)
+            method.invoke(builder, shortText)
+        } catch (e: Throwable) {}
 
-            try {
-                val method = nBuilder.javaClass.getMethod("setShortCriticalText", CharSequence::class.java)
-                method.invoke(nBuilder, shortText)
-            } catch (e: Throwable) {}
+        try {
+            val mPromote = builder.javaClass.getMethod("setRequestPromotedOngoing", Boolean::class.javaPrimitiveType)
+            mPromote.invoke(builder, true)
+        } catch (e: Throwable) {}
 
-            nBuilder.build()
-        } else {
-            val builder = NotificationCompat.Builder(this, NotificationHelper.LIVE_CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_notification_bus)
-                .setContentTitle(title)
-                .setContentText(content)
-                .setSubText(shortText)
-                .setStyle(
-                    NotificationCompat.BigTextStyle()
-                        .bigText("$content\n$title")
-                        .setSummaryText(shortText)
-                )
-                .setProgress(maxMins, progress, false)
-                .setOngoing(true)
-                .setAutoCancel(false)
-                .setOnlyAlertOnce(true)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setCategory(NotificationCompat.CATEGORY_STATUS)
-                .setColor(accentColor)
-                .setColorized(true)
-                .setContentIntent(pLaunch)
-                .setWhen(targetTimestamp)
-                .setShowWhen(true)
-                .setUsesChronometer(mins > 0)
-                .setChronometerCountDown(true)
-                .addExtras(extras)
-                .addAction(android.R.drawable.ic_menu_close_clear_cancel, "🛑 Τερματισμός", pStop)
-
-            builder.build()
-        }
-
+        val notif = builder.build()
         try {
             notif.extras.putBoolean("android.requestPromotedOngoing", true)
             notif.extras.putCharSequence("android.shortCriticalText", shortText)
             notif.extras.putCharSequence("android.substName", shortText)
-            notif.extras.putString("android.template", "android.app.Notification\$BigTextStyle")
         } catch (e: Throwable) {}
 
         return notif

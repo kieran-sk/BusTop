@@ -607,6 +607,7 @@ class SearchManager {
           const safeTitle = stopTitle.replace(/'/g, "\\'");
 
           const hasRoutes = Array.isArray(s.serving_lines) && s.serving_lines.length > 0;
+          const isLoadingRoutes = s.serving_lines === undefined;
           let linesHtml = '';
           if (hasRoutes) {
             linesHtml = `
@@ -618,6 +619,13 @@ class SearchManager {
                     <span>${l.last_stop}</span>
                   </span>
                 `).join('')}
+              </div>
+            `;
+          } else if (isLoadingRoutes) {
+            linesHtml = `
+              <div style="margin-top: 0.45rem; display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--md-sys-color-outline);">
+                <span class="m3-pulse-dot" style="width: 5px; height: 5px; background: var(--md-sys-color-primary);"></span>
+                <span>Φόρτωση διερχόμενων γραμμών...</span>
               </div>
             `;
           } else {

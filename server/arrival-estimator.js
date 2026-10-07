@@ -302,9 +302,16 @@ class ArrivalEstimator {
           const shouldInclude = isTomorrow || (minutesRemaining >= 1 && minutesRemaining <= 1440);
 
           if (shouldInclude) {
-            // Check if there is already a live arrival for this line within +- 7 minutes
+            // If this line already has live GPS telematics operating, any departure that departed in the past (depMinutes < currentMinutes)
+            // is either already tracked live or has concluded. Never inject phantom static estimates for past departures when live buses exist!
+            const hasLiveBuses = !isTomorrow && linesWithLive.has(lineId);
+            if (hasLiveBuses && depMinutes < currentMinutes) {
+              continue;
+            }
+
+            // Check if there is already a live arrival for this line within +- 12 minutes
             const alreadyHasLive = !isTomorrow && results.some(
-              r => r.line_id === lineId && r.is_live && Math.abs(r.btime2 - minutesRemaining) <= 7
+              r => r.line_id === lineId && r.is_live && Math.abs(r.btime2 - minutesRemaining) <= 12
             );
 
             if (!alreadyHasLive) {

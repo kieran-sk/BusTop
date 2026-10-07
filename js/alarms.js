@@ -232,7 +232,8 @@ class AlarmManager {
       return;
     }
     const initialMins = options.targetMinutes || 10;
-    const destination = options.destination || '';
+    let destination = (options.destination || '').replace(/[⬅️➡️←→🔄▲▼]/g, '').trim();
+    if (destination === 'Μετάβαση' || destination === 'Επιστροφή' || destination === 'Τέρμα') destination = '';
     const walkMinutes = options.walkMinutes || 0;
     const stopCodeStr = String(options.stopCode);
     const lineIdStr = String(options.lineId).trim();

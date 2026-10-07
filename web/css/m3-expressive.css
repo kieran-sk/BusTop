@@ -69,11 +69,23 @@
   --md-sys-elevation-3: 0px 4px 12px 3px rgba(0, 0, 0, 0.12), 0px 1px 3px 0px rgba(0, 0, 0, 0.08);
 }
 
-/* Forced Light Mode */
+/* Forced Light Mode & Non-Selectable UI */
 html, body {
   color-scheme: light !important;
   background-color: var(--md-sys-color-surface) !important;
   color: var(--md-sys-color-on-surface) !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+}
+
+/* Allow text selection strictly inside input fields and textareas */
+input, textarea, [contenteditable="true"] {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  -moz-user-select: text !important;
+  -ms-user-select: text !important;
 }
 
 /* Base Styles */
@@ -82,6 +94,7 @@ html, body {
   margin: 0;
   padding: 0;
   -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
 }
 
 body {
@@ -90,6 +103,8 @@ body {
   color: var(--md-sys-color-on-surface);
   line-height: 1.5;
   overflow-x: hidden;
+  user-select: none !important;
+  -webkit-user-select: none !important;
 }
 
 /* App Header */

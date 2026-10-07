@@ -195,8 +195,15 @@ async function getCombinedArrivals(stopCode, targetDay = 'today') {
         const arrMin = depM + transit;
         const rem = isTomorrow ? Math.round((1440 - currentMinutes) + arrMin) : Math.round(arrMin - currentMinutes);
         if (isTomorrow || (rem >= 1 && rem <= 1440)) {
+          // If this line already has live GPS telematics operating, any departure that departed in the past (depM < currentMinutes)
+          // is either already tracked live or has concluded. Never inject phantom static estimates for past departures when live buses exist!
+          const hasLiveBuses = !isTomorrow && linesWithLive.has(lineId);
+          if (hasLiveBuses && depM < currentMinutes) {
+            continue;
+          }
+
           const alreadyHasLive = !isTomorrow && results.some(
-            r => r.line_id === lineId && r.is_live && Math.abs(r.btime2 - rem) <= 7
+            r => r.line_id === lineId && r.is_live && Math.abs(r.btime2 - rem) <= 12
           );
           if (!alreadyHasLive) {
             const depFormatted = String(Math.floor(depM / 60) % 24).padStart(2, '0') + ':' + String(depM % 60).padStart(2, '0');
