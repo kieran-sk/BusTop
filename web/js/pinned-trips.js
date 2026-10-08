@@ -64,19 +64,19 @@ class PinnedTripsManager {
       return false;
     }
 
-    // 1. Vehicle code match (definite live GPS vehicle match)
-    if (item.vehCode && arr.veh_code && String(item.vehCode).trim() === String(arr.veh_code).trim()) {
-      return true;
+    // 1. Vehicle code: if both have it, they MUST match! If either differs, definitely NOT this bus.
+    if (item.vehCode && arr.veh_code) {
+      return String(item.vehCode).trim() === String(arr.veh_code).trim();
     }
 
-    // 2. Exact departure time match (scheduled departure)
-    if (item.departureTime && arr.departure_time && String(item.departureTime).trim() === String(arr.departure_time).trim()) {
-      return true;
+    // 2. Scheduled departure time: if both have it, they MUST match!
+    if (item.departureTime && arr.departure_time) {
+      return String(item.departureTime).trim() === String(arr.departure_time).trim();
     }
 
-    // 3. Exact estimated arrival time match
-    if (item.estimatedArrivalTime && arr.estimated_arrival_time && String(item.estimatedArrivalTime).trim() === String(arr.estimated_arrival_time).trim()) {
-      return true;
+    // 3. Estimated arrival clock time: if both have it, they MUST match!
+    if (item.estimatedArrivalTime && arr.estimated_arrival_time) {
+      return String(item.estimatedArrivalTime).trim() === String(arr.estimated_arrival_time).trim();
     }
 
     // 4. Exact arrivalKey match
@@ -85,17 +85,79 @@ class PinnedTripsManager {
       return true;
     }
 
-    // 5. Target arrival timestamp proximity (within 8 minutes) for live GPS without vehCode or shifting ETA
+    // 5. Target arrival timestamp proximity (tight tolerance <= 3.5 mins to prevent grabbing other buses of same line)
     if (typeof arr.btime2 === 'number' && item.targetArrivalTimestamp) {
       const now = Date.now();
-      const currentEst = now + (arr.btime2 * 60 * 1000);
+      const currentEst = now + (Math.max(0, arr.btime2) * 60 * 1000);
       const diffMs = Math.abs(item.targetArrivalTimestamp - currentEst);
-      if (diffMs <= 8 * 60 * 1000) {
-        return true;
-      }
+      return diffMs <= 3.5 * 60 * 1000;
     }
 
     return false;
+  }
+
+  findBestArrivalMatch(item, arrs) {
+    if (!item || !Array.isArray(arrs) || arrs.length === 0) return null;
+    const sCode = String(item.stopCode || '').trim();
+    const lId = String(item.lineId || '').trim().toUpperCase();
+
+    // Candidates matching line and routeCode
+    const candidates = arrs.filter(arr => {
+      const arrLid = String(arr.line_id || arr.LineID || '').trim().toUpperCase();
+      if (lId !== arrLid) return false;
+      if (item.routeCode && arr.route_code && String(item.routeCode).trim() !== String(arr.route_code).trim()) {
+        return false;
+      }
+      // Disqualify if vehCode conflict
+      if (item.vehCode && arr.veh_code && String(item.vehCode).trim() !== String(arr.veh_code).trim()) {
+        return false;
+      }
+      // Disqualify if departureTime conflict
+      if (item.departureTime && arr.departure_time && String(item.departureTime).trim() !== String(arr.departure_time).trim()) {
+        return false;
+      }
+      return true;
+    });
+
+    if (candidates.length === 0) return null;
+
+    // 1. Direct vehCode match
+    if (item.vehCode) {
+      const vMatch = candidates.find(a => a.veh_code && String(a.veh_code).trim() === String(item.vehCode).trim());
+      if (vMatch) return vMatch;
+    }
+
+    // 2. Direct departureTime match
+    if (item.departureTime) {
+      const dMatch = candidates.find(a => a.departure_time && String(a.departure_time).trim() === String(item.departureTime).trim());
+      if (dMatch) return dMatch;
+    }
+
+    // 3. Direct arrivalKey match
+    if (item.arrivalKey) {
+      const kMatch = candidates.find(a => this.getArrivalKey(sCode, a) === item.arrivalKey);
+      if (kMatch) return kMatch;
+    }
+
+    // 4. Closest ETA to expected target arrival timestamp
+    const now = Date.now();
+    const expectedRemainingMins = item.targetArrivalTimestamp
+      ? Math.max(0, Math.round((item.targetArrivalTimestamp - now) / 60000))
+      : (typeof item.initialMinutes === 'number' ? item.initialMinutes : 10);
+
+    let bestCandidate = null;
+    let minDiff = Infinity;
+
+    for (const cand of candidates) {
+      const mins = typeof cand.btime2 === 'number' ? cand.btime2 : 999;
+      const diff = Math.abs(mins - expectedRemainingMins);
+      if (diff < minDiff && (diff <= 8 || candidates.length === 1)) {
+        minDiff = diff;
+        bestCandidate = cand;
+      }
+    }
+
+    return bestCandidate;
   }
 
   isArrivalPinned(stopCode, arrival) {
@@ -226,7 +288,10 @@ class PinnedTripsManager {
             Number(walkMins),
             0,
             false,
-            Number(busMins)
+            Number(busMins),
+            String(newItem.vehCode || ''),
+            String(newItem.departureTime || ''),
+            String(newItem.estimatedArrivalTime || '')
           );
         } catch (e) {
           console.warn('AndroidBridge startLiveTracking error:', e);
@@ -398,7 +463,7 @@ class PinnedTripsManager {
     for (const item of [...this.pinnedItems]) {
       const arrs = this.liveArrivals.get(item.stopCode) || [];
       const stopFetched = !this.failedStops.has(item.stopCode);
-      const match = arrs.find(a => this.matchArrival(item, a));
+      const match = this.findBestArrivalMatch(item, arrs);
 
       let shouldUnpin = false;
 
@@ -461,7 +526,7 @@ class PinnedTripsManager {
       const arrs = this.liveArrivals.get(item.stopCode);
       const stopFetched = !this.failedStops.has(item.stopCode);
       // Only expire if stop was queried, arrival is absent, and 90s grace period after target arrival passed
-      if (stopFetched && Array.isArray(arrs) && arrs.length > 0 && !arrs.some(a => this.matchArrival(item, a))) {
+      if (stopFetched && Array.isArray(arrs) && arrs.length > 0 && !this.findBestArrivalMatch(item, arrs)) {
         if (item.targetArrivalTimestamp && now >= (item.targetArrivalTimestamp + 90000)) {
           this.pinnedItems = this.pinnedItems.filter(p => p.id !== item.id);
           changed = true;
@@ -510,7 +575,7 @@ class PinnedTripsManager {
     if (preferredPin) {
       targetItem = preferredPin;
       const arrs = this.liveArrivals.get(preferredPin.stopCode) || [];
-      const match = arrs.find(a => this.matchArrival(preferredPin, a));
+      const match = this.findBestArrivalMatch(preferredPin, arrs);
       if (match && typeof match.btime2 === 'number') {
         targetMatch = match;
         targetMins = match.btime2;
@@ -564,11 +629,33 @@ class PinnedTripsManager {
             : false;
 
           if (!hasActiveAlarm) {
+            const initMins = typeof item.initialMinutes === 'number' ? item.initialMinutes : (typeof mins === 'number' ? mins : 10);
             if (typeof window.AndroidBridge.updateLiveArrivalNotification === 'function') {
-              window.AndroidBridge.updateLiveArrivalNotification(item.lineId, mins, item.stopName, dest, item.walkMinutes || 0, item.stopCode, 10);
+              window.AndroidBridge.updateLiveArrivalNotification(
+                item.lineId,
+                mins,
+                item.stopName,
+                dest,
+                item.walkMinutes || 0,
+                item.stopCode,
+                initMins
+              );
             }
             if (typeof window.AndroidBridge.startLiveTracking === 'function') {
-              window.AndroidBridge.startLiveTracking(item.stopCode, item.lineId, item.routeCode || '', item.stopName, dest, item.walkMinutes || 0, 0, false, mins);
+              window.AndroidBridge.startLiveTracking(
+                item.stopCode,
+                item.lineId,
+                item.routeCode || '',
+                item.stopName,
+                dest,
+                item.walkMinutes || 0,
+                0,
+                false,
+                initMins,
+                item.vehCode || '',
+                item.departureTime || '',
+                item.estimatedArrivalTime || ''
+              );
             }
           }
         } catch (e) {}
@@ -668,7 +755,7 @@ class PinnedTripsManager {
 
     const itemsHtml = this.pinnedItems.map((item, idx) => {
       const arrivalsForStop = this.liveArrivals.get(item.stopCode) || [];
-      const matchingArr = arrivalsForStop.find(a => this.matchArrival(item, a));
+      const matchingArr = this.findBestArrivalMatch(item, arrivalsForStop);
 
       let dueBadgeHtml = '';
       let walkMins = 3;

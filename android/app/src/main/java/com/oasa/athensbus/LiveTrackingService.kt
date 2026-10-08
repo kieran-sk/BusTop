@@ -39,6 +39,9 @@ class LiveTrackingService : Service() {
     private var walkMinutes: Int = 0
     private var thresholdMinutes: Int = 0
     private var initialMinutes: Int = 10
+    private var vehCode: String = ""
+    private var departureTime: String = ""
+    private var estimatedArrivalTime: String = ""
     private var startedAtMs: Long = 0L
     private var ringUntilDismissed: Boolean = false
     private var isAlarmTriggered = false
@@ -58,6 +61,9 @@ class LiveTrackingService : Service() {
         const val EXTRA_THRESHOLD = "EXTRA_THRESHOLD"
         const val EXTRA_INITIAL_MINS = "EXTRA_INITIAL_MINS"
         const val EXTRA_RING_UNTIL_DISMISSED = "EXTRA_RING_UNTIL_DISMISSED"
+        const val EXTRA_VEH_CODE = "EXTRA_VEH_CODE"
+        const val EXTRA_DEPARTURE_TIME = "EXTRA_DEPARTURE_TIME"
+        const val EXTRA_ESTIMATED_ARRIVAL_TIME = "EXTRA_ESTIMATED_ARRIVAL_TIME"
 
         fun start(
             context: Context,
@@ -69,7 +75,10 @@ class LiveTrackingService : Service() {
             walkMinutes: Int,
             threshold: Int,
             ringUntilDismissed: Boolean = false,
-            initialMinutes: Int = 10
+            initialMinutes: Int = 10,
+            vehCode: String = "",
+            departureTime: String = "",
+            estimatedArrivalTime: String = ""
         ) {
             val intent = Intent(context, LiveTrackingService::class.java).apply {
                 action = ACTION_START
@@ -82,6 +91,9 @@ class LiveTrackingService : Service() {
                 putExtra(EXTRA_THRESHOLD, threshold)
                 putExtra(EXTRA_RING_UNTIL_DISMISSED, ringUntilDismissed)
                 putExtra(EXTRA_INITIAL_MINS, initialMinutes)
+                putExtra(EXTRA_VEH_CODE, vehCode)
+                putExtra(EXTRA_DEPARTURE_TIME, departureTime)
+                putExtra(EXTRA_ESTIMATED_ARRIVAL_TIME, estimatedArrivalTime)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -146,8 +158,14 @@ class LiveTrackingService : Service() {
 
         val newStop = intent?.getStringExtra(EXTRA_STOP_CODE) ?: ""
         val newLine = intent?.getStringExtra(EXTRA_LINE_ID) ?: ""
+        val newVehCode = intent?.getStringExtra(EXTRA_VEH_CODE) ?: ""
+        val newDepTime = intent?.getStringExtra(EXTRA_DEPARTURE_TIME) ?: ""
+        val newEstArrTime = intent?.getStringExtra(EXTRA_ESTIMATED_ARRIVAL_TIME) ?: ""
         val newThreshold = intent?.getIntExtra(EXTRA_THRESHOLD, 0) ?: 0
-        val isSameTrip = (newStop.isNotBlank() && newStop == stopCode && newLine.equals(lineId, ignoreCase = true))
+        val isSameTrip = (newStop.isNotBlank() && newStop == stopCode &&
+                          newLine.equals(lineId, ignoreCase = true) &&
+                          (vehCode.isBlank() || newVehCode.isBlank() || vehCode.equals(newVehCode, ignoreCase = true)) &&
+                          (departureTime.isBlank() || newDepTime.isBlank() || departureTime == newDepTime))
 
         stopCode = newStop
         lineId = newLine
@@ -159,6 +177,9 @@ class LiveTrackingService : Service() {
         val newRing = intent?.getBooleanExtra(EXTRA_RING_UNTIL_DISMISSED, false) ?: false
         ringUntilDismissed = newRing
         val newInitMins = intent?.getIntExtra(EXTRA_INITIAL_MINS, 10) ?: 10
+        if (newVehCode.isNotBlank()) vehCode = newVehCode
+        if (newDepTime.isNotBlank()) departureTime = newDepTime
+        if (newEstArrTime.isNotBlank()) estimatedArrivalTime = newEstArrTime
 
         if (newThreshold <= 0) {
             // Strictly passive pinned trip tracking: 100% silent, alarm triggers permanently disabled
@@ -271,8 +292,16 @@ class LiveTrackingService : Service() {
                 val json = JSONObject(response)
                 val arrivals = json.optJSONArray("arrivals")
                 if (arrivals != null) {
-                    var bestLiveMins: Int? = null
-                    var bestSchedMins: Int? = null
+                    class Candidate(
+                        val mins: Int,
+                        val isLive: Boolean,
+                        val cVeh: String,
+                        val cDep: String,
+                        val cEst: String,
+                        val cDest: String
+                    )
+
+                    val candidates = mutableListOf<Candidate>()
 
                     for (i in 0 until arrivals.length()) {
                         val arr = arrivals.getJSONObject(i)
@@ -282,33 +311,74 @@ class LiveTrackingService : Service() {
                         if (arrLine.equals(lineId, ignoreCase = true) &&
                             (routeCode.isBlank() || arrRoute.isBlank() || arrRoute == routeCode)) {
                             val btime2 = arr.optInt("btime2", -1)
-                            val isLive = arr.optBoolean("is_live", false)
                             if (btime2 >= 0) {
-                                if (isLive) {
-                                    // Live GPS arrivals take absolute priority
-                                    if (bestLiveMins == null || btime2 < bestLiveMins) {
-                                        bestLiveMins = btime2
-                                        val apiDest = arr.optString("destination", "").ifBlank {
-                                            arr.optString("route_descr", "")
-                                        }
-                                        if (apiDest.isNotBlank()) {
-                                            val cleaned = NotificationHelper.cleanDestination(apiDest)
-                                            if (cleaned.isNotBlank()) destination = cleaned
-                                        }
-                                    }
-                                } else {
-                                    // Fallback scheduled timetable estimate
-                                    if (bestSchedMins == null || btime2 < bestSchedMins) {
-                                        bestSchedMins = btime2
-                                    }
+                                val cVeh = arr.optString("veh_code", "")
+                                val cDep = arr.optString("departure_time", "")
+                                val cEst = arr.optString("estimated_arrival_time", "")
+                                val cDest = arr.optString("destination", "").ifBlank {
+                                    arr.optString("route_descr", "")
                                 }
+                                val isLive = arr.optBoolean("is_live", false)
+
+                                // Disqualify if vehCode explicitly conflicts
+                                if (vehCode.isNotBlank() && cVeh.isNotBlank() && !vehCode.equals(cVeh, ignoreCase = true)) {
+                                    continue
+                                }
+                                // Disqualify if departureTime explicitly conflicts
+                                if (departureTime.isNotBlank() && cDep.isNotBlank() && departureTime != cDep) {
+                                    continue
+                                }
+
+                                candidates.add(Candidate(btime2, isLive, cVeh, cDep, cEst, cDest))
                             }
                         }
                     }
 
-                    val resultMins = bestLiveMins ?: bestSchedMins
-                    if (resultMins != null) {
-                        // Dynamically update rolling reference so subsequent minutes decay gracefully from actual telematics
+                    if (candidates.isEmpty()) {
+                        return null
+                    }
+
+                    // 1. Vehicle code exact match
+                    var matched: Candidate? = if (vehCode.isNotBlank()) {
+                        candidates.firstOrNull { it.cVeh.equals(vehCode, ignoreCase = true) }
+                    } else null
+
+                    // 2. Departure time exact match
+                    if (matched == null && departureTime.isNotBlank()) {
+                        matched = candidates.firstOrNull { it.cDep == departureTime }
+                    }
+
+                    // 3. Estimated arrival time exact match
+                    if (matched == null && estimatedArrivalTime.isNotBlank()) {
+                        matched = candidates.firstOrNull { it.cEst == estimatedArrivalTime }
+                    }
+
+                    // 4. Expected remaining minutes proximity match (NEVER unconditionally pick the minimum)
+                    if (matched == null) {
+                        val elapsedMinutes = ((System.currentTimeMillis() - startedAtMs) / 60000L).toInt()
+                        val expectedMinutes = kotlin.math.max(0, initialMinutes - elapsedMinutes)
+
+                        matched = candidates.minByOrNull {
+                            Math.abs(it.mins - expectedMinutes)
+                        }
+                    }
+
+                    if (matched != null) {
+                        if (matched.cVeh.isNotBlank()) {
+                            vehCode = matched.cVeh
+                        }
+                        if (matched.cDep.isNotBlank()) {
+                            departureTime = matched.cDep
+                        }
+                        if (matched.cEst.isNotBlank()) {
+                            estimatedArrivalTime = matched.cEst
+                        }
+                        if (matched.cDest.isNotBlank()) {
+                            val cleaned = NotificationHelper.cleanDestination(matched.cDest)
+                            if (cleaned.isNotBlank()) destination = cleaned
+                        }
+
+                        val resultMins = matched.mins
                         initialMinutes = resultMins
                         startedAtMs = System.currentTimeMillis()
                         return resultMins

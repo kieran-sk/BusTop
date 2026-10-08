@@ -27,6 +27,12 @@ import android.os.PowerManager
 import android.provider.Settings
 import android.net.Uri
 import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import org.json.JSONObject
 
 class MainActivity : FragmentActivity() {
@@ -70,9 +76,36 @@ class MainActivity : FragmentActivity() {
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun initWebView() {
+        window.statusBarColor = android.graphics.Color.WHITE
+        window.navigationBarColor = android.graphics.Color.WHITE
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+        WindowInsetsControllerCompat(window, window.decorView).apply {
+            isAppearanceLightStatusBars = true
+            isAppearanceLightNavigationBars = true
+        }
+
         webView = WebView(this)
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
-        setContentView(webView)
+
+        val rootLayout = FrameLayout(this).apply {
+            setBackgroundColor(android.graphics.Color.WHITE)
+            addView(
+                webView,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            )
+        }
+        setContentView(rootLayout)
+
+        ViewCompat.setOnApplyWindowInsetsListener(rootLayout) { view, windowInsets ->
+            val insets = windowInsets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+            )
+            view.setPadding(insets.left, insets.top, insets.right, insets.bottom)
+            windowInsets
+        }
 
         val settings: WebSettings = webView.settings
         settings.javaScriptEnabled = true
@@ -407,7 +440,10 @@ class MainActivity : FragmentActivity() {
             walkMinutes: Double,
             thresholdMinutes: Double,
             ringUntilDismissed: Boolean = false,
-            initialMinutes: Double = 10.0
+            initialMinutes: Double = 10.0,
+            vehCode: String = "",
+            departureTime: String = "",
+            estimatedArrivalTime: String = ""
         ) {
             try {
                 if (thresholdMinutes <= 0.0) {
@@ -440,7 +476,10 @@ class MainActivity : FragmentActivity() {
                     walkMinutes.toInt(),
                     thresholdMinutes.toInt(),
                     ringUntilDismissed,
-                    initialMinutes.toInt()
+                    initialMinutes.toInt(),
+                    vehCode,
+                    departureTime,
+                    estimatedArrivalTime
                 )
             } catch (e: Exception) {
                 e.printStackTrace()
