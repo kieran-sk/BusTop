@@ -5,12 +5,12 @@ plugins {
 
 android {
     namespace = "com.oasa.athensbus.wear"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.oasa.athensbus.wear"
         minSdk = 28
-        targetSdk = 35
+        targetSdk = 34
         versionCode = 5
         versionName = "1.4.0"
     }

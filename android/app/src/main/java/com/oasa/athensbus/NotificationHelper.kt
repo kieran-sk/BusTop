@@ -130,6 +130,26 @@ object NotificationHelper {
         }
     }
 
+    fun buildProgressTrack(minutesAway: Int, initialMinutes: Int): String {
+        if (minutesAway <= 0) {
+            return "━━━━━━━🚍📍 Έφτασε στη στάση!"
+        }
+        val totalSegments = 8
+        val maxM = kotlin.math.max(1, initialMinutes)
+        val progressRatio = ((maxM - minutesAway).toDouble() / maxM.toDouble()).coerceIn(0.0, 1.0)
+        val busIndex = (progressRatio * (totalSegments - 1)).toInt().coerceIn(0, totalSegments - 1)
+        val sb = StringBuilder("●")
+        for (i in 0 until totalSegments) {
+            if (i == busIndex) {
+                sb.append("🚍")
+            } else {
+                sb.append("━")
+            }
+        }
+        sb.append("📍")
+        return sb.toString()
+    }
+
     fun updateLiveArrivalNotification(
         context: Context,
         lineId: String,
@@ -171,10 +191,11 @@ object NotificationHelper {
         val cleanDest = cleanDestination(destination)
         val dirPart = if (cleanDest.isNotBlank()) " προς $cleanDest" else ""
         val title = if (minutesAway <= 0) "🚨 $lineId$dirPart • ΕΦΤΑΣΕ!" else "🚍 $lineId$dirPart • σε $timeFormatted"
-        val content = "📍 Στάση: $stopName"
-
         val maxMins = kotlin.math.max(1, initialMinutes)
         val progress = kotlin.math.min(maxMins, kotlin.math.max(0, maxMins - minutesAway))
+        val visualTrack = buildProgressTrack(minutesAway, maxMins)
+        val content = "$visualTrack • 📍 $stopName"
+        val bigText = "$title\n$visualTrack\n📍 Στάση: $stopName"
 
         val extras = android.os.Bundle().apply {
             putBoolean("android.requestPromotedOngoing", true)
@@ -199,7 +220,7 @@ object NotificationHelper {
                 .setSubText(shortText)
                 .setStyle(
                     Notification.BigTextStyle()
-                        .bigText("$content\n$title")
+                        .bigText(bigText)
                         .setSummaryText(shortText)
                 )
                 .setProgress(maxMins, progress, false)
@@ -207,7 +228,6 @@ object NotificationHelper {
                 .setAutoCancel(false)
                 .setOnlyAlertOnce(true)
                 .setColor(accentColor)
-                .setColorized(true)
                 .setContentIntent(pendingIntent)
                 .setWhen(targetTimestamp)
                 .setShowWhen(true)
@@ -243,7 +263,7 @@ object NotificationHelper {
                 .setSubText(shortText)
                 .setStyle(
                     NotificationCompat.BigTextStyle()
-                        .bigText("$content\n$title")
+                        .bigText(bigText)
                         .setSummaryText(shortText)
                 )
                 .setProgress(maxMins, progress, false)
@@ -254,7 +274,6 @@ object NotificationHelper {
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setCategory(NotificationCompat.CATEGORY_STATUS)
                 .setColor(accentColor)
-                .setColorized(true)
                 .setContentIntent(pendingIntent)
                 .setWhen(targetTimestamp)
                 .setShowWhen(true)

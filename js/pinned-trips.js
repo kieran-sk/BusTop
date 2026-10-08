@@ -526,7 +526,18 @@ class PinnedTripsManager {
       const isDueNow = mins === 0;
       const timeStr = isDueNow ? 'ΤΩΡΑ' : `σε ${mins}'`;
       const title = `🚌 ${item.lineId}: Άφιξη ${timeStr}`;
-      const body = `${item.stopName} • ${item.lineDescr || 'Διαδρομή'}${match && match.is_live ? ' (Ζωντανό GPS)' : ''}`;
+
+      const totalSegs = 8;
+      const initM = typeof item.initialMinutes === 'number' && item.initialMinutes > 0 ? item.initialMinutes : 10;
+      const ratio = Math.max(0, Math.min(1, (initM - mins) / initM));
+      const busIdx = Math.max(0, Math.min(totalSegs - 1, Math.floor(ratio * (totalSegs - 1))));
+      let track = '●';
+      for (let i = 0; i < totalSegs; i++) {
+        track += (i === busIdx) ? '🚍' : '━';
+      }
+      track += '📍';
+      if (mins <= 0) track = '━━━━━━━🚍📍';
+      const body = `${track} • ${item.stopName}${item.destination ? ' προς ' + item.destination : ''}`;
 
       // Update Service Worker Live Ongoing Notification
       if (navigator.serviceWorker && navigator.serviceWorker.controller) {

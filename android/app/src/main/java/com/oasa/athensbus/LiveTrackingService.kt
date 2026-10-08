@@ -357,10 +357,11 @@ class LiveTrackingService : Service() {
         val cleanDest = NotificationHelper.cleanDestination(destination)
         val dirPart = if (cleanDest.isNotBlank()) " προς $cleanDest" else ""
         val title = if (mins <= 0) "🚨 $lineId$dirPart • ΕΦΤΑΣΕ!" else "🚍 $lineId$dirPart • σε $timeFormatted"
-        val content = "📍 Στάση: $stopName"
-
         val maxMins = kotlin.math.max(1, initialMinutes)
         val progress = kotlin.math.min(maxMins, kotlin.math.max(0, maxMins - mins))
+        val visualTrack = NotificationHelper.buildProgressTrack(mins, maxMins)
+        val content = "$visualTrack • 📍 $stopName"
+        val bigText = "$title\n$visualTrack\n📍 Στάση: $stopName"
 
         val extras = android.os.Bundle().apply {
             putBoolean("android.requestPromotedOngoing", true)
@@ -385,7 +386,7 @@ class LiveTrackingService : Service() {
                 .setSubText(shortText)
                 .setStyle(
                     Notification.BigTextStyle()
-                        .bigText("$content\n$title")
+                        .bigText(bigText)
                         .setSummaryText(shortText)
                 )
                 .setProgress(maxMins, progress, false)
@@ -393,7 +394,6 @@ class LiveTrackingService : Service() {
                 .setAutoCancel(false)
                 .setOnlyAlertOnce(true)
                 .setColor(accentColor)
-                .setColorized(true)
                 .setContentIntent(pLaunch)
                 .setWhen(targetTimestamp)
                 .setShowWhen(true)
@@ -429,7 +429,7 @@ class LiveTrackingService : Service() {
                 .setSubText(shortText)
                 .setStyle(
                     NotificationCompat.BigTextStyle()
-                        .bigText("$content\n$title")
+                        .bigText(bigText)
                         .setSummaryText(shortText)
                 )
                 .setProgress(maxMins, progress, false)
@@ -440,7 +440,6 @@ class LiveTrackingService : Service() {
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setCategory(NotificationCompat.CATEGORY_STATUS)
                 .setColor(accentColor)
-                .setColorized(true)
                 .setContentIntent(pLaunch)
                 .setWhen(targetTimestamp)
                 .setShowWhen(true)

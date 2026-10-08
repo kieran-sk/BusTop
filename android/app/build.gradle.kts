@@ -5,12 +5,12 @@ plugins {
 
 android {
     namespace = "com.oasa.athensbus"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.oasa.athensbus"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 34
         versionCode = project.findProperty("buildNumber")?.toString()?.toIntOrNull() ?: 12
         versionName = "1.0.${versionCode}"
 
