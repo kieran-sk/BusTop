@@ -588,9 +588,9 @@ class PinnedTripsManager {
       const item = targetItem;
       const match = targetMatch;
       const mins = targetMins;
-      const isDueNow = mins === 0;
-      const timeStr = isDueNow ? 'ΤΩΡΑ' : `σε ${mins}'`;
-      const title = `🚌 ${item.lineId}: Άφιξη ${timeStr}`;
+      const cleanDest = this.getCleanDestination(item);
+      const dirPart = cleanDest ? ' προς ' + cleanDest : '';
+      const title = isDueNow ? `🚨 ${item.lineId}${dirPart} • Έφτασε!` : `🚍 ${item.lineId}${dirPart} • ${timeStr}`;
 
       const totalSegs = 8;
       const initM = typeof item.initialMinutes === 'number' && item.initialMinutes > 0 ? item.initialMinutes : 10;
@@ -601,8 +601,9 @@ class PinnedTripsManager {
         track += (i === busIdx) ? '🚍' : '━';
       }
       track += '📍';
-      if (mins <= 0) track = '━━━━━━━🚍📍';
-      const body = `${track} • ${item.stopName}${item.destination ? ' προς ' + item.destination : ''}`;
+      if (mins <= 0) track = '━━━━━━━🚍📍 Έφτασε στη στάση!';
+      const walkInfo = (item.walkMinutes && item.walkMinutes > 0) ? ` (🚶 ${item.walkMinutes}' περπάτημα)` : '';
+      const body = `${track}\n📍 Στάση: ${item.stopName}${walkInfo}`;
 
       // Update Service Worker Live Ongoing Notification
       if (navigator.serviceWorker && navigator.serviceWorker.controller) {

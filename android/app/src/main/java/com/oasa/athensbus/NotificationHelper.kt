@@ -190,12 +190,18 @@ object NotificationHelper {
         val shortText = if (minutesAway <= 0) "ΤΩΡΑ" else "${minutesAway}'"
         val cleanDest = cleanDestination(destination)
         val dirPart = if (cleanDest.isNotBlank()) " προς $cleanDest" else ""
-        val title = if (minutesAway <= 0) "🚨 $lineId$dirPart • ΕΦΤΑΣΕ!" else "🚍 $lineId$dirPart • σε $timeFormatted"
+        val title = if (minutesAway <= 0) "🚨 $lineId$dirPart • Έφτασε!" else "🚍 $lineId$dirPart"
         val maxMins = kotlin.math.max(1, initialMinutes)
         val progress = kotlin.math.min(maxMins, kotlin.math.max(0, maxMins - minutesAway))
         val visualTrack = buildProgressTrack(minutesAway, maxMins)
-        val content = "$visualTrack • 📍 $stopName"
-        val bigText = "$title\n$visualTrack\n📍 Στάση: $stopName"
+        val content = if (minutesAway <= 0) "Έφτασε στη στάση $stopName" else "$visualTrack • 📍 $stopName"
+        val bigText = buildString {
+            append(visualTrack)
+            append("\n📍 Στάση: ").append(stopName)
+            if (walkMinutes > 0) {
+                append(" (🚶 ").append(walkMinutes).append("' περπάτημα)")
+            }
+        }
 
         val extras = android.os.Bundle().apply {
             putBoolean("android.requestPromotedOngoing", true)
@@ -221,7 +227,6 @@ object NotificationHelper {
                 .setStyle(
                     Notification.BigTextStyle()
                         .bigText(bigText)
-                        .setSummaryText(shortText)
                 )
                 .setProgress(maxMins, progress, false)
                 .setOngoing(true)
@@ -229,6 +234,7 @@ object NotificationHelper {
                 .setOnlyAlertOnce(true)
                 .setColor(accentColor)
                 .setContentIntent(pendingIntent)
+                .setDeleteIntent(pStop)
                 .setWhen(targetTimestamp)
                 .setShowWhen(true)
                 .setUsesChronometer(minutesAway > 0)
@@ -264,7 +270,6 @@ object NotificationHelper {
                 .setStyle(
                     NotificationCompat.BigTextStyle()
                         .bigText(bigText)
-                        .setSummaryText(shortText)
                 )
                 .setProgress(maxMins, progress, false)
                 .setOngoing(true)
@@ -275,6 +280,7 @@ object NotificationHelper {
                 .setCategory(NotificationCompat.CATEGORY_STATUS)
                 .setColor(accentColor)
                 .setContentIntent(pendingIntent)
+                .setDeleteIntent(pStop)
                 .setWhen(targetTimestamp)
                 .setShowWhen(true)
                 .setUsesChronometer(minutesAway > 0)

@@ -426,12 +426,18 @@ class LiveTrackingService : Service() {
         val shortText = if (mins <= 0) "ΤΩΡΑ" else "${mins}'"
         val cleanDest = NotificationHelper.cleanDestination(destination)
         val dirPart = if (cleanDest.isNotBlank()) " προς $cleanDest" else ""
-        val title = if (mins <= 0) "🚨 $lineId$dirPart • ΕΦΤΑΣΕ!" else "🚍 $lineId$dirPart • σε $timeFormatted"
+        val title = if (mins <= 0) "🚨 $lineId$dirPart • Έφτασε!" else "🚍 $lineId$dirPart"
         val maxMins = kotlin.math.max(1, initialMinutes)
         val progress = kotlin.math.min(maxMins, kotlin.math.max(0, maxMins - mins))
         val visualTrack = NotificationHelper.buildProgressTrack(mins, maxMins)
-        val content = "$visualTrack • 📍 $stopName"
-        val bigText = "$title\n$visualTrack\n📍 Στάση: $stopName"
+        val content = if (mins <= 0) "Έφτασε στη στάση $stopName" else "$visualTrack • 📍 $stopName"
+        val bigText = buildString {
+            append(visualTrack)
+            append("\n📍 Στάση: ").append(stopName)
+            if (walkMinutes > 0) {
+                append(" (🚶 ").append(walkMinutes).append("' περπάτημα)")
+            }
+        }
 
         val extras = android.os.Bundle().apply {
             putBoolean("android.requestPromotedOngoing", true)
@@ -457,7 +463,6 @@ class LiveTrackingService : Service() {
                 .setStyle(
                     Notification.BigTextStyle()
                         .bigText(bigText)
-                        .setSummaryText(shortText)
                 )
                 .setProgress(maxMins, progress, false)
                 .setOngoing(true)
@@ -465,6 +470,7 @@ class LiveTrackingService : Service() {
                 .setOnlyAlertOnce(true)
                 .setColor(accentColor)
                 .setContentIntent(pLaunch)
+                .setDeleteIntent(pStop)
                 .setWhen(targetTimestamp)
                 .setShowWhen(true)
                 .setUsesChronometer(mins > 0)
@@ -500,7 +506,6 @@ class LiveTrackingService : Service() {
                 .setStyle(
                     NotificationCompat.BigTextStyle()
                         .bigText(bigText)
-                        .setSummaryText(shortText)
                 )
                 .setProgress(maxMins, progress, false)
                 .setOngoing(true)
@@ -511,6 +516,7 @@ class LiveTrackingService : Service() {
                 .setCategory(NotificationCompat.CATEGORY_STATUS)
                 .setColor(accentColor)
                 .setContentIntent(pLaunch)
+                .setDeleteIntent(pStop)
                 .setWhen(targetTimestamp)
                 .setShowWhen(true)
                 .setUsesChronometer(mins > 0)
