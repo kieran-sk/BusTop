@@ -412,6 +412,9 @@ class AppController {
 
     // Initialize Map Manager (Leaflet + OpenStreetMap)
     this.mapManager = new MapManager('map-container');
+    if (this.userLocation && typeof this.userLocation.lat === 'number' && typeof this.userLocation.lng === 'number') {
+      this.mapManager.userLocation = { lat: this.userLocation.lat, lng: this.userLocation.lng };
+    }
     await this.mapManager.init();
 
     // Geolocation detection
@@ -557,11 +560,28 @@ class AppController {
       // 1. Initial position with cached fix support (maximumAge: 10000) for instant startup
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          this.handleLocationChange(pos.coords.latitude, pos.coords.longitude, true);
-          // Center map immediately on user on app open
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const prevLoc = this.userLocation;
+
+          let distFromPrev = 999999;
+          if (prevLoc && typeof prevLoc.lat === 'number' && typeof prevLoc.lng === 'number') {
+            const dLatM = (lat - prevLoc.lat) * 111139;
+            const dLngM = (lng - prevLoc.lng) * (111139 * Math.cos(lat * Math.PI / 180));
+            distFromPrev = Math.sqrt(dLatM * dLatM + dLngM * dLngM);
+          }
+
+          this.handleLocationChange(lat, lng, true);
+
+          // Center/fit map smoothly ONLY if the user actually moved > 120m or we had no prior location
           if (this.mapManager) {
             const stops = window.Search ? window.Search.nearbyStops : [];
-            this.mapManager.fitAreaAroundUser(pos.coords.latitude, pos.coords.longitude, stops, 350);
+            if (distFromPrev > 120) {
+              this.mapManager.fitAreaAroundUser(lat, lng, stops, 220);
+            } else {
+              // Location matches current map view: update marker without jarring camera jump
+              this.mapManager.setUserLocation(lat, lng);
+            }
           }
         },
         (err) => {

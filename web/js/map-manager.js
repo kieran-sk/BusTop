@@ -25,6 +25,8 @@ class MapManager {
     this.isolatedLine = null; // { lineId, lineCode, routeCode } when in isolation mode
     this.isolatedPollTimer = null;
     this.journeyLayer = null;
+    this.isProgrammaticMove = false;
+    this.isInitialStartup = true;
   }
 
   async init() {
@@ -49,15 +51,16 @@ class MapManager {
       this.map = null;
     }
 
-    // Default to Athens center
+    // Default to Athens center if userLocation unknown
     const defaultCenter = [37.9845, 23.7335];
-    const initialCenter = (this.userLocation && !isNaN(this.userLocation.lat) && !isNaN(this.userLocation.lng)) 
+    const hasValidUserLoc = (this.userLocation && typeof this.userLocation.lat === 'number' && !isNaN(this.userLocation.lat) && typeof this.userLocation.lng === 'number' && !isNaN(this.userLocation.lng));
+    const initialCenter = hasValidUserLoc 
       ? [this.userLocation.lat, this.userLocation.lng] 
       : defaultCenter;
 
     this.map = L.map(this.containerId, {
       center: initialCenter,
-      zoom: 17,
+      zoom: hasValidUserLoc ? 16 : 15,
       zoomControl: false,
       preferCanvas: true,
       zoomAnimation: true,
@@ -87,12 +90,13 @@ class MapManager {
     this.routeLayer = L.layerGroup().addTo(this.map);
     this.journeyLayer = L.layerGroup().addTo(this.map);
 
-    if (this.userLocation && !isNaN(this.userLocation.lat) && !isNaN(this.userLocation.lng)) {
+    if (hasValidUserLoc) {
       this.setUserLocation(this.userLocation.lat, this.userLocation.lng);
     }
 
-    // Dynamic stop discovery on zoom and pan
+    // Dynamic stop discovery: ONLY triggers on manual user zoom/pan, NEVER during programmatic flights
     this.map.on('moveend', () => {
+      if (this.isProgrammaticMove || this.isInitialStartup) return;
       this.onViewportChanged();
     });
 
@@ -103,12 +107,15 @@ class MapManager {
       if (this.map) this.map.invalidateSize();
     }, 150);
 
-    // If nearby stops already exist in Search, render them now
+    // If nearby stops already exist in Search, render them now; otherwise wait for geolocation fix
     if (window.Search && window.Search.nearbyStops && window.Search.nearbyStops.length > 0) {
       this.renderNearbyStops(window.Search.nearbyStops);
-    } else {
-      this.onViewportChanged();
     }
+
+    // Release initial startup lock after coordinates settle
+    setTimeout(() => {
+      this.isInitialStartup = false;
+    }, 1500);
   }
 
   invalidateSize() {
@@ -452,19 +459,19 @@ class MapManager {
   }
 
   /**
-   * Fit map viewport to a comfortable area around the user (~500m walking radius + nearby stops)
+   * Fit map viewport to a comfortable area around the user (~300m walking radius + nearby stops)
    * @param {number} lat - User latitude
    * @param {number} lng - User longitude
    * @param {Array} [nearbyStops] - Optional list of nearby stops to include in bounds
-   * @param {number} [radiusMeters=500] - Radius around user in meters
+   * @param {number} [radiusMeters=220] - Radius around user in meters
+   * @param {boolean} [immediate=false] - If true, jump without animation (for instantaneous startup)
    */
-  fitAreaAroundUser(lat, lng, nearbyStops = [], radiusMeters = 200) {
+  fitAreaAroundUser(lat, lng, nearbyStops = [], radiusMeters = 220, immediate = false) {
     if (!this.map) return;
     const pLat = parseFloat(lat);
     const pLng = parseFloat(lng);
     if (isNaN(pLat) || isNaN(pLng)) return;
 
-    this.map.invalidateSize();
     this.setUserLocation(pLat, pLng);
 
     if (this.userMarker) {
@@ -487,35 +494,44 @@ class MapManager {
       [pLat + deltaLat, pLng + deltaLng]
     );
 
-    // If nearby stops are available, include any within walkable reach (~850m)
+    // If nearby stops are available, include walkable ones within ~600m
     if (Array.isArray(nearbyStops) && nearbyStops.length > 0) {
-      nearbyStops.forEach(s => {
+      nearbyStops.slice(0, 8).forEach(s => {
         const sLat = parseFloat(s.StopLat);
         const sLng = parseFloat(s.StopLng);
         if (!isNaN(sLat) && !isNaN(sLng)) {
           const dLatM = Math.abs(sLat - pLat) * 111320;
           const dLngM = Math.abs(sLng - pLng) * 111320 * Math.cos(latRad);
-          const dist = Math.sqrt(dLatM * dLatM + dLngM * dLngM);
-          if (dist <= 850) {
+          if (Math.hypot(dLatM, dLngM) <= 600) {
             bounds.extend([sLat, sLng]);
           }
         }
       });
     }
 
-    const doFit = () => {
-      if (!this.map) return;
-      this.map.invalidateSize();
+    this.isProgrammaticMove = true;
+    if (immediate) {
+      this.map.fitBounds(bounds, { padding: [35, 35], maxZoom: 17, animate: false });
+      setTimeout(() => { this.isProgrammaticMove = false; }, 150);
+    } else {
       if (typeof this.map.flyToBounds === 'function') {
-        this.map.flyToBounds(bounds, { padding: [35, 35], maxZoom: 18, duration: 0.8 });
+        this.map.flyToBounds(bounds, { padding: [35, 35], maxZoom: 17, duration: 0.65 });
       } else {
-        this.map.fitBounds(bounds, { padding: [35, 35], maxZoom: 18, animate: true });
+        this.map.fitBounds(bounds, { padding: [35, 35], maxZoom: 17, animate: true });
       }
-    };
+      setTimeout(() => { this.isProgrammaticMove = false; }, 750);
+    }
+  }
 
-    doFit();
-    // Safety timeout in case DOM tab switch animation was finishing
-    setTimeout(doFit, 150);
+  setView(lat, lng, zoom = 16, animate = false) {
+    if (!this.map) return;
+    const pLat = parseFloat(lat);
+    const pLng = parseFloat(lng);
+    if (isNaN(pLat) || isNaN(pLng)) return;
+
+    this.isProgrammaticMove = true;
+    this.map.setView([pLat, pLng], zoom, { animate });
+    setTimeout(() => { this.isProgrammaticMove = false; }, 400);
   }
 
   focusStop(lat, lng, stopName = '') {
@@ -524,7 +540,9 @@ class MapManager {
     const pLng = parseFloat(lng);
     if (isNaN(pLat) || isNaN(pLng)) return;
 
+    this.isProgrammaticMove = true;
     this.map.setView([pLat, pLng], 16, { animate: true });
+    setTimeout(() => { this.isProgrammaticMove = false; }, 400);
   }
 
   renderPolyline(coordinates = []) {

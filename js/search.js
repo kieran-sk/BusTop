@@ -403,7 +403,7 @@ class SearchManager {
       window.App.switchTab('search');
     }
 
-    // If user's location is already known, immediately render local stops and fit map (0ms latency)
+    // If user's location is already known, immediately render local stops (0ms latency)
     if (window.App && window.App.userLocation) {
       const uLat = window.App.userLocation.lat;
       const uLng = window.App.userLocation.lng;
@@ -414,7 +414,9 @@ class SearchManager {
         this.renderNearbyStops(uLat, uLng);
       }
       if (window.App.mapManager) {
-        window.App.mapManager.fitAreaAroundUser(uLat, uLng, this.nearbyStops, 200);
+        if (!silent) {
+          window.App.mapManager.fitAreaAroundUser(uLat, uLng, this.nearbyStops, 200);
+        }
         window.App.mapManager.renderNearbyStops(this.nearbyStops);
       }
     }
@@ -423,6 +425,15 @@ class SearchManager {
     const mapCard = document.getElementById('map-container');
     if (mapCard && !silent) {
       mapCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    // On silent startup: window.App.initGeolocation() is already managing geolocation centrally!
+    if (silent) {
+      if (radarBtn) {
+        radarBtn.classList.remove('spin-animation');
+        radarBtn.disabled = false;
+      }
+      return;
     }
 
     const fallbackToCenter = async () => {
