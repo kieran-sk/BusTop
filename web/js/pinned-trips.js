@@ -268,12 +268,8 @@ class PinnedTripsManager {
         window.Alarms.removeAlarmByStopAndLine(stopCode, lineId);
       }
 
-      // Start Android Live Tracking Notification for this pinned bus only if no active alarm is running
-      const hasActiveAlarm = (window.Alarms && Array.isArray(window.Alarms.alarms))
-        ? window.Alarms.alarms.some(a => !a.triggered && typeof a.thresholdMinutes === 'number' && a.thresholdMinutes > 0)
-        : false;
-
-      if (!hasActiveAlarm && window.AndroidBridge && typeof window.AndroidBridge.startLiveTracking === 'function') {
+      // Start Android Live Tracking Notification for this pinned bus
+      if (window.AndroidBridge && typeof window.AndroidBridge.startLiveTracking === 'function') {
         try {
           let walkMins = 0;
           if (currentStop.distanceMeters) {
@@ -588,22 +584,9 @@ class PinnedTripsManager {
       const item = targetItem;
       const match = targetMatch;
       const mins = targetMins;
-      const cleanDest = this.getCleanDestination(item);
-      const dirPart = cleanDest ? ' προς ' + cleanDest : '';
-      const title = isDueNow ? `🚨 ${item.lineId}${dirPart} • Έφτασε!` : `🚍 ${item.lineId}${dirPart} • ${timeStr}`;
-
-      const totalSegs = 8;
-      const initM = typeof item.initialMinutes === 'number' && item.initialMinutes > 0 ? item.initialMinutes : 10;
-      const ratio = Math.max(0, Math.min(1, (initM - mins) / initM));
-      const busIdx = Math.max(0, Math.min(totalSegs - 1, Math.floor(ratio * (totalSegs - 1))));
-      let track = '●';
-      for (let i = 0; i < totalSegs; i++) {
-        track += (i === busIdx) ? '🚍' : '━';
-      }
-      track += '📍';
-      if (mins <= 0) track = '━━━━━━━🚍📍 Έφτασε στη στάση!';
-      const walkInfo = (item.walkMinutes && item.walkMinutes > 0) ? ` (🚶 ${item.walkMinutes}' περπάτημα)` : '';
-      const body = `${track}\n📍 Στάση: ${item.stopName}${walkInfo}`;
+      const minsDisplay = (typeof mins === 'number' && mins > 0) ? `${mins}'` : "0'";
+      const title = `${item.lineId} σε ${minsDisplay}`;
+      const body = cleanDest ? `προς ${cleanDest}\n${item.stopName}` : item.stopName;
 
       // Update Service Worker Live Ongoing Notification
       if (navigator.serviceWorker && navigator.serviceWorker.controller) {
@@ -621,43 +604,37 @@ class PinnedTripsManager {
         navigator.setAppBadge(mins).catch(() => {});
       }
 
-      // Android Bridge Hook if running inside Android APK WebView (only if no active alarm is running)
+      // Android Bridge Hook if running inside Android APK WebView
       if (window.AndroidBridge) {
         try {
           const dest = this.getCleanDestination(item);
-          const hasActiveAlarm = (window.Alarms && Array.isArray(window.Alarms.alarms))
-            ? window.Alarms.alarms.some(a => !a.triggered && typeof a.thresholdMinutes === 'number' && a.thresholdMinutes > 0)
-            : false;
-
-          if (!hasActiveAlarm) {
-            const initMins = typeof item.initialMinutes === 'number' ? item.initialMinutes : (typeof mins === 'number' ? mins : 10);
-            if (typeof window.AndroidBridge.updateLiveArrivalNotification === 'function') {
-              window.AndroidBridge.updateLiveArrivalNotification(
-                item.lineId,
-                mins,
-                item.stopName,
-                dest,
-                item.walkMinutes || 0,
-                item.stopCode,
-                initMins
-              );
-            }
-            if (typeof window.AndroidBridge.startLiveTracking === 'function') {
-              window.AndroidBridge.startLiveTracking(
-                item.stopCode,
-                item.lineId,
-                item.routeCode || '',
-                item.stopName,
-                dest,
-                item.walkMinutes || 0,
-                0,
-                false,
-                initMins,
-                item.vehCode || '',
-                item.departureTime || '',
-                item.estimatedArrivalTime || ''
-              );
-            }
+          const initMins = typeof item.initialMinutes === 'number' ? item.initialMinutes : (typeof mins === 'number' ? mins : 10);
+          if (typeof window.AndroidBridge.updateLiveArrivalNotification === 'function') {
+            window.AndroidBridge.updateLiveArrivalNotification(
+              item.lineId,
+              mins,
+              item.stopName,
+              dest,
+              item.walkMinutes || 0,
+              item.stopCode,
+              initMins
+            );
+          }
+          if (typeof window.AndroidBridge.startLiveTracking === 'function') {
+            window.AndroidBridge.startLiveTracking(
+              item.stopCode,
+              item.lineId,
+              item.routeCode || '',
+              item.stopName,
+              dest,
+              item.walkMinutes || 0,
+              0,
+              false,
+              initMins,
+              item.vehCode || '',
+              item.departureTime || '',
+              item.estimatedArrivalTime || ''
+            );
           }
         } catch (e) {}
       }

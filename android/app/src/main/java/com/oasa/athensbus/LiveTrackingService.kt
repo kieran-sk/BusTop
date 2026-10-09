@@ -422,22 +422,12 @@ class LiveTrackingService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val timeFormatted = NotificationHelper.formatMinutesHuman(mins)
-        val shortText = if (mins <= 0) "ΤΩΡΑ" else "${mins}'"
+        val timeFormatted = NotificationHelper.formatMinutesHuman(kotlin.math.max(0, mins))
+        val shortText = if (mins <= 0) "0'" else "${mins}'"
         val cleanDest = NotificationHelper.cleanDestination(destination)
-        val dirPart = if (cleanDest.isNotBlank()) " προς $cleanDest" else ""
-        val title = if (mins <= 0) "🚨 $lineId$dirPart • Έφτασε!" else "🚍 $lineId$dirPart"
-        val maxMins = kotlin.math.max(1, initialMinutes)
-        val progress = kotlin.math.min(maxMins, kotlin.math.max(0, maxMins - mins))
-        val visualTrack = NotificationHelper.buildProgressTrack(mins, maxMins)
-        val content = if (mins <= 0) "Έφτασε στη στάση $stopName" else "$visualTrack • 📍 $stopName"
-        val bigText = buildString {
-            append(visualTrack)
-            append("\n📍 Στάση: ").append(stopName)
-            if (walkMinutes > 0) {
-                append(" (🚶 ").append(walkMinutes).append("' περπάτημα)")
-            }
-        }
+        val title = "$lineId σε $timeFormatted"
+        val content = if (cleanDest.isNotBlank()) "προς $cleanDest • $stopName" else stopName
+        val bigText = if (cleanDest.isNotBlank()) "προς $cleanDest\n$stopName" else stopName
 
         val extras = android.os.Bundle().apply {
             putBoolean("android.requestPromotedOngoing", true)
@@ -464,7 +454,6 @@ class LiveTrackingService : Service() {
                     Notification.BigTextStyle()
                         .bigText(bigText)
                 )
-                .setProgress(maxMins, progress, false)
                 .setOngoing(true)
                 .setAutoCancel(false)
                 .setOnlyAlertOnce(true)
@@ -507,7 +496,6 @@ class LiveTrackingService : Service() {
                     NotificationCompat.BigTextStyle()
                         .bigText(bigText)
                 )
-                .setProgress(maxMins, progress, false)
                 .setOngoing(true)
                 .setAutoCancel(false)
                 .setOnlyAlertOnce(true)

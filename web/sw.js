@@ -94,11 +94,11 @@ function tickServiceWorkerAlarms() {
       activeAlarms.delete(id);
     } else {
       // Live countdown notification update
-      const destLine = alarm.destination ? ` • Προς ${alarm.destination}` : '';
-      const walkLine = alarm.walkMinutes ? `\n🚶 Βάδισμα: ~${formatMinutesHuman(alarm.walkMinutes)}` : '';
       const timeDisplay = formatMinutesHuman(remainingMins);
-      self.registration.showNotification(`🚍 ${alarm.lineId} σε ${timeDisplay}`, {
-        body: `Στάση: ${alarm.stopName}${destLine}${walkLine} • Ειδοποίηση στα ${formatMinutesHuman(alarm.thresholdMinutes)}`,
+      const title = `${alarm.lineId} σε ${timeDisplay}`;
+      const body = alarm.destination ? `προς ${alarm.destination}\n${alarm.stopName}` : alarm.stopName;
+      self.registration.showNotification(title, {
+        body,
         tag: `live_alarm_${alarm.id}`,
         icon: '/assets/icon-192.png',
         badge: '/assets/icon-192.png',
@@ -153,8 +153,10 @@ self.addEventListener('message', (event) => {
     }
 
     // Show initial live notification immediately
-    self.registration.showNotification(`🚍 ${lineId} σε ${initialMinutes || 10}'`, {
-      body: `Στάση: ${stopName} • Ειδοποίηση στα ${threshold}'`,
+    const initDisplay = formatMinutesHuman(initialMinutes || 10);
+    const initBody = event.data.destination ? `προς ${event.data.destination}\n${stopName}` : stopName;
+    self.registration.showNotification(`${lineId} σε ${initDisplay}`, {
+      body: initBody,
       tag: `live_alarm_${id}`,
       icon: '/assets/icon-192.png',
       badge: '/assets/icon-192.png',

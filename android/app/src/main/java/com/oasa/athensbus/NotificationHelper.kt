@@ -131,23 +131,7 @@ object NotificationHelper {
     }
 
     fun buildProgressTrack(minutesAway: Int, initialMinutes: Int): String {
-        if (minutesAway <= 0) {
-            return "━━━━━━━🚍📍 Έφτασε στη στάση!"
-        }
-        val totalSegments = 8
-        val maxM = kotlin.math.max(1, initialMinutes)
-        val progressRatio = ((maxM - minutesAway).toDouble() / maxM.toDouble()).coerceIn(0.0, 1.0)
-        val busIndex = (progressRatio * (totalSegments - 1)).toInt().coerceIn(0, totalSegments - 1)
-        val sb = StringBuilder("●")
-        for (i in 0 until totalSegments) {
-            if (i == busIndex) {
-                sb.append("🚍")
-            } else {
-                sb.append("━")
-            }
-        }
-        sb.append("📍")
-        return sb.toString()
+        return ""
     }
 
     fun updateLiveArrivalNotification(
@@ -186,22 +170,12 @@ object NotificationHelper {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val timeFormatted = formatMinutesHuman(minutesAway)
-        val shortText = if (minutesAway <= 0) "ΤΩΡΑ" else "${minutesAway}'"
+        val timeFormatted = formatMinutesHuman(kotlin.math.max(0, minutesAway))
+        val shortText = if (minutesAway <= 0) "0'" else "${minutesAway}'"
         val cleanDest = cleanDestination(destination)
-        val dirPart = if (cleanDest.isNotBlank()) " προς $cleanDest" else ""
-        val title = if (minutesAway <= 0) "🚨 $lineId$dirPart • Έφτασε!" else "🚍 $lineId$dirPart"
-        val maxMins = kotlin.math.max(1, initialMinutes)
-        val progress = kotlin.math.min(maxMins, kotlin.math.max(0, maxMins - minutesAway))
-        val visualTrack = buildProgressTrack(minutesAway, maxMins)
-        val content = if (minutesAway <= 0) "Έφτασε στη στάση $stopName" else "$visualTrack • 📍 $stopName"
-        val bigText = buildString {
-            append(visualTrack)
-            append("\n📍 Στάση: ").append(stopName)
-            if (walkMinutes > 0) {
-                append(" (🚶 ").append(walkMinutes).append("' περπάτημα)")
-            }
-        }
+        val title = "$lineId σε $timeFormatted"
+        val content = if (cleanDest.isNotBlank()) "προς $cleanDest • $stopName" else stopName
+        val bigText = if (cleanDest.isNotBlank()) "προς $cleanDest\n$stopName" else stopName
 
         val extras = android.os.Bundle().apply {
             putBoolean("android.requestPromotedOngoing", true)
@@ -228,7 +202,6 @@ object NotificationHelper {
                     Notification.BigTextStyle()
                         .bigText(bigText)
                 )
-                .setProgress(maxMins, progress, false)
                 .setOngoing(true)
                 .setAutoCancel(false)
                 .setOnlyAlertOnce(true)
@@ -271,7 +244,6 @@ object NotificationHelper {
                     NotificationCompat.BigTextStyle()
                         .bigText(bigText)
                 )
-                .setProgress(maxMins, progress, false)
                 .setOngoing(true)
                 .setAutoCancel(false)
                 .setOnlyAlertOnce(true)

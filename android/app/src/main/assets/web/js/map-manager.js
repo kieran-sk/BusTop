@@ -1,0 +1,880 @@
+/**
+ * Interactive OpenStreetMap & Leaflet Map View of Stops Near Me
+ * Displays all stops near user with name, lines, direction, and option to open expanded view.
+ */
+
+class MapManager {
+  constructor(containerId = 'map-container') {
+    this.containerId = containerId;
+    this.map = null;
+    this.stopsLayer = null;
+    this.busLayer = null;
+    this.routeLayer = null;
+    this.userMarker = null;
+    this.userLocation = null;
+    this.isLoaded = false;
+    this.moveDebounceTimer = null;
+    this.lastSearchCenter = null;
+    this.lastSearchZoom = null;
+    this.busLoadTimer = null;
+    this.resolvedLinesCache = new Map();
+    this.stopMarkersMap = new Map();
+    this.vehicleHistoryMap = new Map(); // vehNo -> { lat, lng, heading }
+    this.busMarkersMap = new Map(); // vehNo -> L.Marker for smooth animation
+    this.busAnimationFrames = new Map(); // vehNo -> requestAnimationFrame ID
+    this.isolatedLine = null; // { lineId, lineCode, routeCode } when in isolation mode
+    this.isolatedPollTimer = null;
+    this.journeyLayer = null;
+    this.isProgrammaticMove = false;
+    this.isInitialStartup = true;
+  }
+
+  async init() {
+    const container = document.getElementById(this.containerId);
+    if (!container) return;
+
+    if (typeof L === 'undefined') {
+      console.warn('Leaflet not loaded yet, waiting...');
+      let retries = 0;
+      while (typeof L === 'undefined' && retries < 20) {
+        await new Promise(r => setTimeout(r, 100));
+        retries++;
+      }
+      if (typeof L === 'undefined') {
+        console.error('Leaflet failed to load');
+        return;
+      }
+    }
+
+    if (this.map) {
+      this.map.remove();
+      this.map = null;
+    }
+
+    // Default to Athens center if userLocation unknown
+    const defaultCenter = [37.9845, 23.7335];
+    const hasValidUserLoc = (this.userLocation && typeof this.userLocation.lat === 'number' && !isNaN(this.userLocation.lat) && typeof this.userLocation.lng === 'number' && !isNaN(this.userLocation.lng));
+    const initialCenter = hasValidUserLoc 
+      ? [this.userLocation.lat, this.userLocation.lng] 
+      : defaultCenter;
+
+    this.map = L.map(this.containerId, {
+      center: initialCenter,
+      zoom: hasValidUserLoc ? 16 : 15,
+      zoomControl: false,
+      preferCanvas: true,
+      zoomAnimation: true,
+      fadeAnimation: true,
+      markerZoomAnimation: true,
+      inertia: true,
+      inertiaDeceleration: 3000,
+      inertiaMaxSpeed: 1500,
+      easeLinearity: 0.2
+    });
+
+    // Zoom control intentionally hidden — pinch/scroll to zoom
+
+    // OpenStreetMap Tile Layer with subdomains, tile buffer & idle updates for 60fps panning
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      subdomains: ['a', 'b', 'c'],
+      maxZoom: 19,
+      updateWhenIdle: true,
+      updateWhenZooming: false,
+      keepBuffer: 4,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(this.map);
+
+    // Layer groups
+    this.stopsLayer = L.layerGroup().addTo(this.map);
+    this.busLayer = L.layerGroup().addTo(this.map);
+    this.routeLayer = L.layerGroup().addTo(this.map);
+    this.journeyLayer = L.layerGroup().addTo(this.map);
+
+    if (hasValidUserLoc) {
+      this.setUserLocation(this.userLocation.lat, this.userLocation.lng);
+    }
+
+    // Dynamic stop discovery: ONLY triggers on manual user zoom/pan, NEVER during programmatic flights
+    this.map.on('moveend', () => {
+      if (this.isProgrammaticMove || this.isInitialStartup) return;
+      this.onViewportChanged();
+    });
+
+    this.isLoaded = true;
+
+    // Ensure Leaflet recalculates viewport bounds
+    setTimeout(() => {
+      if (this.map) this.map.invalidateSize();
+    }, 150);
+
+    // If nearby stops already exist in Search, render them now; otherwise wait for geolocation fix
+    if (window.Search && window.Search.nearbyStops && window.Search.nearbyStops.length > 0) {
+      this.renderNearbyStops(window.Search.nearbyStops);
+    }
+
+    // Release initial startup lock after coordinates settle
+    setTimeout(() => {
+      this.isInitialStartup = false;
+    }, 1500);
+  }
+
+  invalidateSize() {
+    if (this.map) {
+      this.map.invalidateSize();
+    }
+  }
+
+  setUserLocation(lat, lng) {
+    const pLat = parseFloat(lat);
+    const pLng = parseFloat(lng);
+    if (isNaN(pLat) || isNaN(pLng)) return;
+
+    this.userLocation = { lat: pLat, lng: pLng };
+    if (!this.map) return;
+
+    if (this.userMarker) {
+      this.userMarker.setLatLng([pLat, pLng]);
+    } else {
+      const userIcon = L.divIcon({
+        className: 'user-location-pulse-marker',
+        html: `
+          <div style="position: relative; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;">
+            <span class="m3-pulse-dot" style="width: 22px; height: 22px; background: rgba(0, 90, 193, 0.25); position: absolute;"></span>
+            <span style="width: 12px; height: 12px; border-radius: 50%; background: #005ac1; border: 2.5px solid #ffffff; box-shadow: 0 2px 5px rgba(0,0,0,0.3); z-index: 2;"></span>
+          </div>
+        `,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
+      });
+
+      this.userMarker = L.marker([pLat, pLng], { icon: userIcon }).addTo(this.map);
+      this.userMarker.bindTooltip('Η τοποθεσία σας', { direction: 'top', offset: [0, -10] });
+    }
+  }
+
+  /**
+   * Viewport-driven stop discovery: triggers when user zooms or pans the map
+   */
+  onViewportChanged() {
+    if (!this.map) return;
+    if (this.moveDebounceTimer) clearTimeout(this.moveDebounceTimer);
+
+    this.moveDebounceTimer = setTimeout(async () => {
+      if (this.isolatedLine) return; // Do not overwrite stops when user is inspecting an isolated line
+      const zoom = this.map.getZoom();
+      if (zoom < 13) return;
+
+      const center = this.map.getCenter();
+      if (this.lastSearchCenter && this.lastSearchZoom === zoom) {
+        const dist = center.distanceTo(this.lastSearchCenter);
+        if (dist < 120) return;
+      }
+      this.lastSearchCenter = center;
+      this.lastSearchZoom = zoom;
+
+      if (window.Search && typeof window.Search.findNearbyStopsForCoords === 'function') {
+        window.Search.findNearbyStopsForCoords(center.lat, center.lng);
+      }
+    }, 550);
+  }
+
+  /**
+   * Clear and render stops discovered around user or center with marker diffing
+   */
+  renderNearbyStops(stops = [], shouldFit = false) {
+    if (!this.map || !this.stopsLayer) return;
+
+    if (!Array.isArray(stops) || stops.length === 0) {
+      this.stopsLayer.clearLayers();
+      this.stopMarkersMap.clear();
+      return;
+    }
+
+    const newCodes = new Set(stops.map(s => String(s.StopCode)));
+
+    // Diffing: remove markers that are no longer in the new set
+    for (const [code, marker] of this.stopMarkersMap.entries()) {
+      if (!newCodes.has(code)) {
+        this.stopsLayer.removeLayer(marker);
+        this.stopMarkersMap.delete(code);
+      }
+    }
+
+    // Add only new markers (preserving existing ones to avoid DOM churn)
+    stops.forEach(s => {
+      const sCode = String(s.StopCode);
+      if (!this.stopMarkersMap.has(sCode)) {
+        const marker = this.createStopMarker(s);
+        if (marker) {
+          marker.addTo(this.stopsLayer);
+          this.stopMarkersMap.set(sCode, marker);
+        }
+      }
+    });
+
+    // Debounced fetch of live buses traveling around nearby stops
+    this.scheduleLoadBusesForNearbyStops(stops);
+
+    if (shouldFit) {
+      if (this.userLocation) {
+        this.fitAreaAroundUser(this.userLocation.lat, this.userLocation.lng, stops, 350);
+      } else {
+        const bounds = L.latLngBounds();
+        stops.forEach(s => {
+          const lat = parseFloat(s.StopLat);
+          const lng = parseFloat(s.StopLng);
+          if (!isNaN(lat) && !isNaN(lng)) bounds.extend([lat, lng]);
+        });
+        if (bounds.isValid()) {
+          this.map.fitBounds(bounds, { padding: [30, 30], maxZoom: 16 });
+        }
+      }
+    }
+  }
+
+  scheduleLoadBusesForNearbyStops(stops) {
+    if (this.busLoadTimer) clearTimeout(this.busLoadTimer);
+    // Only schedule if search/map tab is currently active to avoid background battery/network waste
+    if (window.App && window.App.activeTab !== 'search' && window.App.activeTab !== 'map') return;
+    if (this.map && this.map.getZoom() < 14) return;
+
+    this.busLoadTimer = setTimeout(() => {
+      this.loadBusesForNearbyStops(stops);
+    }, 2000);
+  }
+
+  /**
+   * Fetch and display live moving buses for lines serving nearby stops (with line cache)
+   */
+  async loadBusesForNearbyStops(stops = []) {
+    if (!this.map || !this.busLayer) return;
+    if (window.App && window.App.activeTab !== 'search' && window.App.activeTab !== 'map') return;
+    if (this.map.getZoom() < 14) return;
+
+    try {
+      const linesToQuery = new Set();
+      for (const s of stops.slice(0, 8)) {
+        if (Array.isArray(s.serving_lines)) {
+          for (const l of s.serving_lines) {
+            if (l.line_id) linesToQuery.add(l.line_id);
+            if (linesToQuery.size >= 3) break;
+          }
+        }
+        if (linesToQuery.size >= 3) break;
+      }
+
+      if (linesToQuery.size === 0) return;
+
+      const promises = Array.from(linesToQuery).map(async (lid) => {
+        try {
+          let cached = this.resolvedLinesCache.get(lid);
+          let rCode = cached ? cached.routeCode : null;
+
+          if (!rCode) {
+            const res = await window.API.resolveLine(lid);
+            if (res && res.line_code) {
+              const routes = await window.API.getRoutes(res.line_code);
+              if (Array.isArray(routes) && routes.length > 0) {
+                rCode = routes[0].RouteCode;
+                this.resolvedLinesCache.set(lid, { lineCode: res.line_code, routeCode: rCode });
+              }
+            }
+          }
+
+          if (rCode) {
+            const buses = await window.API.getLiveBuses(rCode);
+            if (Array.isArray(buses)) {
+              return buses.map(b => ({ ...b, line_id: lid }));
+            }
+          }
+        } catch (e) {}
+        return [];
+      });
+
+      const resList = await Promise.all(promises);
+      const allBuses = resList.flat();
+      if (allBuses.length > 0) {
+        this.updateBuses(allBuses);
+      }
+    } catch (err) {
+      console.warn('Failed to load live buses around user:', err);
+    }
+  }
+
+  /**
+   * Render stops discovered within the viewport smoothly
+   */
+  renderViewportStops(stops = []) {
+    if (!this.map || !this.stopsLayer) return;
+
+    stops.forEach(s => {
+      const sCode = String(s.StopCode);
+      if (this.stopMarkersMap.has(sCode)) return; // Already rendered
+
+      const marker = this.createStopMarker(s);
+      if (marker) {
+        marker.addTo(this.stopsLayer);
+        this.stopMarkersMap.set(sCode, marker);
+      }
+    });
+
+    // Prune markers that are far outside the expanded viewport
+    if (this.stopMarkersMap.size > 200) {
+      const currentBounds = this.map.getBounds().pad(1.2);
+      for (const [code, marker] of this.stopMarkersMap.entries()) {
+        const latLng = marker.getLatLng();
+        if (!currentBounds.contains(latLng)) {
+          this.stopsLayer.removeLayer(marker);
+          this.stopMarkersMap.delete(code);
+        }
+      }
+    }
+  }
+
+  /**
+   * Helper to create an interactive bus stop pin marker with small name below bubble
+   */
+  createStopMarker(s) {
+    const lat = parseFloat(s.StopLat);
+    const lng = parseFloat(s.StopLng);
+    if (isNaN(lat) || isNaN(lng)) return null;
+
+    const isFav = window.Favorites && window.Favorites.isStopFav(s.StopCode);
+    const stopTitle = s.StopDescr || `Στάση #${s.StopCode}`;
+    const safeTitle = stopTitle.replace(/'/g, "\\'");
+
+    // Custom Bus Stop Pin Icon - Distinct station pole/shelter design (NOT confusing vehicle)
+    const pinColor = isFav ? '#d97706' : '#005ac1';
+    const pinIcon = L.divIcon({
+      className: 'map-bus-stop-icon',
+      html: `
+        <div style="display: flex; flex-direction: column; align-items: center; width: 120px; margin-left: -48px; pointer-events: auto; cursor: pointer;">
+          <div style="background: ${pinColor}; width: 24px; height: 24px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); display: flex; align-items: center; justify-content: center; box-shadow: ${isFav ? '0 2px 8px rgba(217,119,6,0.45)' : '0 2px 5px rgba(0,0,0,0.28)'}; border: 2px solid #ffffff;">
+            ${isFav ? `
+              <span style="transform: rotate(45deg); font-size: 11px; line-height: 1;">⭐</span>
+            ` : `
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="#ffffff" style="transform: rotate(45deg);">
+                <circle cx="12" cy="12" r="8" stroke="#ffffff" stroke-width="2" fill="none"/>
+                <rect x="11" y="4" width="2" height="16" fill="#ffffff"/>
+                <rect x="7" y="7" width="10" height="4" rx="1" fill="#ffffff"/>
+              </svg>
+            `}
+          </div>
+          <div style="margin-top: 3px; font-size: 0.65rem; font-weight: 800; color: #0f172a; background: ${isFav ? '#fef9c3' : 'rgba(255,255,255,0.95)'}; padding: 1px 6px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 115px; border: ${isFav ? '1px solid #d97706' : '1px solid rgba(0,0,0,0.1)'}; text-align: center; line-height: 1.25;">
+            ${isFav ? '⭐ ' : ''}${stopTitle}
+          </div>
+        </div>
+      `,
+      iconSize: [24, 40],
+      iconAnchor: [12, 24],
+      popupAnchor: [0, -22]
+    });
+
+    const marker = L.marker([lat, lng], { icon: pinIcon });
+
+    // Initial Popup Content in Greek
+    let linesHtml = '<div style="font-size: 0.75rem; color: #64748b;">Φόρτωση διερχόμενων γραμμών...</div>';
+    if (Array.isArray(s.serving_lines) && s.serving_lines.length > 0) {
+      linesHtml = s.serving_lines.map(l => `
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 3px 0; border-bottom: 1px dashed #e2e8f0; font-size: 0.75rem;">
+          <span style="font-weight: 800; color: #005ac1; background: #e0f2fe; padding: 1px 5px; border-radius: 4px;">${l.line_id}</span>
+          <span style="flex: 1; margin: 0 4px; color: #0f172a; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px;">προς ${l.last_stop}</span>
+          <span style="font-size: 0.75rem; color: #64748b;">${l.direction === '←' ? '⬅️' : (l.direction === '→' ? '➡️' : (l.direction || ''))}</span>
+        </div>
+      `).join('');
+    }
+
+    const popupContent = `
+      <div style="font-family: 'Inter', 'Noto Sans', sans-serif; min-width: 210px; max-width: 260px; padding: 2px;">
+        <div style="font-size: 0.85rem; font-weight: 800; color: #0f172a; margin-bottom: 2px; line-height: 1.25;">
+          ${stopTitle}
+        </div>
+        <div style="font-size: 0.72rem; color: #64748b; margin-bottom: 6px;">
+          ${s.StopStreet ? s.StopStreet + ' • ' : ''}#${s.StopCode}
+        </div>
+        <div style="font-size: 0.7rem; font-weight: 800; color: #005ac1; text-transform: uppercase; margin-bottom: 3px; letter-spacing: 0.04em;">
+          Γραμμές &amp; Κατευθύνσεις
+        </div>
+        <div id="popup-lines-${s.StopCode}" style="max-height: 110px; overflow-y: auto; margin-bottom: 8px;">
+          ${linesHtml}
+        </div>
+        <button class="m3-btn m3-btn-primary" style="width: 100%; padding: 0.45rem 0.8rem; font-size: 0.85rem; border-radius: 9999px;" onclick="window.App.selectStop('${s.StopCode}', '${safeTitle}', ${lat}, ${lng});">
+          Προβολή Αφίξεων Στάσης
+        </button>
+      </div>
+    `;
+
+    marker.bindPopup(popupContent);
+
+    // Dynamically fetch lines when user taps the popup if not pre-populated
+    marker.on('popupopen', async () => {
+      const containerEl = document.getElementById(`popup-lines-${s.StopCode}`);
+      if (!containerEl) return;
+
+      try {
+        const routes = await window.API.getStopRoutes(s.StopCode);
+        if (containerEl && Array.isArray(routes)) {
+          const linesMap = new Map();
+          for (const r of routes) {
+            const lid = r.LineID;
+            if (!lid) continue;
+            let lastStop = r.cleanDestination;
+            if (!lastStop) {
+              let raw = (r.RouteDescr || r.LineDescr || '').trim();
+              raw = raw.replace(/\[.*?\]/g, ' ').replace(/\(.*?\)/g, ' ').replace(/^[*+\s]+/, '');
+              const parts = raw.split(/[-–—/]/).map(x => x.trim()).filter(Boolean);
+              lastStop = parts.length > 1 ? parts[parts.length - 1] : (parts[0] || raw);
+              lastStop = lastStop.replace(/\bΣΤ\.?\s*/g, 'ΣΤ. ').replace(/\s+/g, ' ').trim();
+            }
+            const isCirc = /κυκλικη|circular/i.test(r.RouteDescr || '') || /κυκλικη|circular/i.test(r.LineDescr || '') || r.directionLabel === 'Κυκλική';
+            const direction = isCirc ? 'Κυκλική' : (r.directionLabel || (r.RouteType === '2' ? 'Επιστροφή' : 'Μετάβαση'));
+
+            if (!linesMap.has(lid)) {
+              linesMap.set(lid, {
+                line_id: lid,
+                last_stop: lastStop,
+                direction
+              });
+            }
+          }
+          const lines = Array.from(linesMap.values());
+          if (lines.length > 0) {
+            containerEl.innerHTML = lines.map(l => `
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 3px 0; border-bottom: 1px dashed #e2e8f0; font-size: 0.8rem;">
+                <span style="font-weight: 800; color: #005ac1; background: #e0f2fe; padding: 1px 6px; border-radius: 4px;">${l.line_id}</span>
+                <span style="flex: 1; margin: 0 4px; color: #0f172a; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px;">προς ${l.last_stop}</span>
+                <span style="font-size: 0.8rem; color: #64748b;">${l.direction === '←' ? '⬅️' : (l.direction === '→' ? '➡️' : (l.direction || ''))}</span>
+              </div>
+            `).join('');
+          } else {
+            containerEl.innerHTML = '<div style="font-size: 0.75rem; color: #64748b;">Δεν βρέθηκαν διερχόμενες γραμμές.</div>';
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load popup lines:', e);
+      }
+    });
+
+    return marker;
+  }
+
+  /**
+   * Fit map viewport to a comfortable area around the user (~300m walking radius + nearby stops)
+   * @param {number} lat - User latitude
+   * @param {number} lng - User longitude
+   * @param {Array} [nearbyStops] - Optional list of nearby stops to include in bounds
+   * @param {number} [radiusMeters=220] - Radius around user in meters
+   * @param {boolean} [immediate=false] - If true, jump without animation (for instantaneous startup)
+   */
+  fitAreaAroundUser(lat, lng, nearbyStops = [], radiusMeters = 220, immediate = false) {
+    if (!this.map) return;
+    const pLat = parseFloat(lat);
+    const pLng = parseFloat(lng);
+    if (isNaN(pLat) || isNaN(pLng)) return;
+
+    this.setUserLocation(pLat, pLng);
+
+    if (this.userMarker) {
+      if (typeof this.userMarker.setZIndexOffset === 'function') {
+        this.userMarker.setZIndexOffset(1000);
+      }
+      this.userMarker.openTooltip();
+      setTimeout(() => {
+        if (this.userMarker) this.userMarker.closeTooltip();
+      }, 3500);
+    }
+
+    // Calculate bounding box for radiusMeters around user
+    const deltaLat = radiusMeters / 111320;
+    const latRad = (pLat * Math.PI) / 180;
+    const deltaLng = radiusMeters / (111320 * Math.max(0.1, Math.cos(latRad)));
+
+    const bounds = L.latLngBounds(
+      [pLat - deltaLat, pLng - deltaLng],
+      [pLat + deltaLat, pLng + deltaLng]
+    );
+
+    // If nearby stops are available, include walkable ones within ~600m
+    if (Array.isArray(nearbyStops) && nearbyStops.length > 0) {
+      nearbyStops.slice(0, 8).forEach(s => {
+        const sLat = parseFloat(s.StopLat);
+        const sLng = parseFloat(s.StopLng);
+        if (!isNaN(sLat) && !isNaN(sLng)) {
+          const dLatM = Math.abs(sLat - pLat) * 111320;
+          const dLngM = Math.abs(sLng - pLng) * 111320 * Math.cos(latRad);
+          if (Math.hypot(dLatM, dLngM) <= 600) {
+            bounds.extend([sLat, sLng]);
+          }
+        }
+      });
+    }
+
+    this.isProgrammaticMove = true;
+    if (immediate) {
+      this.map.fitBounds(bounds, { padding: [35, 35], maxZoom: 17, animate: false });
+      setTimeout(() => { this.isProgrammaticMove = false; }, 150);
+    } else {
+      if (typeof this.map.flyToBounds === 'function') {
+        this.map.flyToBounds(bounds, { padding: [35, 35], maxZoom: 17, duration: 0.65 });
+      } else {
+        this.map.fitBounds(bounds, { padding: [35, 35], maxZoom: 17, animate: true });
+      }
+      setTimeout(() => { this.isProgrammaticMove = false; }, 750);
+    }
+  }
+
+  setView(lat, lng, zoom = 16, animate = false) {
+    if (!this.map) return;
+    const pLat = parseFloat(lat);
+    const pLng = parseFloat(lng);
+    if (isNaN(pLat) || isNaN(pLng)) return;
+
+    this.isProgrammaticMove = true;
+    this.map.setView([pLat, pLng], zoom, { animate });
+    setTimeout(() => { this.isProgrammaticMove = false; }, 400);
+  }
+
+  focusStop(lat, lng, stopName = '') {
+    if (!this.map) return;
+    const pLat = parseFloat(lat);
+    const pLng = parseFloat(lng);
+    if (isNaN(pLat) || isNaN(pLng)) return;
+
+    this.isProgrammaticMove = true;
+    this.map.setView([pLat, pLng], 16, { animate: true });
+    setTimeout(() => { this.isProgrammaticMove = false; }, 400);
+  }
+
+  renderPolyline(coordinates = []) {
+    if (!this.map || !this.routeLayer) return;
+    this.routeLayer.clearLayers();
+
+    if (!Array.isArray(coordinates) || coordinates.length === 0) return;
+
+    const latLngs = coordinates.map(c => [parseFloat(c.RouteDetailsLat), parseFloat(c.RouteDetailsLng)]);
+    const line = L.polyline(latLngs, {
+      color: '#005ac1',
+      weight: 5,
+      opacity: 0.85,
+      lineCap: 'round',
+      lineJoin: 'round'
+    }).addTo(this.routeLayer);
+
+    this.map.fitBounds(line.getBounds(), { padding: [20, 20] });
+  }
+
+  renderRouteStops(stops = []) {
+    this.renderNearbyStops(stops, false);
+  }
+
+  /**
+   * Calculates bearing angle in degrees from lat1,lng1 to lat2,lng2
+   */
+  calculateBearing(lat1, lng1, lat2, lng2) {
+    const toRad = deg => (deg * Math.PI) / 180;
+    const toDeg = rad => (rad * 180) / Math.PI;
+    const phi1 = toRad(lat1);
+    const phi2 = toRad(lat2);
+    const deltaLambda = toRad(lng2 - lng1);
+
+    const y = Math.sin(deltaLambda) * Math.cos(phi2);
+    const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
+    const bearing = toDeg(Math.atan2(y, x));
+    return (bearing + 360) % 360;
+  }
+
+  createBusIcon(lineId, heading) {
+    const headingHtml = (heading !== null && heading !== undefined) ? `
+      <div style="position: absolute; top: -5px; right: -5px; width: 14px; height: 14px; border-radius: 50%; background: #0f172a; border: 1.5px solid #ffffff; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transform: rotate(${heading}deg); transition: transform 0.4s ease;" title="Κατεύθυνση: ${heading}°">
+        <svg width="8" height="8" viewBox="0 0 24 24" fill="#fbbf24">
+          <polygon points="12,2 22,21 12,17 2,21" />
+        </svg>
+      </div>
+    ` : '';
+
+    return L.divIcon({
+      className: 'map-live-bus-icon',
+      html: `
+        <div style="display: flex; flex-direction: column; align-items: center; pointer-events: auto; cursor: pointer; transform: translateZ(0);">
+          <div style="position: relative; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.25));">
+            <span style="font-size: 1.5rem; line-height: 1;">🚌</span>
+            ${headingHtml}
+          </div>
+          <div style="margin-top: 1px; font-size: 0.68rem; font-weight: 900; color: #0f172a; background: rgba(255,255,255,0.96); padding: 1px 5px; border-radius: 4px; border: 1px solid rgba(15,23,42,0.2); box-shadow: 0 1px 3px rgba(0,0,0,0.18); letter-spacing: 0.02em; white-space: nowrap; line-height: 1.2;">
+            ${lineId}
+          </div>
+        </div>
+      `,
+      iconSize: [36, 46],
+      iconAnchor: [18, 23]
+    });
+  }
+
+  /**
+   * Smooth 60fps Bus Vehicle Marker Updates with Coordinate Interpolation (Lerp)
+   */
+  updateBuses(buses = [], defaultLineId = 'BUS') {
+    if (!this.map || !this.busLayer) return;
+
+    // Filter if currently in Line Isolation mode
+    let targetBuses = buses;
+    if (this.isolatedLine && this.isolatedLine.lineId) {
+      targetBuses = buses.filter(b => {
+        const lid = String(b.line_id || b.LINE_ID || '').trim().toLowerCase();
+        return lid === this.isolatedLine.lineId.toLowerCase();
+      });
+      const countEl = document.getElementById('isolated-bus-count-badge');
+      if (countEl) {
+        countEl.innerText = `${targetBuses.length} ${targetBuses.length === 1 ? 'όχημα' : 'οχήματα'} σε κίνηση`;
+      }
+    }
+
+    const activeVehKeys = new Set();
+    const easeOutQuad = t => t * (2 - t);
+
+    targetBuses.forEach((b, idx) => {
+      const lat = parseFloat(b.CS_LAT);
+      const lng = parseFloat(b.CS_LNG);
+      if (isNaN(lat) || isNaN(lng)) return;
+
+      const lineId = b.line_id || b.LINE_ID || defaultLineId;
+      const vehNo = b.VEH_NO || `${lineId}_${idx}`;
+      activeVehKeys.add(vehNo);
+
+      // Determine vehicle heading from movement history
+      let heading = null;
+      if (this.vehicleHistoryMap.has(vehNo)) {
+        const prev = this.vehicleHistoryMap.get(vehNo);
+        const distMoved = Math.hypot(lat - prev.lat, lng - prev.lng);
+        // Only calculate new heading if bus moved more than ~8 meters
+        if (distMoved > 0.00008) {
+          heading = Math.round(this.calculateBearing(prev.lat, prev.lng, lat, lng));
+        } else {
+          heading = prev.heading;
+        }
+      }
+      this.vehicleHistoryMap.set(vehNo, { lat, lng, heading });
+
+      const headingTxt = (heading !== null && heading !== undefined) ? ` | Κατεύθυνση: ${heading}°` : '';
+      const tooltipHtml = `🚍 Λεωφορείο ${lineId}${headingTxt}`;
+
+      if (this.busMarkersMap.has(vehNo)) {
+        // Marker exists: smoothly glide (lerp) from current position to new position
+        const marker = this.busMarkersMap.get(vehNo);
+        const cur = marker.getLatLng();
+        const distLat = Math.abs(lat - cur.lat);
+        const distLng = Math.abs(lng - cur.lng);
+
+        if (distLat > 0.00002 || distLng > 0.00002) {
+          // Cancel prior animation frame for this vehicle
+          if (this.busAnimationFrames.has(vehNo)) {
+            cancelAnimationFrame(this.busAnimationFrames.get(vehNo));
+          }
+
+          const fromLat = cur.lat;
+          const fromLng = cur.lng;
+          const startTime = performance.now();
+          const duration = 1400; // 1.4s smooth glide
+
+          const step = (now) => {
+            const elapsed = now - startTime;
+            const progress = Math.min(1, elapsed / duration);
+            const ease = easeOutQuad(progress);
+            const interpLat = fromLat + (lat - fromLat) * ease;
+            const interpLng = fromLng + (lng - fromLng) * ease;
+            marker.setLatLng([interpLat, interpLng]);
+
+            if (progress < 1) {
+              this.busAnimationFrames.set(vehKey => this.busAnimationFrames.set(vehNo, requestAnimationFrame(step)));
+            } else {
+              this.busAnimationFrames.delete(vehNo);
+            }
+          };
+
+          this.busAnimationFrames.set(vehNo, requestAnimationFrame(step));
+        }
+
+        // Update icon orientation and tooltip
+        marker.setIcon(this.createBusIcon(lineId, heading));
+        marker.setTooltipContent(tooltipHtml);
+      } else {
+        // New marker: create and add to map
+        const icon = this.createBusIcon(lineId, heading);
+        const marker = L.marker([lat, lng], { icon }).addTo(this.busLayer);
+        marker.bindTooltip(tooltipHtml, { direction: 'top' });
+        this.busMarkersMap.set(vehNo, marker);
+      }
+    });
+
+    // Prune disappeared vehicles gracefully
+    for (const [vKey, marker] of this.busMarkersMap.entries()) {
+      if (!activeVehKeys.has(vKey)) {
+        if (this.busAnimationFrames.has(vKey)) {
+          cancelAnimationFrame(this.busAnimationFrames.get(vKey));
+          this.busAnimationFrames.delete(vKey);
+        }
+        this.busLayer.removeLayer(marker);
+        this.busMarkersMap.delete(vKey);
+        this.vehicleHistoryMap.delete(vKey);
+      }
+    }
+  }
+
+  /**
+   * One-Tap Line Isolation Filter: focuses map entirely on a single bus line
+   */
+  async isolateLine(lineId, lineCode = null) {
+    if (!lineId || !this.map) return;
+
+    this.clearLineIsolation(false);
+    this.isolatedLine = { lineId, lineCode, routeCode: null };
+
+    // Create or show floating isolation banner on map
+    let bar = document.getElementById('map-isolated-line-bar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'map-isolated-line-bar';
+      bar.className = 'map-isolation-bar';
+      const container = document.getElementById('map-card-wrapper') || document.getElementById(this.containerId);
+      if (container) container.appendChild(bar);
+    }
+
+    bar.innerHTML = `
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <span class="m3-badge" style="background: #005ac1; color: #ffffff; font-weight: 900; font-size: 0.85rem; padding: 3px 8px; border-radius: 6px;">${lineId}</span>
+        <span id="isolated-bus-count-badge" style="font-size: 0.8rem; font-weight: 700; color: #0f172a;">Αναζήτηση διαδρομής &amp; οχημάτων...</span>
+      </div>
+      <button class="m3-btn m3-btn-tonal" style="padding: 0.25rem 0.65rem; font-size: 0.75rem; border-radius: 9999px; background: rgba(0,0,0,0.06); cursor: pointer;" onclick="window.App.mapManager.clearLineIsolation()">✕ Εμφάνιση όλων</button>
+    `;
+    bar.style.display = 'flex';
+
+    try {
+      // 1. Resolve lineCode if needed
+      let lCode = lineCode;
+      if (!lCode) {
+        const res = await window.API.resolveLine(lineId);
+        if (res && res.line_code) lCode = res.line_code;
+      }
+
+      if (!lCode) {
+        const countEl = document.getElementById('isolated-bus-count-badge');
+        if (countEl) countEl.innerText = `Δεν βρέθηκε η γραμμή ${lineId}`;
+        return;
+      }
+
+      // 2. Fetch routes
+      const routes = await window.API.getRoutes(lCode);
+      if (!Array.isArray(routes) || routes.length === 0) return;
+
+      const mainRoute = routes[0];
+      const rCode = mainRoute.RouteCode;
+      this.isolatedLine.routeCode = rCode;
+
+      // 3. Fetch and render route polyline
+      const details = await window.API.getRouteDetails(rCode);
+      if (Array.isArray(details) && details.length > 0) {
+        this.renderPolyline(details);
+      }
+
+      // 4. Fetch and render stops for this route only
+      const stops = await window.API.getRouteStops(rCode);
+      if (Array.isArray(stops) && stops.length > 0) {
+        this.renderRouteStops(stops);
+      }
+
+      // 5. Fetch live buses for this route
+      const fetchIsolatedBuses = async () => {
+        if (!this.isolatedLine || this.isolatedLine.routeCode !== rCode) return;
+        try {
+          const buses = await window.API.getLiveBuses(rCode);
+          if (Array.isArray(buses)) {
+            const mapped = buses.map(b => ({ ...b, line_id: lineId }));
+            this.updateBuses(mapped, lineId);
+          }
+        } catch (e) {}
+      };
+
+      await fetchIsolatedBuses();
+
+      // Poll isolated line buses every 10 seconds
+      if (this.isolatedPollTimer) clearInterval(this.isolatedPollTimer);
+      this.isolatedPollTimer = setInterval(fetchIsolatedBuses, 10000);
+    } catch (err) {
+      console.warn('Failed to isolate line on map:', err);
+    }
+  }
+
+  /**
+   * Clear Line Isolation mode and restore normal nearby exploration
+   */
+  clearLineIsolation(restoreNearby = true) {
+    if (this.isolatedPollTimer) {
+      clearInterval(this.isolatedPollTimer);
+      this.isolatedPollTimer = null;
+    }
+    this.isolatedLine = null;
+
+    const bar = document.getElementById('map-isolated-line-bar');
+    if (bar) bar.style.display = 'none';
+
+    if (this.routeLayer) this.routeLayer.clearLayers();
+
+    if (restoreNearby) {
+      if (window.Search && typeof window.Search.findNearbyStops === 'function') {
+        const stops = window.Search.nearbyStops || [];
+        this.renderNearbyStops(stops, false);
+      }
+    }
+  }
+
+  clearJourneyRoute() {
+    if (this.journeyLayer) {
+      this.journeyLayer.clearLayers();
+    }
+  }
+
+  clearAll() {
+    if (this.routeLayer) this.routeLayer.clearLayers();
+    if (this.busLayer) this.busLayer.clearLayers();
+    this.clearJourneyRoute();
+    this.clearLineIsolation(false);
+  }
+
+  toggleFullscreen() {
+    const card = document.getElementById('map-card-wrapper');
+    const btn = document.getElementById('map-fullscreen-btn');
+    if (!card) return;
+
+    const isFull = card.classList.toggle('map-card-fullscreen');
+    if (btn) {
+      btn.innerHTML = isFull ? `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="4 14 10 14 10 20"></polyline>
+          <polyline points="20 10 14 10 14 4"></polyline>
+          <line x1="14" y1="10" x2="21" y2="3"></line>
+          <line x1="3" y1="21" x2="10" y2="14"></line>
+        </svg>
+      ` : `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 3 21 3 21 9"></polyline>
+          <polyline points="9 21 3 21 3 15"></polyline>
+          <line x1="21" y1="3" x2="14" y2="10"></line>
+          <line x1="3" y1="21" x2="10" y2="14"></line>
+        </svg>
+      `;
+      btn.title = isFull ? 'Κλείσιμο πλήρους οθόνης' : 'Πλήρης οθόνη χάρτη';
+    }
+
+    if (this.map) {
+      setTimeout(() => {
+        this.map.invalidateSize();
+      }, 100);
+      setTimeout(() => {
+        this.map.invalidateSize();
+      }, 300);
+    }
+  }
+}
+
+window.MapManager = MapManager;
+window.GoogleMapManager = MapManager;

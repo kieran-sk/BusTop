@@ -37,11 +37,16 @@
   <!-- Stylesheets (Relative paths with cache-busting for PWA updates) -->
   <link rel="stylesheet" href="css/m3-expressive.css?v=20261008_1430">
   <link rel="stylesheet" href="css/airport-ticker.css?v=20261008_1430">
+  <script>
+    if (window.AndroidBridge) {
+      document.documentElement.classList.add('is-android-app');
+    }
+  </script>
 </head>
 <body>
 
   <!-- Top App Bar -->
-  <header class="m3-top-app-bar" style="position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between;">
+  <header class="m3-top-app-bar" style="position: sticky; top: 0; z-index: 2000; display: flex; align-items: center; justify-content: space-between;">
     <!-- Left slot: back button (fixed basis so it doesn't push center) -->
     <div style="flex: 1 0 0; display: flex; align-items: center; justify-content: flex-start; min-width: 0;">
       <button id="global-back-btn" class="m3-back-btn" onclick="this.blur(); window.App.goBack()" onpointerup="this.blur()" style="display: none;" title="Επιστροφή" aria-label="Επιστροφή">
@@ -180,10 +185,10 @@
       <!-- PC Dual-Pane Layout (Map Left, Cards Right) / Mobile Single Column -->
       <div class="search-desktop-split">
         <!-- Interactive Stops Map Column -->
-        <div id="map-card-wrapper" class="m3-card search-map-pane" style="padding: 0; overflow: hidden; position: relative;">
+        <div id="map-card-wrapper" class="m3-card search-map-pane" style="padding: 0; overflow: hidden; position: relative; isolation: isolate; z-index: 10;">
           <div id="map-container" style="width: 100%; height: 100%;"></div>
           <!-- Fullscreen + Locate + Journey Planner buttons — top right stack -->
-          <div style="position: absolute; top: 12px; right: 12px; z-index: 1000; display: flex; flex-direction: column; gap: 6px;">
+          <div style="position: absolute; top: 12px; right: 12px; z-index: 500; display: flex; flex-direction: column; gap: 6px;">
             <button id="map-fullscreen-btn" class="m3-icon-btn" onclick="window.App.mapManager.toggleFullscreen()" title="Πλήρης οθόνη χάρτη" aria-label="Πλήρης οθόνη χάρτη" style="background: rgba(255,255,255,0.95); backdrop-filter: blur(8px); width: 34px; height: 34px; border-radius: 50%; box-shadow: var(--md-sys-elevation-2); display: flex; align-items: center; justify-content: center; color: var(--md-sys-color-on-surface); border: 1px solid var(--md-sys-color-outline-variant); cursor: pointer;">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="15 3 21 3 21 9"></polyline>

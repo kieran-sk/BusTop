@@ -55,6 +55,11 @@ jobs:
           **Downloads**: Download the APKs below.
           EOF
 
+      - name: Bundle Web Assets into Android App
+        run: |
+          mkdir -p android/app/src/main/assets/web
+          cp -r web/* android/app/src/main/assets/web/
+
       - name: Build Android Debug APKs (Phone + Wear OS)
         working-directory: ./android
         run: |

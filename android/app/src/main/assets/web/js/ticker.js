@@ -1,0 +1,1022 @@
+/**
+ * Airport Departure Board ("Ticker") & Walk Navigation Engine
+ * Light mode, delta-only split-flap flip animation, Greek typography,
+ * urban pedestrian walking distance, dedicated alarm and pin buttons,
+ * and full timetable opening on row click.
+ */
+
+class AirportTicker {
+  constructor(containerId = 'ticker-container') {
+    this.containerId = containerId;
+    this.userLocation = null;
+    this.currentStop = null;
+    this.arrivals = [];
+    this.timerInterval = null;
+    this.previousDigitsMap = new Map();
+    this.hiddenLines = new Set();
+    this.selectedLines = new Set();
+    this.showAllStops = false;
+    this.modeFilter = 'all'; // 'all', 'live', 'scheduled'
+    this.activeView = 'stops'; // 'stops' or 'lines'
+    this.allLines = [];
+    this.linesFilterQuery = '';
+    this.allStops = [];
+    this.stopsFilterQuery = '';
+    this.stopsPageSize = 80;
+    this.stopsVisibleCount = 80;
+    this.stopsSortBy = 'distance'; // 'distance', 'alpha', 'numeric'
+    this.isLoadingAllStops = false;
+    window.Ticker = this;
+    this.startClock();
+    this.loadAllStops();
+    this.initPullToRefresh();
+  }
+
+  /**
+   * Pull-to-Refresh Gesture Engine for Departures Board
+   */
+  initPullToRefresh() {
+    let startY = 0;
+    let currentY = 0;
+    let isPulling = false;
+    let isRefreshing = false;
+    const threshold = 65;
+
+    const getIndicator = () => document.getElementById('ticker-pull-indicator');
+    const getIcon = () => document.getElementById('ticker-pull-icon');
+    const getText = () => document.getElementById('ticker-pull-text');
+
+    window.addEventListener('touchstart', (e) => {
+      if (isRefreshing) return;
+      if (window.App && window.App.activeTab !== 'ticker') return;
+      if (window.scrollY > 5) return;
+      if (e.touches.length !== 1) return;
+      startY = e.touches[0].clientY;
+      currentY = startY;
+      isPulling = true;
+    }, { passive: true });
+
+    window.addEventListener('touchmove', (e) => {
+      if (!isPulling || isRefreshing) return;
+      if (window.scrollY > 5) {
+        isPulling = false;
+        const ind = getIndicator();
+        if (ind) ind.style.display = 'none';
+        return;
+      }
+      currentY = e.touches[0].clientY;
+      const pullDist = Math.max(0, currentY - startY);
+      if (pullDist > 12) {
+        const ind = getIndicator();
+        const icon = getIcon();
+        const text = getText();
+        if (ind) {
+          ind.style.display = 'flex';
+          const dampDist = Math.min(threshold + 20, pullDist * 0.45);
+          ind.style.transform = `translateY(${dampDist}px)`;
+          if (pullDist >= threshold) {
+            if (icon) icon.style.transform = 'rotate(180deg)';
+            if (text) text.innerText = 'Αφήστε για ανανέωση...';
+          } else {
+            if (icon) icon.style.transform = 'rotate(0deg)';
+            if (text) text.innerText = 'Τραβήξτε για ανανέωση...';
+          }
+        }
+      }
+    }, { passive: true });
+
+    window.addEventListener('touchend', async () => {
+      if (!isPulling || isRefreshing) return;
+      isPulling = false;
+      const pullDist = Math.max(0, currentY - startY);
+      const ind = getIndicator();
+      const icon = getIcon();
+      const text = getText();
+
+      if (pullDist >= threshold && window.scrollY <= 5) {
+        isRefreshing = true;
+        if (window.App && typeof window.App.triggerHaptic === 'function') {
+          window.App.triggerHaptic('medium');
+        }
+        if (icon) {
+          icon.innerText = '🔄';
+          icon.style.transform = 'none';
+          icon.classList.add('spin-animation');
+        }
+        if (text) text.innerText = 'Ανανέωση αφίξεων...';
+
+        try {
+          if (window.App && window.App.currentStop) {
+            await window.App.refreshStopArrivals(window.App.currentStopRequestId);
+          } else if (window.Search) {
+            await window.Search.findNearbyStops(true);
+          }
+        } catch (e) {
+          console.warn('Pull-to-refresh error:', e);
+        }
+
+        if (text) text.innerText = '✓ Ενημερώθηκε!';
+        if (icon) icon.classList.remove('spin-animation');
+        if (window.App && typeof window.App.triggerHaptic === 'function') {
+          window.App.triggerHaptic('light');
+        }
+
+        setTimeout(() => {
+          if (ind) {
+            ind.style.transform = 'translateY(-100%)';
+            setTimeout(() => {
+              ind.style.display = 'none';
+              if (icon) icon.innerText = '⬇️';
+              isRefreshing = false;
+            }, 200);
+          } else {
+            isRefreshing = false;
+          }
+        }, 550);
+      } else {
+        if (ind) {
+          ind.style.transform = 'translateY(-100%)';
+          setTimeout(() => { ind.style.display = 'none'; }, 200);
+        }
+      }
+    }, { passive: true });
+  }
+
+  setStopsSortBy(mode) {
+    this.stopsSortBy = mode;
+    this.stopsVisibleCount = this.stopsPageSize;
+    this.render();
+  }
+
+  loadMoreStops() {
+    this.stopsVisibleCount += this.stopsPageSize;
+    this.render();
+  }
+
+  setActiveView(view) {
+    this.activeView = view;
+    if (view === 'stops' && (!this.allStops || this.allStops.length === 0)) {
+      this.loadAllStops();
+    }
+    this.render();
+  }
+
+  setLinesFilterQuery(q) {
+    this.linesFilterQuery = q;
+    this.render();
+  }
+
+  setStopsFilterQuery(q) {
+    this.stopsFilterQuery = q;
+    this.stopsVisibleCount = this.stopsPageSize;
+    this.render();
+  }
+
+  async loadAllStops() {
+    if (this.isLoadingAllStops) return;
+    this.isLoadingAllStops = true;
+    try {
+      const stops = await window.API.getAllStops();
+      if (Array.isArray(stops) && stops.length > 0) {
+        this.allStops = stops;
+        this._allStopsCodesSet = new Set(stops.map(s => String(s.StopCode)));
+        stops.forEach(s => {
+          s._normName = (s.StopDescr || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+          s._normStreet = (s.StopStreet || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+          s._code = String(s.StopCode || '');
+        });
+        if (!this.currentStop && window.App && window.App.activeTab === 'ticker') {
+          this.render();
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load all stops:', e);
+    } finally {
+      this.isLoadingAllStops = false;
+    }
+  }
+
+  setModeFilter(mode) {
+    this.modeFilter = mode;
+    const allBtn = document.getElementById('filter-all-btn');
+    const liveBtn = document.getElementById('filter-live-btn');
+    const schedBtn = document.getElementById('filter-sched-btn');
+    if (allBtn && liveBtn && schedBtn) {
+      allBtn.className = mode === 'all' ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-tonal';
+      liveBtn.className = mode === 'live' ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-tonal';
+      schedBtn.className = mode === 'scheduled' ? 'm3-btn m3-btn-primary' : 'm3-btn m3-btn-tonal';
+    }
+    this.render();
+  }
+
+  setUserLocation(lat, lng) {
+    this.userLocation = { lat, lng };
+    this.render();
+  }
+
+  setStopLoading(stopInfo) {
+    this.currentStop = stopInfo;
+    this.arrivals = [];
+    const container = document.getElementById(this.containerId);
+    if (!container) return;
+
+    const stopName = stopInfo.StopDescr || `Στάση #${stopInfo.StopCode}`;
+    container.innerHTML = `
+      <div class="ticker-board">
+        <div class="ticker-board-header">
+          <div class="ticker-board-title">
+            <span class="m3-pulse-dot" style="background: var(--md-sys-color-primary);"></span>
+            ${stopName.toUpperCase()} • ΑΦΙΞΕΙΣ
+          </div>
+        </div>
+        <div style="padding: 3rem 1rem; text-align: center;">
+          <div class="m3-pulse-dot" style="width: 14px; height: 14px; margin: 0 auto 0.75rem; background: var(--md-sys-color-primary);"></div>
+          <div style="font-weight: 800; font-size: 1.05rem; color: #0f172a;">Φόρτωση αφίξεων σε πραγματικό χρόνο...</div>
+          <div style="font-size: 0.8rem; color: #64748b; margin-top: 4px;">Τηλεματική ΟΑΣΑ & oasa.live</div>
+        </div>
+      </div>
+    `;
+    this.startClock();
+  }
+
+  setStopAndArrivals(stopInfo, arrivals = []) {
+    if (this.currentStop && stopInfo && String(this.currentStop.StopCode) !== String(stopInfo.StopCode)) {
+      this.hiddenLines.clear();
+      if (this.selectedLines) this.selectedLines.clear();
+    }
+    this.currentStop = stopInfo;
+    this.arrivals = arrivals;
+    this.render();
+  }
+
+  /**
+   * Format long amounts of minutes into hours and minutes (e.g. 500λ -> 8ω 20λ)
+   */
+  formatMinutesHuman(mins) {
+    if (typeof mins !== 'number' || isNaN(mins)) return '--';
+    if (mins < 60) return `${mins}'`;
+    const hours = Math.floor(mins / 60);
+    const remMins = mins % 60;
+    return remMins > 0 ? `${hours}ʰ ${remMins}'` : `${hours}ʰ`;
+  }
+
+  renderSplitFlapDigits(key, text, urgencyClass = '') {
+    const chars = String(text).split('');
+    const prev = this.previousDigitsMap.get(key) || '';
+    const prevChars = prev.split('');
+    if (this.previousDigitsMap.size > 200) {
+      const oldestKey = this.previousDigitsMap.keys().next().value;
+      if (oldestKey) this.previousDigitsMap.delete(oldestKey);
+    }
+    this.previousDigitsMap.set(key, String(text));
+
+    const html = chars.map((ch, idx) => {
+      if (ch === ':' || ch === '.' || ch === '-') {
+        return `<span class="flap-separator">${ch}</span>`;
+      } else if (ch === ' ') {
+        return `<span class="flap-separator" style="width: 6px; display: inline-block;"> </span>`;
+      } else if (/[a-zA-Z\u0370-\u03ff]/.test(ch)) {
+        return `<span class="flap-unit">${ch}</span>`;
+      } else {
+        const changed = prev.length > 0 && prevChars[idx] !== ch;
+        return `<span class="flap-digit-box ${changed ? 'flap-flip' : ''}" data-digit="${ch}">${ch}</span>`;
+      }
+    }).join('');
+
+    return `<div class="split-flap-board ${urgencyClass}">${html}</div>`;
+  }
+
+  /**
+   * Athens urban street network walking distance (Manhattan + urban tortuosity factor)
+   */
+  calculateWalkingDistance(lat1, lon1, lat2, lon2) {
+    const dLatM = Math.abs(lat2 - lat1) * 111139;
+    const avgLat = ((lat1 + lat2) / 2) * Math.PI / 180;
+    const dLngM = Math.abs(lon2 - lon1) * (111139 * Math.cos(avgLat));
+    return Math.round((dLatM + dLngM) * 1.25);
+  }
+
+  /**
+   * Calculate walk time in minutes along pedestrian urban network
+   */
+  getWalkMinutes(stopLat, stopLng) {
+    const userLoc = this.userLocation || (window.App && window.App.userLocation) || (() => {
+      try { return JSON.parse(localStorage.getItem('OASA_LAST_USER_LOCATION') || 'null'); } catch (e) { return null; }
+    })();
+    if (!userLoc || !userLoc.lat || !userLoc.lng) return null;
+
+    let sLat = parseFloat(stopLat);
+    let sLng = parseFloat(stopLng);
+
+    // If stop coords are missing, try cached coordinates or lookup from nearby stops
+    if ((isNaN(sLat) || isNaN(sLng)) && this.currentStop && this.currentStop.StopCode) {
+      try {
+        const cached = JSON.parse(localStorage.getItem('OASA_STOP_COORDS_' + this.currentStop.StopCode) || 'null');
+        if (cached && cached.lat && cached.lng) {
+          sLat = parseFloat(cached.lat);
+          sLng = parseFloat(cached.lng);
+        }
+      } catch (e) {}
+
+      if ((isNaN(sLat) || isNaN(sLng)) && window.Search && Array.isArray(window.Search.nearbyStops)) {
+        const found = window.Search.nearbyStops.find(s => String(s.StopCode) === String(this.currentStop.StopCode));
+        if (found && found.StopLat && found.StopLng) {
+          sLat = parseFloat(found.StopLat);
+          sLng = parseFloat(found.StopLng);
+        }
+      }
+
+      if (!isNaN(sLat) && !isNaN(sLng)) {
+        this.currentStop.StopLat = sLat;
+        this.currentStop.StopLng = sLng;
+        localStorage.setItem('OASA_STOP_COORDS_' + this.currentStop.StopCode, JSON.stringify({ lat: sLat, lng: sLng }));
+      }
+    }
+
+    if (isNaN(sLat) || isNaN(sLng)) return null;
+
+    // Cache valid coords for future queries
+    if (this.currentStop && this.currentStop.StopCode) {
+      localStorage.setItem('OASA_STOP_COORDS_' + this.currentStop.StopCode, JSON.stringify({ lat: sLat, lng: sLng }));
+    }
+
+    const meters = this.calculateWalkingDistance(
+      userLoc.lat,
+      userLoc.lng,
+      sLat,
+      sLng
+    );
+    const walkMins = Math.ceil(meters / 75) + 2;
+    return {
+      minutes: walkMins,
+      meters: Math.round(meters)
+    };
+  }
+
+  /**
+   * Get Commute Advice: Signed time difference (+20λ, -2λ, +1ω 15λ)
+   * Explains whether user has plenty of time (+), should leave immediately (0λ / 1-4λ), or if bus will arrive before user reaches the stop (-).
+   */
+  getCommuteAdvice(busMinutes, walkMinutes) {
+    if (walkMinutes === null || typeof busMinutes !== 'number' || walkMinutes > 45) {
+      return {
+        label: '',
+        displayLabel: '',
+        shortLabel: '',
+        tooltip: '',
+        className: 'commute-none',
+        buffer: null
+      };
+    }
+
+    const buffer = busMinutes - walkMinutes;
+    const absBuf = Math.abs(buffer);
+    const formattedBuf = this.formatMinutesHuman(absBuf);
+    const sign = buffer > 0 ? `+${formattedBuf}` : (buffer < 0 ? `-${formattedBuf}` : "0'");
+
+    if (buffer >= 5) {
+      return {
+        label: sign,
+        displayLabel: `⏱️ ${sign}`,
+        shortLabel: `⏱️ ${sign}`,
+        tooltip: `Περιθώριο αναχώρησης: Έχετε ${formattedBuf} διαθέσιμα πριν ξεκινήσετε για να προλάβετε το λεωφορείο!`,
+        className: 'commute-relax',
+        buffer
+      };
+    } else if (buffer >= 0) {
+      return {
+        label: sign,
+        displayLabel: `⚡ ${sign}`,
+        shortLabel: `⚡ ${sign}`,
+        tooltip: `Ξεκινήστε τώρα! Το λεωφορείο φτάνει σχεδόν ταυτόχρονα με εσάς (${sign}).`,
+        className: 'commute-leave-now',
+        buffer
+      };
+    } else {
+      return {
+        label: sign,
+        displayLabel: `⚠️ ${sign}`,
+        shortLabel: `⚠️ ${sign}`,
+        tooltip: `Το λεωφορείο αναμένεται ${formattedBuf} πριν φτάσετε στη στάση (χρειάζεστε ${walkMinutes}' περπάτημα).`,
+        className: 'commute-hurry',
+        buffer
+      };
+    }
+  }
+
+  /**
+   * Extract base line identifier for variant grouping (e.g. 314B -> 314, 314 -> 314, 040 -> 040, X95 -> X95)
+   */
+  getBaseLineId(lineId) {
+    if (!lineId) return '';
+    const match = String(lineId).trim().match(/^([A-Za-zΑ-Ωα-ω]*\d+)/);
+    return match ? match[1].toUpperCase() : String(lineId).trim().toUpperCase();
+  }
+
+  renderArrivalRow(arr, arrIdx, walk) {
+    const busMins = arr.btime2;
+    const advice = this.getCommuteAdvice(busMins, walk ? walk.minutes : null);
+    const isLive = arr.is_live;
+    const rawDir = arr.direction || '➡️';
+    const directionText = rawDir === '←' ? '⬅️' : (rawDir === '→' ? '➡️' : rawDir);
+    const lineDescr = arr.route_descr || arr.line_descr || 'Διαδρομή Λεωφορείου';
+    const safeDescr = lineDescr.replace(/'/g, "\\'");
+
+    // Due time display: Separate split-flap digit tiles with urgency styling
+    let dueDisplay = '';
+    let urgencyClass = '';
+    const fieldKey = `arr_${arr.line_id}_${arr.route_code}_${arrIdx}`;
+
+    if (isLive) {
+      let timeText = '';
+      if (busMins >= 60) {
+        timeText = this.formatMinutesHuman(busMins);
+      } else {
+        timeText = String(busMins).padStart(2, '0');
+      }
+
+      if (busMins <= 3) {
+        urgencyClass = 'urgency-now';
+      } else if (busMins <= 10) {
+        urgencyClass = 'urgency-soon';
+      } else {
+        urgencyClass = 'urgency-normal';
+      }
+      dueDisplay = this.renderSplitFlapDigits(fieldKey, timeText, urgencyClass);
+    } else {
+      urgencyClass = 'urgency-scheduled';
+      const clockTime = arr.estimated_arrival_time || arr.departure_time;
+      if (clockTime) {
+        dueDisplay = this.renderSplitFlapDigits(fieldKey, clockTime, urgencyClass);
+      } else if (typeof busMins === 'number') {
+        dueDisplay = this.renderSplitFlapDigits(fieldKey, this.formatMinutesHuman(busMins), urgencyClass);
+      } else {
+        dueDisplay = this.renderSplitFlapDigits(fieldKey, '--:--', urgencyClass);
+      }
+    }
+
+    // Check if an alarm is active for this route
+    const isAlarmSet = window.Alarms && Array.isArray(window.Alarms.alarms) && window.Alarms.alarms.some(a => 
+      String(a.stopCode).trim() === String(this.currentStop.StopCode).trim() && 
+      String(a.lineId).trim().toUpperCase() === String(arr.line_id).trim().toUpperCase() && 
+      !a.triggered
+    );
+
+    // Check if pinned for complex trips (specific arrival)
+    const isPinned = window.PinnedTrips && window.PinnedTrips.isArrivalPinned(this.currentStop.StopCode, arr);
+
+    // Live location report latency string
+    const reportAgo = arr.last_contact_ago_gr || arr.last_contact_ago;
+
+    const walkMins = (walk && typeof walk.minutes === 'number') ? walk.minutes : null;
+
+    return `
+      <div class="ticker-row" onclick="if(window.App && window.App.triggerHaptic) window.App.triggerHaptic('tick'); window.App.openLineTimetableBothDirections('${arr.line_code}', '${arr.line_id}', '${safeDescr}')" title="Κλικ για προβολή πλήρους δρομολογίου και στάσεων">
+        <!-- Top Section: Line Badge, Destination, Direction, GPS Status & Labeled Arrival Countdown -->
+        <div class="ticker-row-top">
+          <div class="ticker-cell-line">
+            <span class="ticker-line-badge">
+              ${arr.line_id}
+            </span>
+          </div>
+          <div class="ticker-dest-info">
+            <div class="ticker-dest-title-row">
+              <span class="ticker-dest-name">${arr.destination || lineDescr}</span>
+              <span style="font-size: 1rem; line-height: 1; flex-shrink: 0;">${directionText}</span>
+            </div>
+            <div class="ticker-dest-sub">
+              ${isLive ? `
+                <span style="color: #059669; font-weight: 700; font-size: 0.74rem; display: inline-flex; align-items: center; gap: 4px;">
+                  <span class="m3-pulse-dot" style="width: 5px; height: 5px; background: #059669;"></span>
+                  Ζωντανό GPS${reportAgo ? ` (πριν ${reportAgo})` : ''}${arr.veh_code ? ` • #${arr.veh_code}` : ''}
+                </span>
+              ` : `
+                <span style="color: #64748b; font-weight: 600; font-size: 0.74rem;">
+                  ${arr.departure_time ? `🕒 ${arr.departure_time}` : '🕒 —'}
+                </span>
+              `}
+              ${lineDescr && arr.destination && lineDescr !== arr.destination ? `<span style="font-size: 0.7rem; color: #94a3b8;">• ${lineDescr}</span>` : ''}
+            </div>
+          </div>
+          <div class="ticker-cell-due" title="Εκτιμώμενος χρόνος άφιξης στη στάση">
+            <span class="ticker-due-sublabel">Άφιξη</span>
+            ${dueDisplay}
+          </div>
+        </div>
+
+        <!-- Bottom Section: Commute Difference / Buffer, Alarm and Pin -->
+        <div class="ticker-row-bottom">
+          <div class="ticker-commute-group">
+            <!-- Commute Buffer / Departure Timing Advice Badge -->
+            <div class="ticker-commute-badge ${advice.className}" title="${advice.tooltip || 'Χρονικό περιθώριο αναχώρησης'}">
+              ${advice.displayLabel || advice.label}
+            </div>
+          </div>
+
+          <div class="ticker-cell-actions">
+            <div class="ticker-cell-alarm">
+              <button class="ticker-alarm-btn ${isAlarmSet ? 'active' : ''}" title="${isAlarmSet ? 'Ειδοποίηση ενεργή' : 'Ρύθμιση ειδοποίησης άφιξης'}" onclick="event.stopPropagation(); const notifDest = '${(arr.destination || safeDescr).replace(/[⬅️➡️←→🔄▲▼]/g, '').trim().replace(/'/g, "\\'")}'; window.App.openAlarmDialog('${arr.line_id}', '${arr.route_code}', ${busMins}, notifDest)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="${isAlarmSet ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                </svg>
+              </button>
+            </div>
+
+            <div class="ticker-cell-pin">
+              <button class="ticker-pin-btn ${isPinned ? 'active' : ''}" title="${isPinned ? 'Καρφιτσωμένο (κλικ για αφαίρεση)' : 'Καρφίτσωμα άφιξης στις Καρφίτσες'}" onclick="event.stopPropagation(); window.App.ticker.togglePinArrival(${arrIdx})">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="${isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="17" x2="12" y2="22"></line>
+                  <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  toggleShowAllStops() {
+    this.showAllStops = !this.showAllStops;
+    this.render();
+  }
+
+  render() {
+    const container = document.getElementById(this.containerId);
+    if (!container) return;
+
+    if (!this.currentStop) {
+      const rawStops = window.Search && Array.isArray(window.Search.nearbyStops) ? [...window.Search.nearbyStops] : [];
+      // Prioritize starred/favourite stops with routes, active routes, and push stops without routes to the bottom
+      rawStops.sort((a, b) => {
+        const aHas = Array.isArray(a.serving_lines) && a.serving_lines.length > 0;
+        const bHas = Array.isArray(b.serving_lines) && b.serving_lines.length > 0;
+
+        if (aHas && !bHas) return -1;
+        if (!aHas && bHas) return 1;
+
+        const isFavA = window.Favorites && window.Favorites.isStopFav(a.StopCode);
+        const isFavB = window.Favorites && window.Favorites.isStopFav(b.StopCode);
+
+        if (isFavA && !isFavB) return -1;
+        if (!isFavA && isFavB) return 1;
+
+        return (a.distanceMeters || 0) - (b.distanceMeters || 0);
+      });
+      // Show all loaded stops without artificial cap of 20
+      const displayStops = rawStops;
+
+      // Prepare lines list
+      let lines = [];
+      if (window.Search && Array.isArray(window.Search.allLines) && window.Search.allLines.length > 0) {
+        lines = window.Search.allLines;
+      } else if (Array.isArray(this.allLines) && this.allLines.length > 0) {
+        lines = this.allLines;
+      } else {
+        // Asynchronously load if not ready
+        window.API.getLines().then(l => {
+          if (Array.isArray(l) && l.length > 0) {
+            this.allLines = l;
+            if (this.activeView === 'lines' && !this.currentStop) {
+              this.render();
+            }
+          }
+        }).catch(() => {});
+      }
+
+      // Filter lines if query exists
+      let displayLines = lines;
+      if (this.linesFilterQuery && this.linesFilterQuery.trim().length > 0) {
+        const normQ = (this.linesFilterQuery || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+        displayLines = lines.filter(l => {
+          const lId = (l.LineID || '').toLowerCase();
+          const lDescr = (l.LineDescr || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+          const lCode = String(l.LineCode || '');
+          return lId.includes(normQ) || lDescr.includes(normQ) || lCode.includes(normQ);
+        });
+      }
+
+      // Total stops count (either master allStops or nearbyStops)
+      const totalStopsCount = (this.allStops && this.allStops.length > 0) ? this.allStops.length : rawStops.length;
+
+      // Header with view switcher (Στάσεις vs Γραμμές)
+      const tabSwitcherHtml = `
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; padding: 0.25rem 0.1rem;">
+          <div style="display: inline-flex; background: var(--md-sys-color-surface-container-high); padding: 4px; border-radius: 9999px; border: 1px solid var(--md-sys-color-outline-variant);">
+            <button class="m3-btn ${this.activeView === 'stops' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="font-size: 0.82rem; padding: 0.35rem 1rem; border-radius: 9999px; border: none; font-weight: 800; cursor: pointer;" onclick="window.App.ticker.setActiveView('stops')">
+              🚏 Στάσεις ${totalStopsCount > 0 ? `(${totalStopsCount})` : (this.isLoadingAllStops ? '(φόρτωση...)' : '')}
+            </button>
+            <button class="m3-btn ${this.activeView === 'lines' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="font-size: 0.82rem; padding: 0.35rem 1rem; border-radius: 9999px; border: none; font-weight: 800; cursor: pointer;" onclick="window.App.ticker.setActiveView('lines')">
+              🚌 Γραμμές ${lines.length > 0 ? `(${lines.length})` : ''}
+            </button>
+          </div>
+        </div>
+      `;
+
+      if (this.activeView === 'lines') {
+        let linesContent = '';
+        if (displayLines.length > 0) {
+          linesContent = `
+            ${tabSwitcherHtml}
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.65rem;">
+              ${displayLines.map(l => {
+                const safeDescr = (l.LineDescr || '').replace(/'/g, "\\'");
+                const isLineFav = window.Favorites && window.Favorites.isLineFav(l.LineCode);
+                return `
+                  <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.65rem; padding: 0.85rem 1rem; margin-bottom: 0; cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); transition: transform 0.15s ease, border-color 0.15s ease;" onclick="window.App.openLineTimetableBothDirections('${l.LineCode}', '${l.LineID}', '${safeDescr}')" onmouseover="this.style.borderColor='var(--md-sys-color-primary)'" onmouseout="this.style.borderColor='var(--md-sys-color-outline-variant)'">
+                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.65rem;">
+                      <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
+                        <span class="ticker-line-badge" style="font-size: 0.95rem; min-width: 46px; flex-shrink: 0;">
+                          ${l.LineID}
+                        </span>
+                        <div style="min-width: 0; flex: 1;">
+                          <div style="font-weight: 800; font-size: 0.92rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: normal; overflow-wrap: normal; hyphens: none;">${l.LineDescr}</div>
+                          <div style="font-size: 0.74rem; color: var(--md-sys-color-outline); margin-top: 2px;">Γραμμή #${l.LineCode}</div>
+                        </div>
+                      </div>
+                      <button class="m3-icon-btn" style="width: 36px; height: 36px; border: none; cursor: pointer; background: none; flex-shrink: 0;" title="Αποθήκευση γραμμής" onclick="event.stopPropagation(); const isFav = window.Favorites.toggleLine('${l.LineCode}', '${l.LineID}', '${safeDescr}'); this.querySelector('svg').setAttribute('fill', isFav ? '#eab308' : 'none'); this.querySelector('svg').setAttribute('stroke', isFav ? '#ca8a04' : '#64748b');">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="${isLineFav ? '#eab308' : 'none'}" stroke="${isLineFav ? '#ca8a04' : '#64748b'}" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          `;
+        } else {
+          linesContent = `
+            ${tabSwitcherHtml}
+            <div class="m3-card" style="padding: 2.5rem 1.5rem; text-align: center; background: #ffffff; border: 1px solid var(--md-sys-color-outline-variant);">
+              <div style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin-bottom: 0.4rem;">Δεν βρέθηκαν γραμμές</div>
+              <div style="font-size: 0.8rem; color: #64748b;">Δοκιμάστε διαφορετικό όρο αναζήτησης.</div>
+            </div>
+          `;
+        }
+        container.innerHTML = linesContent;
+        return;
+      }
+
+      // STOPS VIEW
+      // Merge all master stops (~9,425) with enriched nearby stops using fast Map & Set lookups
+      const nearbyMap = new Map();
+      for (let i = 0; i < rawStops.length; i++) {
+        nearbyMap.set(String(rawStops[i].StopCode), rawStops[i]);
+      }
+      const allCodesSet = this._allStopsCodesSet || (this._allStopsCodesSet = new Set((this.allStops || []).map(s => String(s.StopCode))));
+      
+      let masterStopsList = [];
+      if (this.allStops && this.allStops.length > 0) {
+        masterStopsList = this.allStops.map(s => nearbyMap.get(String(s.StopCode)) || s);
+        // Include any rawStops that might not be in allStops (O(1) Set check)
+        for (let i = 0; i < rawStops.length; i++) {
+          const ns = rawStops[i];
+          if (!allCodesSet.has(String(ns.StopCode))) {
+            masterStopsList.unshift(ns);
+          }
+        }
+      } else {
+        masterStopsList = rawStops;
+      }
+
+      let stopsToDisplay = masterStopsList;
+
+      if (this.stopsFilterQuery && this.stopsFilterQuery.trim().length > 0) {
+        const normQ = this.stopsFilterQuery.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+        stopsToDisplay = masterStopsList.filter(s => {
+          const sCode = s._code || String(s.StopCode || '');
+          const sName = s._normName || (s.StopDescr || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+          const sStreet = s._normStreet || (s.StopStreet || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+          const sEng = s._normEng || (s.StopDescrEng || '').toLowerCase();
+          return sCode.includes(normQ) || sName.includes(normQ) || sStreet.includes(normQ) || sEng.includes(normQ);
+        });
+      }
+
+      // Prioritize favorites first, then sort according to stopsSortBy (cached for high fps)
+      const sortBy = this.stopsSortBy || 'distance';
+      const favsCount = (window.Favorites && Array.isArray(window.Favorites.favStops)) ? window.Favorites.favStops.length : 0;
+      const cacheKey = `${this.stopsFilterQuery || ''}_${sortBy}_${stopsToDisplay.length}_${favsCount}`;
+
+      if (!this._sortedStopsCache || this._sortedStopsCacheKey !== cacheKey) {
+        this._sortedStopsCache = [...stopsToDisplay].sort((a, b) => {
+          const isFavA = window.Favorites && window.Favorites.isStopFav(a.StopCode);
+          const isFavB = window.Favorites && window.Favorites.isStopFav(b.StopCode);
+          if (isFavA && !isFavB) return -1;
+          if (!isFavA && isFavB) return 1;
+
+          if (sortBy === 'alpha') {
+            const na = a.StopDescr || '';
+            const nb = b.StopDescr || '';
+            return na < nb ? -1 : (na > nb ? 1 : 0);
+          } else if (sortBy === 'numeric') {
+            const numA = a._numCode || (a._numCode = parseInt(a.StopCode || 0, 10) || 0);
+            const numB = b._numCode || (b._numCode = parseInt(b.StopCode || 0, 10) || 0);
+            return numA - numB;
+          } else {
+            // Default: distance
+            const aDist = typeof a.distanceMeters === 'number' ? a.distanceMeters : (typeof a.Distance === 'number' ? a.Distance : 999999);
+            const bDist = typeof b.distanceMeters === 'number' ? b.distanceMeters : (typeof b.Distance === 'number' ? b.Distance : 999999);
+            if (aDist !== bDist) return aDist - bDist;
+            const na = a.StopDescr || '';
+            const nb = b.StopDescr || '';
+            return na < nb ? -1 : (na > nb ? 1 : 0);
+          }
+        });
+        this._sortedStopsCacheKey = cacheKey;
+      }
+      const sortedStops = this._sortedStopsCache;
+
+      // Display paginated slice for smooth 60fps rendering
+      const visibleLimit = this.stopsVisibleCount || 80;
+      const paginatedStops = sortedStops.slice(0, visibleLimit);
+
+      const stopsTabSwitcherHtml = `
+        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; padding: 0.25rem 0.1rem;">
+          <div style="display: inline-flex; background: var(--md-sys-color-surface-container-high); padding: 4px; border-radius: 9999px; border: 1px solid var(--md-sys-color-outline-variant);">
+            <button class="m3-btn ${this.activeView === 'stops' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="font-size: 0.82rem; padding: 0.35rem 1rem; border-radius: 9999px; border: none; font-weight: 800; cursor: pointer;" onclick="window.App.ticker.setActiveView('stops')">
+              🚏 Στάσεις ${sortedStops.length > 0 ? `(${sortedStops.length})` : (this.isLoadingAllStops ? '(φόρτωση...)' : '')}
+            </button>
+            <button class="m3-btn ${this.activeView === 'lines' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="font-size: 0.82rem; padding: 0.35rem 1rem; border-radius: 9999px; border: none; font-weight: 800; cursor: pointer;" onclick="window.App.ticker.setActiveView('lines')">
+              🚌 Γραμμές ${lines.length > 0 ? `(${lines.length})` : ''}
+            </button>
+          </div>
+
+          <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <label for="stops-sort-select" style="font-size: 0.75rem; color: #64748b; font-weight: 700;">Ταξινόμηση:</label>
+            <select id="stops-sort-select" onchange="window.App.ticker.setStopsSortBy(this.value)" style="padding: 0.25rem 0.6rem; font-size: 0.78rem; font-weight: 700; border-radius: 9999px; border: 1px solid var(--md-sys-color-outline-variant); background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface); outline: none; cursor: pointer;">
+              <option value="distance" ${sortBy === 'distance' ? 'selected' : ''}>Απόσταση</option>
+              <option value="alpha" ${sortBy === 'alpha' ? 'selected' : ''}>Αλφαβητικά</option>
+              <option value="numeric" ${sortBy === 'numeric' ? 'selected' : ''}>Κωδικός</option>
+            </select>
+          </div>
+        </div>
+      `;
+
+      let stopsContent = '';
+      if (paginatedStops.length > 0) {
+        stopsContent = `
+          ${stopsTabSwitcherHtml}
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #64748b; margin-bottom: 0.5rem; padding: 0 0.2rem;">
+            <span>${this.stopsFilterQuery ? `Αποτελέσματα: ${sortedStops.length}` : `Σύνολο: ${sortedStops.length} στάσεις`}</span>
+            <span>Εμφάνιση ${paginatedStops.length} από ${sortedStops.length}</span>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem;">
+            ${paginatedStops.map(s => {
+              const sCode = s.StopCode;
+              const isFav = window.Favorites && window.Favorites.isStopFav(sCode);
+              const sTitle = s.StopDescr || ('Στάση #' + sCode);
+              const safeTitle = sTitle.replace(/'/g, "\\'");
+              const sStreet = s.StopStreet || '';
+              const walk = this.getWalkMinutes(s.StopLat, s.StopLng);
+              const distText = s.distanceMeters ? `${Math.round(s.distanceMeters)}m` : (s.Distance ? `${Math.round(s.Distance)}m` : (walk ? `${walk.meters}m` : ''));
+              const walkText = walk ? `~${walk.minutes}'` : '';
+              
+              const hasRoutes = Array.isArray(s.serving_lines) && s.serving_lines.length > 0;
+              let linesPills = '';
+              if (hasRoutes) {
+                linesPills = s.serving_lines.slice(0, 3).map(l => `
+                  <span class="m3-badge" style="background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface); font-size: 0.75rem; padding: 2px 7px; border: 1px solid var(--md-sys-color-outline-variant); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%;">
+                    <strong style="color: var(--md-sys-color-primary);">${l.line_id}</strong>
+                    <span style="color: var(--md-sys-color-outline); margin: 0 3px;">προς</span>
+                    <span>${l.last_stop}</span>
+                  </span>
+                `).join('');
+                if (s.serving_lines.length > 3) {
+                  linesPills += `<span class="m3-badge" style="background: var(--md-sys-color-surface-container-high); color: #64748b; font-size: 0.75rem; padding: 2px 7px; border: 1px solid var(--md-sys-color-outline-variant); margin-bottom: 2px; font-weight: 700; letter-spacing: 0.05em;">…</span>`;
+                }
+              }
+
+              return `
+                <div class="m3-card stop-interactive-card ${isFav ? 'is-favourite-stop' : ''}" data-stop-code="${sCode}" data-stop-title="${safeTitle}" data-stop-lat="${s.StopLat}" data-stop-lng="${s.StopLng}" style="padding: 0.9rem; display: flex; flex-direction: column; justify-content: space-between; gap: 0.65rem; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; ${isFav ? 'background: #fffdf5;' : 'background: #ffffff;'}" onclick="window.App.selectStop('${sCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})">
+                  <div>
+                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem;">
+                      <div style="font-weight: 800; font-size: 0.98rem; color: #0f172a; line-height: 1.25;">
+                        ${sTitle}
+                      </div>
+                      <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                        ${isFav ? '<span class="m3-badge" style="background: #fef08a; color: #854d0e; font-size: 0.72rem; font-weight: 800; padding: 2px 6px;">⭐</span>' : ''}
+                        <span class="m3-badge" style="font-size: 0.7rem; font-weight: 800; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;">
+                          #${sCode}
+                        </span>
+                      </div>
+                    </div>
+                    ${sStreet ? `<div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">${sStreet}</div>` : ''}
+                    ${(distText || walkText) ? `
+                      <div style="display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #0284c7; font-weight: 700; margin-top: 4px;">
+                        <span>🚶 ${distText}</span>
+                        ${walkText ? `<span>• ${walkText}</span>` : ''}
+                      </div>
+                    ` : ''}
+                  </div>
+
+                  ${linesPills ? `
+                    <div style="display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding-top: 4px; border-top: 1px dashed #e2e8f0;">
+                      ${linesPills}
+                    </div>
+                  ` : ''}
+
+                  <div style="display: flex; justify-content: flex-end; padding-top: 2px;">
+                    <button class="m3-btn m3-btn-primary" style="font-size: 0.78rem; padding: 0.3rem 0.8rem; border-radius: 9999px; width: 100%; justify-content: center;" onclick="event.stopPropagation(); window.App.selectStop('${sCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})">
+                      Προβολή Αφίξεων ➜
+                    </button>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+          ${sortedStops.length > paginatedStops.length ? `
+            <div style="text-align: center; margin: 1.5rem 0 0.5rem;">
+              <button class="m3-btn m3-btn-tonal" style="padding: 0.6rem 1.75rem; font-size: 0.85rem; font-weight: 800; border-radius: 9999px; cursor: pointer;" onclick="window.App.ticker.loadMoreStops()">
+                Φόρτωση περισσότερων στάσεων (${sortedStops.length - paginatedStops.length} απομένουν) ⇩
+              </button>
+            </div>
+          ` : ''}
+        `;
+      } else {
+        stopsContent = `
+          ${stopsTabSwitcherHtml}
+          <div class="m3-card" style="padding: 2.5rem 1.5rem; text-align: center; background: #ffffff; border: 1px solid var(--md-sys-color-outline-variant);">
+            <div style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin-bottom: 0.4rem;">Δεν βρέθηκαν στάσεις</div>
+            <div style="font-size: 0.8rem; color: #64748b;">Δοκιμάστε διαφορετικό όνομα ή κωδικό στάσης.</div>
+          </div>
+        `;
+      }
+
+      container.innerHTML = stopsContent;
+      return;
+    }
+
+    const stopName = this.currentStop.StopDescr || ('ΣΤΑΣΗ ' + this.currentStop.StopCode);
+    const walk = this.getWalkMinutes(this.currentStop.StopLat, this.currentStop.StopLng);
+
+    // Keep the top walking time pill in the stop banner perpetually synchronized
+    const walkPill = document.getElementById('selected-stop-walk-pill');
+    if (walkPill) {
+      if (walk && typeof walk.minutes === 'number') {
+        walkPill.style.display = 'inline-flex';
+        walkPill.innerText = `🚶 ${walk.minutes}' (${walk.meters}μ)`;
+      } else {
+        walkPill.style.display = 'none';
+      }
+    }
+
+    // Extract unique line IDs for interactive show/hide filtering
+    const uniqueLines = Array.from(new Set(this.arrivals.map(a => String(a.line_id || '').trim()).filter(Boolean)));
+    
+    // Filter arrivals by line visibility (multi-line selection)
+    let visibleArrivals = this.arrivals.filter(a => {
+      const lid = String(a.line_id || '').trim();
+      if (this.selectedLines && this.selectedLines.size > 0) {
+        return this.selectedLines.has(lid);
+      }
+      return !this.hiddenLines.has(lid);
+    });
+    
+    // Filter arrivals by live vs scheduled mode
+    if (this.modeFilter === 'live') {
+      visibleArrivals = visibleArrivals.filter(a => a.is_live);
+    } else if (this.modeFilter === 'scheduled') {
+      visibleArrivals = visibleArrivals.filter(a => !a.is_live);
+    }
+
+    let rowsHtml = '';
+    if (this.arrivals.length === 0) {
+      rowsHtml = `
+        <div style="padding: 2.5rem 1rem; text-align: center; color: #64748b; font-size: 0.9rem;">
+          Δεν βρέθηκαν προγραμματισμένες αφίξεις για αυτή τη στάση.
+        </div>
+      `;
+    } else if (this.modeFilter === 'live' && visibleArrivals.length === 0) {
+      rowsHtml = `
+        <div style="padding: 2.5rem 1rem; text-align: center; color: #64748b; font-size: 0.9rem;">
+          ⚡ Δεν υπάρχουν ζωντανές αφίξεις με ενεργό GPS αυτή τη στιγμή.
+        </div>
+      `;
+    } else if (this.modeFilter === 'scheduled' && visibleArrivals.length === 0) {
+      rowsHtml = `
+        <div style="padding: 2.5rem 1rem; text-align: center; color: #64748b; font-size: 0.9rem;">
+          🕒 Δεν υπάρχουν προγραμματισμένες αφίξεις για την επιλεγμένη ημέρα.
+        </div>
+      `;
+    } else if (visibleArrivals.length === 0) {
+      rowsHtml = `
+        <div style="padding: 2.5rem 1rem; text-align: center; color: #64748b; font-size: 0.9rem;">
+          Όλες οι γραμμές έχουν αποκρυφθεί από το φίλτρο.
+          <div style="margin-top: 0.5rem;">
+            <button class="m3-btn m3-btn-outlined" style="font-size: 0.8rem; padding: 4px 12px;" onclick="window.App.ticker.showAllLines()">
+              Επανεμφάνιση Όλων
+            </button>
+          </div>
+        </div>
+      `;
+    } else {
+      // Show upcoming lines and departures as separate arrivals in chronological order
+      this.renderedArrivals = visibleArrivals;
+      rowsHtml = visibleArrivals.map((arr, arrIdx) => this.renderArrivalRow(arr, arrIdx, walk)).join('');
+    }
+
+    // Filter bar HTML when multiple lines serve this stop (Multi-Line Selection)
+    let filterBarHtml = '';
+    if (uniqueLines.length > 1) {
+      const hasSelection = this.selectedLines && this.selectedLines.size > 0;
+      const isAllActive = !hasSelection && this.hiddenLines.size === 0;
+      filterBarHtml = `
+        <div class="ticker-filter-bar">
+          <span class="ticker-filter-label">Γραμμές:</span>
+          <div class="ticker-filter-pills">
+            <button class="ticker-filter-pill ${isAllActive ? 'is-active' : ''}" 
+              onclick="event.stopPropagation(); window.App.ticker.showAllLines()"
+              title="Εμφάνιση όλων των γραμμών">
+              <span class="ticker-filter-dot" style="background: ${isAllActive ? '#005ac1' : '#94a3b8'};"></span>
+              Όλες
+            </button>
+            ${uniqueLines.map(lid => {
+              const isSelected = hasSelection ? this.selectedLines.has(lid) : false;
+              return `
+                <button class="ticker-filter-pill ${isSelected ? 'is-active' : (hasSelection ? 'is-hidden' : '')}" 
+                  onclick="event.stopPropagation(); window.App.ticker.toggleLineFilter('${lid}')"
+                  title="Επιλογή / Αποεπιλογή γραμμής ${lid}">
+                  <span class="ticker-filter-dot" style="background: ${isSelected ? '#005ac1' : (isAllActive ? '#005ac1' : '#94a3b8')};"></span>
+                  ${lid}
+                </button>
+              `;
+            }).join('')}
+            ${(!isAllActive) ? `
+              <button class="ticker-filter-reset" onclick="event.stopPropagation(); window.App.ticker.showAllLines()">
+                Εμφάνιση Όλων
+              </button>
+            ` : ''}
+          </div>
+        </div>
+      `;
+    }
+
+    container.innerHTML = `
+      <div class="ticker-board">
+        ${filterBarHtml}
+
+        <div class="ticker-rows">
+          ${rowsHtml}
+        </div>
+      </div>
+    `;
+
+    this.startClock();
+  }
+
+  togglePinArrival(arrIdx) {
+    const list = this.renderedArrivals || this.arrivals || [];
+    const arr = list[arrIdx];
+    if (arr && window.PinnedTrips) {
+      window.PinnedTrips.togglePin(arr, this.currentStop);
+    }
+  }
+
+  toggleLineFilter(lineId) {
+    const lid = String(lineId).trim();
+    if (!this.selectedLines) this.selectedLines = new Set();
+    if (this.selectedLines.has(lid)) {
+      this.selectedLines.delete(lid);
+    } else {
+      this.selectedLines.add(lid);
+    }
+    this.hiddenLines.clear();
+    this.render();
+  }
+
+  selectLineFilter(lineId) {
+    this.toggleLineFilter(lineId);
+  }
+
+  toggleLine(lineId) {
+    this.toggleLineFilter(lineId);
+  }
+
+  showAllLines() {
+    if (this.selectedLines) this.selectedLines.clear();
+    this.hiddenLines.clear();
+    this.render();
+  }
+
+  startClock() {
+    if (this.timerInterval) clearInterval(this.timerInterval);
+    const updateTime = () => {
+      const el = document.getElementById('ticker-live-clock');
+      if (el) {
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('el-GR', {
+          timeZone: 'Europe/Athens',
+          hour12: false,
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit'
+        });
+        el.innerHTML = this.renderSplitFlapDigits('global_clock', timeStr, 'urgency-normal');
+      }
+    };
+    updateTime();
+    this.timerInterval = setInterval(updateTime, 1000);
+  }
+}
+
+window.AirportTicker = AirportTicker;

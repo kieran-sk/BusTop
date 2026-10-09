@@ -405,6 +405,10 @@ class AppController {
 
   async init() {
     console.log('[Athens OASA Bus Suite] Initializing Material 3 Expressive & Leaflet Map in Greek...');
+    if (window.AndroidBridge) {
+      document.documentElement.classList.add('is-android-app');
+      document.body.classList.add('is-android-app');
+    }
     this.applyStoredTheme();
 
     // Initialize Ticker

@@ -364,8 +364,9 @@ class AlarmManager {
     // 2. Web Service Worker Live Notification
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
     const timeDisplay = this.formatMinutesHuman(minutes);
-    const title = `🚍 ${alarm.lineId} σε ${timeDisplay}`;
-    const body = `Στάση: ${alarm.stopName} • Ειδοποίηση στα ${this.formatMinutesHuman(alarm.thresholdMinutes)}`;
+    const title = `${alarm.lineId} σε ${timeDisplay}`;
+    const cleanDest = alarm.destination ? String(alarm.destination).trim() : '';
+    const body = cleanDest ? `προς ${cleanDest}\n${alarm.stopName}` : alarm.stopName;
     const tag = `live_alarm_${alarm.id}`;
     const iconUrl = new URL('assets/icon-192.png', window.location.href).href;
 

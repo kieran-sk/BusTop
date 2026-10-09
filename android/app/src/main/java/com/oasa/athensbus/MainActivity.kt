@@ -159,7 +159,45 @@ class MainActivity : FragmentActivity() {
                 error: android.webkit.WebResourceError?
             ) {
                 if (request?.isForMainFrame == true) {
-                    view?.loadUrl("file:///android_asset/web/index.html")
+                    val failingUrl = request.url?.toString() ?: ""
+                    if (!failingUrl.startsWith("file:///android_asset/")) {
+                        val hasLocalAsset = try {
+                            assets.list("web")?.contains("index.html") == true
+                        } catch (e: Exception) {
+                            false
+                        }
+                        if (hasLocalAsset) {
+                            view?.loadUrl("file:///android_asset/web/index.html")
+                            return
+                        }
+                    }
+
+                    val retryHtml = """
+                        <!DOCTYPE html>
+                        <html lang="el">
+                        <head>
+                            <meta charset="UTF-8">
+                            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                            <style>
+                                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #f8fafc; color: #0f172a; text-align: center; padding: 1.5rem; box-sizing: border-box; }
+                                .card { background: white; border-radius: 20px; padding: 2rem 1.5rem; box-shadow: 0 4px 16px rgba(0,0,0,0.06); max-width: 320px; width: 100%; border: 1px solid #e2e8f0; }
+                                .icon { font-size: 3rem; margin-bottom: 0.75rem; }
+                                h2 { margin: 0 0 0.5rem; font-size: 1.25rem; font-weight: 800; color: #0f172a; }
+                                p { color: #64748b; font-size: 0.9rem; line-height: 1.5; margin: 0 0 1.5rem; }
+                                button { background: #005ac1; color: white; border: none; padding: 0.75rem 1.8rem; border-radius: 9999px; font-size: 0.95rem; font-weight: 700; cursor: pointer; box-shadow: 0 2px 6px rgba(0,90,193,0.3); }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="card">
+                                <div class="icon">📡</div>
+                                <h2>Δεν υπάρχει σύνδεση</h2>
+                                <p>Αδυναμία φόρτωσης τηλεματικής. Ελέγξτε τη σύνδεσή σας στο διαδίκτυο και δοκιμάστε ξανά.</p>
+                                <button onclick="window.location.href='https://bustop.pages.dev'">Επανάληψη</button>
+                            </div>
+                        </body>
+                        </html>
+                    """.trimIndent()
+                    view?.loadDataWithBaseURL("https://bustop.pages.dev", retryHtml, "text/html", "UTF-8", null)
                 }
             }
 
@@ -167,7 +205,7 @@ class MainActivity : FragmentActivity() {
                 super.onPageFinished(view, url)
                 isPageLoaded = true
                 dispatchPendingStop()
-                view?.evaluateJavascript("if (window.App && typeof window.App.applyMaterialYou === 'function') window.App.applyMaterialYou();", null)
+                view?.evaluateJavascript("document.documentElement.classList.add('is-android-app'); if (window.App && typeof window.App.applyMaterialYou === 'function') window.App.applyMaterialYou();", null)
             }
         }
 
