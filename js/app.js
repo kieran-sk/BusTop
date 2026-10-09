@@ -776,6 +776,9 @@ class AppController {
   }
 
   switchTab(tabId, pushHistory = true) {
+    if (tabId === 'notifications') {
+      tabId = 'pinned';
+    }
     if (pushHistory && tabId !== this.activeTab) {
       this.pushNavState({
         tab: this.activeTab,

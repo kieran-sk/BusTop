@@ -14,6 +14,15 @@ class PinnedTripsManager {
     this.previousDigitsMap = new Map();
   }
 
+  updateBadge() {
+    const badge = document.getElementById('nav-pinned-badge');
+    if (badge) {
+      const count = this.pinnedItems.length;
+      badge.style.display = count > 0 ? 'inline-block' : 'none';
+      badge.textContent = count;
+    }
+  }
+
   save() {
     localStorage.setItem('OASA_PINNED_ARRIVALS', JSON.stringify(this.pinnedItems));
     if (this.activePinId) {
@@ -21,6 +30,7 @@ class PinnedTripsManager {
     } else {
       localStorage.removeItem('OASA_ACTIVE_PIN_ID');
     }
+    this.updateBadge();
     this.renderUI();
   }
 
@@ -32,6 +42,28 @@ class PinnedTripsManager {
     const item = this.pinnedItems.find(p => p.id === pinId);
     if (item) {
       this.showToast(`Ενεργή παρακολούθηση: ${item.lineId}`);
+    }
+  }
+
+  toggleNotification(pinId) {
+    const item = this.pinnedItems.find(p => p.id === pinId);
+    if (!item) return;
+    // Defaults to true if undefined
+    const currentEnabled = item.notificationEnabled !== false;
+    item.notificationEnabled = !currentEnabled;
+    this.save();
+
+    if (item.notificationEnabled) {
+      this.showToast(`🔔 Ενεργοποιήθηκε η ειδοποίηση για ${item.lineId}`);
+      if (this.activePinId === pinId || this.pinnedItems.length === 1) {
+        this.updateLiveAndroidNotification();
+      }
+    } else {
+      this.showToast(`🔕 Απενεργοποιήθηκε η ειδοποίηση για ${item.lineId}`);
+      if (this.activePinId === pinId) {
+        // If this active pin's notification was turned off, clear or refresh notification
+        this.updateLiveAndroidNotification();
+      }
     }
   }
 
@@ -247,7 +279,8 @@ class PinnedTripsManager {
         initialMinutes: Math.max(0, busMins),
         targetArrivalTimestamp,
         arrivalKey,
-        pinnedAt: now
+        pinnedAt: now,
+        notificationEnabled: true
       };
       this.pinnedItems.push(newItem);
       this.activePinId = newItem.id;
@@ -560,7 +593,9 @@ class PinnedTripsManager {
       return;
     }
 
-    // Prioritize active pinned arrival or the most recently pinned arrival
+    // Find the candidate item to display in the notification:
+    // It should be the preferred pin (activePinId or last added) IF its notification is enabled,
+    // or the most recent pinned item that HAS notifications enabled.
     let targetItem = null;
     let targetMatch = null;
     let targetMins = null;
@@ -568,22 +603,44 @@ class PinnedTripsManager {
     const preferredPin = (this.activePinId && this.pinnedItems.find(p => p.id === this.activePinId))
       || this.pinnedItems[this.pinnedItems.length - 1];
 
-    if (preferredPin) {
+    if (preferredPin && preferredPin.notificationEnabled !== false) {
       targetItem = preferredPin;
-      const arrs = this.liveArrivals.get(preferredPin.stopCode) || [];
-      const match = this.findBestArrivalMatch(preferredPin, arrs);
-      if (match && typeof match.btime2 === 'number') {
-        targetMatch = match;
-        targetMins = match.btime2;
-      } else {
-        targetMins = typeof preferredPin.initialMinutes === 'number' ? preferredPin.initialMinutes : 10;
+    } else {
+      // Find any other pinned item with notifications enabled
+      targetItem = [...this.pinnedItems].reverse().find(p => p.notificationEnabled !== false) || null;
+    }
+
+    if (!targetItem) {
+      // All pinned items have notifications turned off! Clear Android bridge & SW notification.
+      if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
+        try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
       }
+      if (window.AndroidBridge && typeof window.AndroidBridge.clearLiveArrivalNotification === 'function') {
+        try { window.AndroidBridge.clearLiveArrivalNotification(); } catch (e) {}
+      }
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({ type: 'CLEAR_PINNED_LIVE_NOTIFICATION' });
+      }
+      if ('clearAppBadge' in navigator) {
+        navigator.clearAppBadge().catch(() => {});
+      }
+      return;
+    }
+
+    const arrs = this.liveArrivals.get(targetItem.stopCode) || [];
+    const match = this.findBestArrivalMatch(targetItem, arrs);
+    if (match && typeof match.btime2 === 'number') {
+      targetMatch = match;
+      targetMins = match.btime2;
+    } else {
+      targetMins = typeof targetItem.initialMinutes === 'number' ? targetItem.initialMinutes : 10;
     }
 
     if (targetItem) {
       const item = targetItem;
       const match = targetMatch;
       const mins = targetMins;
+      const cleanDest = this.getCleanDestination(item);
       const minsDisplay = (typeof mins === 'number' && mins > 0) ? `${mins}'` : "0'";
       const title = `${item.lineId} σε ${minsDisplay}`;
       const body = cleanDest ? `προς ${cleanDest}\n${item.stopName}` : item.stopName;
@@ -709,19 +766,21 @@ class PinnedTripsManager {
     const container = document.getElementById(this.containerId);
     if (!container) return;
 
+    this.updateBadge();
+
     if (this.pinnedItems.length === 0) {
       container.innerHTML = `
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.5rem;">
           <div>
-            <h2 style="font-size: 1.25rem; font-weight: 800; margin: 0; color: #0f172a;">📌 Καρφιτσωμένες Αφίξεις</h2>
-            <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">Ζωντανή παρακολούθηση επιλεγμένων αφίξεων σε συγκεντρωτικό πίνακα</div>
+            <h2 style="font-size: 1.25rem; font-weight: 800; margin: 0; color: #0f172a;">📌 Καρφιτσωμένα &amp; Ειδοποιήσεις</h2>
+            <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">Ζωντανή παρακολούθηση επιλεγμένων αφίξεων με ειδοποιήσεις στο κινητό</div>
           </div>
         </div>
         <div class="m3-card" style="text-align: center; padding: 2.5rem 1.25rem; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant);">
           <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">📌</div>
           <div style="font-weight: 800; font-size: 1.1rem; color: var(--md-sys-color-on-surface); margin-bottom: 0.4rem;">Δεν υπάρχουν καρφιτσωμένες αφίξεις</div>
           <p style="color: var(--md-sys-color-outline); font-size: 0.85rem; max-width: 380px; margin: 0 auto 1.25rem; line-height: 1.4;">
-            Πατήστε το εικονίδιο καρφίτσας δίπλα σε οποιαδήποτε άφιξη στον πίνακα για να παρακολουθείτε ζωντανά το λεωφορείο σας.
+            Πατήστε το εικονίδιο καρφίτσας δίπλα σε οποιαδήποτε άφιξη στον πίνακα δρομολογίων για να παρακολουθείτε ζωντανά το λεωφορείο και να λαμβάνετε ειδοποιήσεις.
           </p>
           <button class="m3-btn m3-btn-primary" style="border-radius: 9999px; padding: 0.5rem 1.2rem; font-weight: 800;" onclick="window.App.switchTab('ticker')">
             Προβολή Αφίξεων ➜
@@ -770,6 +829,8 @@ class PinnedTripsManager {
 
       const isActiveTracked = (item.id === this.activePinId) || (!this.activePinId && idx === this.pinnedItems.length - 1);
 
+      const isNotifOn = item.notificationEnabled !== false;
+
       return `
         <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem; margin-bottom: 0; background: ${isActiveTracked ? '#f0fdf4' : 'var(--md-sys-color-surface-container)'}; border: 1px solid ${isActiveTracked ? '#86efac' : 'var(--md-sys-color-outline-variant)'}; border-left: 4px solid ${isActiveTracked ? '#16a34a' : (isUrgent ? '#ea580c' : 'var(--md-sys-color-primary)')}; cursor: pointer;" onclick="window.App.switchTab('ticker'); window.App.selectStop('${item.stopCode}', '${cleanStopName}', ${item.stopLat || 'null'}, ${item.stopLng || 'null'});">
           <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
@@ -780,7 +841,7 @@ class PinnedTripsManager {
               <div style="min-width: 0; flex: 1;">
                 <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                   <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: normal; overflow-wrap: normal; hyphens: none;">${item.stopName}</div>
-                  ${isActiveTracked ? `<span class="m3-badge" style="background: #dcfce7; color: #166534; font-size: 0.68rem; font-weight: 800; padding: 1px 6px; border: 1px solid #bbf7d0;">🔔 Σε παρακολούθηση</span>` : ''}
+                  ${isActiveTracked ? `<span class="m3-badge" style="background: #dcfce7; color: #166534; font-size: 0.68rem; font-weight: 800; padding: 1px 6px; border: 1px solid #bbf7d0;">📍 Ενεργό</span>` : ''}
                 </div>
                 <div style="font-size: 0.76rem; color: var(--md-sys-color-outline); margin-top: 2px;">
                   ${item.direction ? `<strong style="color: var(--md-sys-color-primary); margin-right: 4px;">${item.direction}</strong> • ` : ''}${item.departureTime ? `<strong style="color: #475569; margin-right: 4px;">🕒 Αναχώρηση: ${item.departureTime}</strong> • ` : ''}Στάση #${item.stopCode} • <span style="color: var(--md-sys-color-primary); text-decoration: underline;">Προβολή στάσης ➜</span>
@@ -793,18 +854,22 @@ class PinnedTripsManager {
               </span>
             </div>
           </div>
-          <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px dashed var(--md-sys-color-outline-variant); padding-top: 0.5rem; font-size: 0.8rem; color: var(--md-sys-color-outline);">
+          <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px dashed var(--md-sys-color-outline-variant); padding-top: 0.5rem; font-size: 0.8rem; color: var(--md-sys-color-outline); flex-wrap: wrap; gap: 0.4rem;">
             <div>
               🚶 <strong style="color: var(--md-sys-color-on-surface);">${walkMins}'</strong> (${walkDistanceM}μ. περπάτημα)
             </div>
-            <div style="display: flex; gap: 0.4rem; align-items: center;">
+            <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+              <!-- Notification toggle button -->
+              <button class="m3-btn ${isNotifOn ? 'm3-btn-primary' : 'm3-btn-tonal'}" onclick="event.stopPropagation(); window.PinnedTrips.toggleNotification('${item.id}')" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; border-radius: 9999px; gap: 4px; display: inline-flex; align-items: center; ${isNotifOn ? 'background: #16a34a; border-color: #16a34a; color: #ffffff;' : 'color: #64748b;'}" title="Ενεργοποίηση/Απενεργοποίηση ειδοποίησης για αυτή την άφιξη">
+                ${isNotifOn ? '🔔 Ειδοποίηση ON' : '🔕 Ειδοποίηση OFF'}
+              </button>
               ${!isActiveTracked ? `
-                <button class="m3-btn m3-btn-outlined" onclick="event.stopPropagation(); window.PinnedTrips.setActivePin('${item.id}')" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; border-radius: 9999px; border-color: #10b981; color: #047857;" title="Εμφάνιση αυτής της γραμμής στην ειδοποίηση Android">
-                  🔔 Παρακολούθηση
+                <button class="m3-btn m3-btn-outlined" onclick="event.stopPropagation(); window.PinnedTrips.setActivePin('${item.id}')" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; border-radius: 9999px; border-color: #005ac1; color: #005ac1;" title="Ορισμός ως κύρια γραμμή για την ειδοποίηση Android">
+                  📍 Εστίαση
                 </button>
               ` : ''}
-              <button class="m3-btn m3-btn-tonal" onclick="event.stopPropagation(); window.PinnedTrips.removePin('${item.id}')" style="padding: 0.25rem 0.7rem; font-size: 0.74rem; border-radius: 9999px;">
-                Ξεκαρφίτσωμα
+              <button class="m3-btn m3-btn-tonal" onclick="event.stopPropagation(); window.PinnedTrips.removePin('${item.id}')" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; border-radius: 9999px; color: #64748b;">
+                ✕ Αφαίρεση
               </button>
             </div>
           </div>
@@ -835,8 +900,8 @@ class PinnedTripsManager {
     container.innerHTML = `
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.5rem;">
         <div>
-          <h2 style="font-size: 1.25rem; font-weight: 800; margin: 0; color: #0f172a;">📌 Καρφιτσωμένες Αφίξεις</h2>
-          <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">${this.pinnedItems.length} καρφιτσωμένες γραμμές για γρήγορη παρακολούθηση</div>
+          <h2 style="font-size: 1.25rem; font-weight: 800; margin: 0; color: #0f172a;">📌 Καρφιτσωμένα &amp; Ειδοποιήσεις</h2>
+          <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">${this.pinnedItems.length} παρακολουθούμενες γραμμές με ζωντανές ειδοποιήσεις άφιξης</div>
         </div>
         <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
           <button class="m3-btn m3-btn-outlined" style="font-size: 0.75rem; padding: 3px 10px; border-radius: 9999px; color: var(--md-sys-color-error); border-color: #ef4444;" onclick="window.PinnedTrips.clearAll()">
@@ -853,3 +918,8 @@ class PinnedTripsManager {
 }
 
 window.PinnedTrips = new PinnedTripsManager();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => window.PinnedTrips.updateBadge());
+} else {
+  window.PinnedTrips.updateBadge();
+}

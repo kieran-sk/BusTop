@@ -227,7 +227,7 @@ self.addEventListener('push', (event) => {
     renotify: true,
     requireInteraction: true,
     tag: data.tag || ('bus_push_' + Date.now()),
-    data: { url: data.url || '/?tab=notifications' }
+    data: { url: data.url || '/?tab=pinned' }
   };
 
   event.waitUntil(self.registration.showNotification(title, options));

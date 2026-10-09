@@ -227,24 +227,7 @@
 
     </section>
 
-    <!-- ================= 4b. NOTIFICATIONS (ALARMS & ALERTS) TAB ================= -->
-    <section id="section-notifications" class="app-section" style="display: none;">
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.5rem;">
-        <div>
-          <h2 style="font-size: 1.25rem; font-weight: 800; margin: 0; color: #0f172a;">🔔 Ειδοποιήσεις &amp; Υπενθυμίσεις</h2>
-          <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">Ζωντανή παρακολούθηση αφίξεων με ηχητικό συναγερμό και ειδοποιήσεις στο κινητό</div>
-        </div>
-        <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-          <button id="btn-request-battery-opt" class="m3-btn m3-btn-tonal" style="display: none; font-size: 0.78rem; padding: 0.35rem 0.75rem; border-radius: 9999px; align-items: center; gap: 4px;" onclick="if (window.AndroidBridge && typeof window.AndroidBridge.requestIgnoreBatteryOptimizations === 'function') { window.AndroidBridge.requestIgnoreBatteryOptimizations(); }" title="Εξαίρεση από εξοικονόμηση μπαταρίας για αξιόπιστες ειδοποιήσεις στο παρασκήνιο">
-            ⚡ Εξοικονόμηση Μπαταρίας
-          </button>
-        </div>
-      </div>
 
-      <div id="notifications-container">
-        <!-- Injected dynamically by AlarmManager -->
-      </div>
-    </section>
 
     <!-- ================= 5. FAVORITES (SAVED) TAB ================= -->
     <section id="section-favorites" class="app-section" style="display: none;">
@@ -548,25 +531,15 @@
         </span>
       </div>
     </div>
-    <div class="m3-nav-item" data-tab="notifications" onclick="window.App.switchTab('notifications')" title="Ειδοποιήσεις &amp; Ξυπνητήρια" aria-label="Ειδοποιήσεις">
+    <div class="m3-nav-item" data-tab="pinned" onclick="window.App.switchTab('pinned')" title="Καρφιτσωμένα &amp; Ειδοποιήσεις" aria-label="Καρφίτσες &amp; Ειδοποιήσεις">
       <div class="m3-nav-pill" style="position: relative;">
-        <span class="m3-nav-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-          </svg>
-        </span>
-        <span id="nav-alarms-badge" style="display: none; position: absolute; top: -3px; right: -4px; background: #dc2626; color: #ffffff; font-size: 0.62rem; font-weight: 900; padding: 1px 5px; border-radius: 9999px; border: 1.5px solid #ffffff;">0</span>
-      </div>
-    </div>
-    <div class="m3-nav-item" data-tab="pinned" onclick="window.App.switchTab('pinned')" title="Καρφιτσωμένα Δρομολόγια" aria-label="Καρφίτσες">
-      <div class="m3-nav-pill">
         <span class="m3-nav-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="12" y1="17" x2="12" y2="22"></line>
             <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
           </svg>
         </span>
+        <span id="nav-pinned-badge" style="display: none; position: absolute; top: -3px; right: -4px; background: #005ac1; color: #ffffff; font-size: 0.62rem; font-weight: 900; padding: 1px 5px; border-radius: 9999px; border: 1.5px solid #ffffff;">0</span>
       </div>
     </div>
     <div class="m3-nav-item" data-tab="favorites" onclick="window.App.switchTab('favorites')" title="Αγαπημένες Στάσεις &amp; Γραμμές" aria-label="Αγαπημένα">
