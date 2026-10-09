@@ -46,6 +46,18 @@ class AirportTicker {
     const getIcon = () => document.getElementById('ticker-pull-icon');
     const getText = () => document.getElementById('ticker-pull-text');
 
+    const downArrowSvg = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <polyline points="19 12 12 19 5 12"></polyline>
+      </svg>
+    `;
+    const spinnerSvg = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="spin-animation">
+        <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
+      </svg>
+    `;
+
     window.addEventListener('touchstart', (e) => {
       if (isRefreshing) return;
       if (window.App && window.App.activeTab !== 'ticker') return;
@@ -72,7 +84,7 @@ class AirportTicker {
         const text = getText();
         if (ind) {
           ind.style.display = 'flex';
-          const dampDist = Math.min(threshold + 20, pullDist * 0.45);
+          const dampDist = Math.min(threshold + 15, pullDist * 0.4);
           ind.style.transform = `translateY(${dampDist}px)`;
           if (pullDist >= threshold) {
             if (icon) icon.style.transform = 'rotate(180deg)';
@@ -99,9 +111,8 @@ class AirportTicker {
           window.App.triggerHaptic('medium');
         }
         if (icon) {
-          icon.innerText = '🔄';
+          icon.innerHTML = spinnerSvg;
           icon.style.transform = 'none';
-          icon.classList.add('spin-animation');
         }
         if (text) text.innerText = 'Ανανέωση αφίξεων...';
 
@@ -116,17 +127,21 @@ class AirportTicker {
         }
 
         if (text) text.innerText = '✓ Ενημερώθηκε!';
-        if (icon) icon.classList.remove('spin-animation');
         if (window.App && typeof window.App.triggerHaptic === 'function') {
           window.App.triggerHaptic('light');
         }
 
         setTimeout(() => {
           if (ind) {
-            ind.style.transform = 'translateY(-100%)';
+            ind.style.opacity = '0';
+            ind.style.transform = 'translateY(0px)';
             setTimeout(() => {
               ind.style.display = 'none';
-              if (icon) icon.innerText = '⬇️';
+              ind.style.opacity = '1';
+              if (icon) {
+                icon.innerHTML = downArrowSvg;
+                icon.style.transform = 'rotate(0deg)';
+              }
               isRefreshing = false;
             }, 200);
           } else {
@@ -135,8 +150,16 @@ class AirportTicker {
         }, 550);
       } else {
         if (ind) {
-          ind.style.transform = 'translateY(-100%)';
-          setTimeout(() => { ind.style.display = 'none'; }, 200);
+          ind.style.opacity = '0';
+          ind.style.transform = 'translateY(0px)';
+          setTimeout(() => {
+            ind.style.display = 'none';
+            ind.style.opacity = '1';
+            if (icon) {
+              icon.innerHTML = downArrowSvg;
+              icon.style.transform = 'rotate(0deg)';
+            }
+          }, 200);
         }
       }
     }, { passive: true });
