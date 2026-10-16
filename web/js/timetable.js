@@ -13,10 +13,26 @@ class TimetableManager {
     this.stopsByRoute = new Map();
     this.liveBusesByRoute = new Map();
     this.selectedDayIndex = 0; // 0: Daily, 1: Saturday, 2: Sunday
-    this.currentViewMode = 'stops'; // 'stops' or 'schedule'
+    this.currentViewMode = 'schedule'; // Default to timetable schedule first
   }
 
   async loadLine(lineCode, lineId = '', lineDescr = '') {
+    this.currentViewMode = 'schedule'; // Always show timetable schedule first when tapping on a line
+
+    // Match day of week dynamically to Athens time
+    try {
+      const athensDay = new Date().toLocaleDateString('en-US', { timeZone: 'Europe/Athens', weekday: 'short' });
+      if (athensDay === 'Sat') {
+        this.selectedDayIndex = 1;
+      } else if (athensDay === 'Sun') {
+        this.selectedDayIndex = 2;
+      } else {
+        this.selectedDayIndex = 0;
+      }
+    } catch (e) {
+      this.selectedDayIndex = 0;
+    }
+
     // 1. Resolve lineCode if missing or invalid
     if (!lineCode || lineCode === 'undefined' || lineCode === 'null' || lineCode === '') {
       if (lineId && window.Search && Array.isArray(window.Search.allLines)) {
@@ -126,7 +142,7 @@ class TimetableManager {
       const diff = tripMins - currentMins;
 
       return `
-        <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.85rem; border-radius: 8px; margin-bottom: 0.3rem; background: ${isNext ? '#eff6ff' : isPast ? '#f8fafc' : '#ffffff'}; border: 1px solid ${isNext ? '#93c5fd' : '#e2e8f0'}; opacity: ${isPast ? '0.55' : '1'};">
+        <div class="timetable-trip-row ${isNext ? 'is-next-trip' : ''}" style="display: flex; align-items: center; justify-content: space-between; padding: 0.6rem 0.85rem; border-radius: 8px; margin-bottom: 0.3rem; background: ${isNext ? '#eff6ff' : isPast ? '#f8fafc' : '#ffffff'}; border: 1px solid ${isNext ? '#93c5fd' : '#e2e8f0'}; opacity: ${isPast ? '0.55' : '1'}; scroll-margin-top: 60px;">
           <div style="display: flex; align-items: center; gap: 0.6rem;">
             <span style="font-family: 'Roboto Mono', monospace; font-size: 1.05rem; font-weight: 800; color: ${isNext ? '#005ac1' : '#0f172a'};">
               ${formatted}
@@ -602,13 +618,13 @@ class TimetableManager {
           </div>
         </div>
 
-        <!-- View Mode Segmented Control: Stops vs Schedule vs Route Map -->
+        <!-- View Mode Segmented Control: Schedule vs Stops vs Route Map -->
         <div style="display: flex; gap: 0.4rem; margin-bottom: 1.25rem; background: var(--md-sys-color-surface-container); padding: 4px; border-radius: 9999px; max-width: 480px; overflow-x: auto;">
-          <button class="m3-btn ${isStopsMode ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="flex: 1; padding: 0.45rem 0.8rem; font-size: 0.82rem; border-radius: 9999px; white-space: nowrap;" onclick="window.Timetable.setViewMode('stops')">
-            🚏 Στάσεις
-          </button>
           <button class="m3-btn ${isScheduleMode ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="flex: 1; padding: 0.45rem 0.8rem; font-size: 0.82rem; border-radius: 9999px; white-space: nowrap;" onclick="window.Timetable.setViewMode('schedule')">
             🕒 Ωράρια
+          </button>
+          <button class="m3-btn ${isStopsMode ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="flex: 1; padding: 0.45rem 0.8rem; font-size: 0.82rem; border-radius: 9999px; white-space: nowrap;" onclick="window.Timetable.setViewMode('stops')">
+            🚏 Στάσεις
           </button>
           <button class="m3-btn ${isMapMode ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="flex: 1; padding: 0.45rem 0.8rem; font-size: 0.82rem; border-radius: 9999px; white-space: nowrap;" onclick="window.Timetable.setViewMode('map')">
             🗺️ Χάρτης
@@ -632,6 +648,32 @@ class TimetableManager {
 
     if (isMapMode) {
       setTimeout(() => this.initRouteMap(), 80);
+    } else if (isScheduleMode) {
+      setTimeout(() => {
+        try {
+          const nextTripRows = container.querySelectorAll('.is-next-trip');
+          if (nextTripRows && nextTripRows.length > 0) {
+            nextTripRows.forEach(el => {
+              const scrollParent = el.closest('div[style*="overflow-y"]') || el.parentElement;
+              if (scrollParent) {
+                // Calculate position inside parent scroll container
+                const parentRect = scrollParent.getBoundingClientRect();
+                const elRect = el.getBoundingClientRect();
+                const relativeTop = elRect.top - parentRect.top;
+                const targetScroll = scrollParent.scrollTop + relativeTop - (scrollParent.clientHeight / 2) + (el.clientHeight / 2);
+                scrollParent.scrollTo({
+                  top: Math.max(0, targetScroll),
+                  behavior: 'smooth'
+                });
+              } else {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            });
+          }
+        } catch (e) {
+          console.warn('Could not auto-scroll to next trip:', e);
+        }
+      }, 100);
     }
   }
 }
