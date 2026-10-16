@@ -655,12 +655,101 @@ body.is-android-app .m3-nav-bar {
   z-index: 10;
   height: 320px;
   margin-bottom: 1.25rem;
+  transition: height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.3s ease,
+              margin-bottom 0.3s ease;
+  will-change: height;
+}
+
+/* Slightly shrink the home map to take up about half the normal space when scrolling */
+@media (max-width: 991px) {
+  #map-card-wrapper.map-shrunk {
+    height: 160px !important;
+    min-height: 160px !important;
+    margin-bottom: 0.85rem !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.14);
+  }
 }
 
 #map-container {
   will-change: transform;
   transform: translateZ(0);
   touch-action: pan-x pan-y pinch-zoom;
+}
+
+/* Map Stop Pin Highlight Animation as user scrolls through stops */
+.map-stop-pin-highlighted > div > div:first-child {
+  transform: rotate(-45deg) scale(1.35) !important;
+  box-shadow: 0 0 0 5px rgba(0, 90, 193, 0.35), 0 4px 14px rgba(0, 90, 193, 0.5) !important;
+  border-color: #ffffff !important;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+}
+
+.map-stop-pin-highlighted > div > div:last-child {
+  background: #005ac1 !important;
+  color: #ffffff !important;
+  transform: scale(1.1) translateY(2px) !important;
+  box-shadow: 0 3px 8px rgba(0, 90, 193, 0.4) !important;
+  font-weight: 900 !important;
+  z-index: 2000;
+  transition: all 0.25s ease;
+}
+
+/* Stop Card Active Highlight in List when scrolled into view */
+.stop-interactive-card.stop-card-active-scrolled {
+  border-color: var(--md-sys-color-primary) !important;
+  box-shadow: 0 4px 16px rgba(0, 90, 193, 0.18) !important;
+  transform: scale(1.015) translateX(3px);
+  background: var(--md-sys-color-surface-container-high) !important;
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* Screen / Tab Switch Fade Animations */
+.app-section {
+  animation: appSectionFadeIn 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: opacity, transform;
+}
+
+@keyframes appSectionFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* App Startup Splash Screen */
+#app-splash-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.4s ease;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#app-splash-screen.splash-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.splash-logo-bounce {
+  animation: splashPop 0.85s cubic-bezier(0.34, 1.56, 0.64, 1) infinite alternate;
+}
+
+@keyframes splashPop {
+  0% { transform: scale(0.96) translateY(0); }
+  100% { transform: scale(1.04) translateY(-6px); }
 }
 
 .search-cards-pane {

@@ -591,6 +591,27 @@ class MapManager {
     setTimeout(() => { this.isProgrammaticMove = false; }, 400);
   }
 
+  highlightStopMarker(stopCode) {
+    if (!this.map || !this.stopMarkersMap) return;
+    const targetCode = String(stopCode);
+
+    for (const [code, marker] of this.stopMarkersMap.entries()) {
+      const el = marker.getElement();
+      if (!el) continue;
+      if (code === targetCode) {
+        el.classList.add('map-stop-pin-highlighted');
+        if (typeof marker.setZIndexOffset === 'function') {
+          marker.setZIndexOffset(1000);
+        }
+      } else {
+        el.classList.remove('map-stop-pin-highlighted');
+        if (typeof marker.setZIndexOffset === 'function') {
+          marker.setZIndexOffset(0);
+        }
+      }
+    }
+  }
+
   renderPolyline(coordinates = []) {
     if (!this.map || !this.routeLayer) return;
     this.routeLayer.clearLayers();

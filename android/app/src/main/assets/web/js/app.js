@@ -543,11 +543,89 @@ class AppController {
       this.handlePopState(e);
     });
 
-    // Update back button initial state
-    this.updateBackButtonsVisibility();
+    // Setup scroll shrinking for home map & dynamic stop highlight
+    this.setupHomepageScrollEffects();
 
-    // Load real-time OASA service disruptions & strike bulletins
-    this.loadDisruptions();
+    // Hide launch splash screen with smooth fade after initial UI stabilizes
+    setTimeout(() => {
+      const splash = document.getElementById('app-splash-screen');
+      if (splash) {
+        splash.classList.add('splash-hidden');
+        setTimeout(() => splash.remove(), 450);
+      }
+    }, 600);
+  }
+
+  /**
+   * Home Map Scroll Dynamics:
+   * 1. Shrinks map to half height (~160px) when scrolling through stops below it
+   * 2. Detects stops passing through middle of viewport and highlights their map pin
+   */
+  setupHomepageScrollEffects() {
+    let scrollTimeout = null;
+    let lastHighlightedCode = null;
+
+    const handleScroll = () => {
+      const mapWrapper = document.getElementById('map-card-wrapper');
+      if (!mapWrapper) return;
+
+      const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
+
+      // 1. Shrink map on mobile when user scrolls down > 60px into the stops list
+      if (scrollY > 60) {
+        if (!mapWrapper.classList.contains('map-shrunk')) {
+          mapWrapper.classList.add('map-shrunk');
+          if (this.mapManager) {
+            setTimeout(() => this.mapManager.invalidateSize(), 360);
+          }
+        }
+      } else {
+        if (mapWrapper.classList.contains('map-shrunk')) {
+          mapWrapper.classList.remove('map-shrunk');
+          if (this.mapManager) {
+            setTimeout(() => this.mapManager.invalidateSize(), 360);
+          }
+        }
+      }
+
+      // 2. Highlight stops as user scrolls through them below the map
+      if (scrollTimeout) cancelAnimationFrame(scrollTimeout);
+      scrollTimeout = requestAnimationFrame(() => {
+        const cards = document.querySelectorAll('.stop-interactive-card[data-stop-code]');
+        if (!cards || cards.length === 0) return;
+
+        const viewportCenterY = window.innerHeight * 0.45;
+        let closestCard = null;
+        let minDiff = 999999;
+
+        cards.forEach(card => {
+          const rect = card.getBoundingClientRect();
+          // Card center Y relative to viewport
+          const cardCenterY = rect.top + rect.height / 2;
+          const diff = Math.abs(cardCenterY - viewportCenterY);
+          if (diff < minDiff && rect.bottom > 60 && rect.top < window.innerHeight - 60) {
+            minDiff = diff;
+            closestCard = card;
+          }
+        });
+
+        if (closestCard) {
+          const stopCode = closestCard.dataset.stopCode;
+          if (stopCode && stopCode !== lastHighlightedCode) {
+            lastHighlightedCode = stopCode;
+            // Highlight list card
+            cards.forEach(c => c.classList.remove('stop-card-active-scrolled'));
+            closestCard.classList.add('stop-card-active-scrolled');
+            // Highlight map marker pin
+            if (this.mapManager && typeof this.mapManager.highlightStopMarker === 'function') {
+              this.mapManager.highlightStopMarker(stopCode);
+            }
+          }
+        }
+      });
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
   }
 
   initGeolocation() {
