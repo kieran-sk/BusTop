@@ -830,11 +830,18 @@ class AppController {
       }
     }
 
-    // Invalidate Leaflet Map size if on search / map tab
-    if ((tabId === 'map' || tabId === 'search') && this.mapManager) {
-      setTimeout(() => {
-        this.mapManager.invalidateSize();
-      }, 150);
+    // Invalidate Leaflet Map size & resume live bus polling if on search / map tab
+    if (tabId === 'map' || tabId === 'search') {
+      if (this.mapManager) {
+        setTimeout(() => {
+          this.mapManager.invalidateSize();
+          this.mapManager.scheduleLoadBusesForNearbyStops();
+        }, 150);
+      }
+    } else {
+      if (this.mapManager) {
+        this.mapManager.stopNearbyBusPolling();
+      }
     }
 
     // Handle Pinned Trips Polling & Immediate UI Render

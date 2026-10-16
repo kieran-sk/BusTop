@@ -24,6 +24,8 @@ class MapManager {
     this.busAnimationFrames = new Map(); // vehNo -> requestAnimationFrame ID
     this.isolatedLine = null; // { lineId, lineCode, routeCode } when in isolation mode
     this.isolatedPollTimer = null;
+    this.nearbyBusPollTimer = null;
+    this.currentNearbyStops = [];
     this.journeyLayer = null;
     this.isProgrammaticMove = false;
     this.isInitialStartup = true;
@@ -212,7 +214,8 @@ class MapManager {
       }
     });
 
-    // Debounced fetch of live buses traveling around nearby stops
+    // Store current nearby stops and schedule bus loading & polling
+    this.currentNearbyStops = stops;
     this.scheduleLoadBusesForNearbyStops(stops);
 
     if (shouldFit) {
@@ -232,15 +235,33 @@ class MapManager {
     }
   }
 
-  scheduleLoadBusesForNearbyStops(stops) {
+  scheduleLoadBusesForNearbyStops(stops = this.currentNearbyStops) {
     if (this.busLoadTimer) clearTimeout(this.busLoadTimer);
     // Only schedule if search/map tab is currently active to avoid background battery/network waste
     if (window.App && window.App.activeTab !== 'search' && window.App.activeTab !== 'map') return;
-    if (this.map && this.map.getZoom() < 14) return;
+    if (this.map && this.map.getZoom() < 13) return;
 
     this.busLoadTimer = setTimeout(() => {
       this.loadBusesForNearbyStops(stops);
-    }, 2000);
+    }, 600);
+
+    // Setup periodic polling for home map buses every 12 seconds
+    if (!this.nearbyBusPollTimer) {
+      this.nearbyBusPollTimer = setInterval(() => {
+        if (this.isolatedLine) return; // Do not overwrite in isolation mode
+        if (window.App && window.App.activeTab !== 'search' && window.App.activeTab !== 'map') return;
+        if (this.map && this.map.getZoom() >= 13 && this.currentNearbyStops.length > 0) {
+          this.loadBusesForNearbyStops(this.currentNearbyStops);
+        }
+      }, 12000);
+    }
+  }
+
+  stopNearbyBusPolling() {
+    if (this.nearbyBusPollTimer) {
+      clearInterval(this.nearbyBusPollTimer);
+      this.nearbyBusPollTimer = null;
+    }
   }
 
   /**
@@ -248,44 +269,69 @@ class MapManager {
    */
   async loadBusesForNearbyStops(stops = []) {
     if (!this.map || !this.busLayer) return;
+    if (this.isolatedLine) return;
     if (window.App && window.App.activeTab !== 'search' && window.App.activeTab !== 'map') return;
-    if (this.map.getZoom() < 14) return;
+    if (this.map.getZoom() < 13) return;
+
+    const targetStops = stops && stops.length > 0 ? stops : this.currentNearbyStops;
+    if (!Array.isArray(targetStops) || targetStops.length === 0) return;
 
     try {
+      // 1. Collect lines from stops serving_lines
       const linesToQuery = new Set();
-      for (const s of stops.slice(0, 8)) {
-        if (Array.isArray(s.serving_lines)) {
+      const stopsWithoutLines = [];
+
+      for (const s of targetStops.slice(0, 15)) {
+        if (Array.isArray(s.serving_lines) && s.serving_lines.length > 0) {
           for (const l of s.serving_lines) {
-            if (l.line_id) linesToQuery.add(l.line_id);
-            if (linesToQuery.size >= 3) break;
+            const lid = l.line_id || l.LineID;
+            if (lid) linesToQuery.add(lid);
+            if (linesToQuery.size >= 8) break;
           }
+        } else if (s.StopCode) {
+          stopsWithoutLines.push(s.StopCode);
         }
-        if (linesToQuery.size >= 3) break;
+        if (linesToQuery.size >= 8) break;
+      }
+
+      // If stops did not have serving_lines populated yet, fetch routes for the first 3 nearest stops directly
+      if (linesToQuery.size < 4 && stopsWithoutLines.length > 0) {
+        const stopRoutePromises = stopsWithoutLines.slice(0, 4).map(async sc => {
+          try {
+            const rts = await window.API.getStopRoutes(sc);
+            if (Array.isArray(rts)) {
+              rts.forEach(r => {
+                if (r.LineID) linesToQuery.add(r.LineID);
+              });
+            }
+          } catch (e) {}
+        });
+        await Promise.all(stopRoutePromises);
       }
 
       if (linesToQuery.size === 0) return;
 
-      const promises = Array.from(linesToQuery).map(async (lid) => {
+      const promises = Array.from(linesToQuery).slice(0, 8).map(async (lid) => {
         try {
           let cached = this.resolvedLinesCache.get(lid);
-          let rCode = cached ? cached.routeCode : null;
+          let routesToPoll = cached ? cached.routeCodes : null;
 
-          if (!rCode) {
+          if (!routesToPoll || routesToPoll.length === 0) {
             const res = await window.API.resolveLine(lid);
             if (res && res.line_code) {
               const routes = await window.API.getRoutes(res.line_code);
               if (Array.isArray(routes) && routes.length > 0) {
-                rCode = routes[0].RouteCode;
-                this.resolvedLinesCache.set(lid, { lineCode: res.line_code, routeCode: rCode });
+                // Keep up to 2 main route directions (outbound & return) for maximum coverage
+                routesToPoll = routes.slice(0, 2).map(r => r.RouteCode);
+                this.resolvedLinesCache.set(lid, { lineCode: res.line_code, routeCodes: routesToPoll });
               }
             }
           }
 
-          if (rCode) {
-            const buses = await window.API.getLiveBuses(rCode);
-            if (Array.isArray(buses)) {
-              return buses.map(b => ({ ...b, line_id: lid }));
-            }
+          if (Array.isArray(routesToPoll) && routesToPoll.length > 0) {
+            const busResults = await Promise.all(routesToPoll.map(rc => window.API.getLiveBuses(rc).catch(() => [])));
+            const lineBuses = busResults.flat().filter(b => b && b.CS_LAT && b.CS_LNG);
+            return lineBuses.map(b => ({ ...b, line_id: lid }));
           }
         } catch (e) {}
         return [];
@@ -293,7 +339,7 @@ class MapManager {
 
       const resList = await Promise.all(promises);
       const allBuses = resList.flat();
-      if (allBuses.length > 0) {
+      if (allBuses.length > 0 && !this.isolatedLine) {
         this.updateBuses(allBuses);
       }
     } catch (err) {
