@@ -520,21 +520,12 @@ class AppController {
       navigator.serviceWorker.addEventListener('message', (event) => {
         if (!event.data) return;
         if (event.data.type === 'NOTIFICATION_DISMISSED_PIN') {
-          console.log('Pin dismissed from notification');
-          if (window.PinnedTrips && typeof window.PinnedTrips.clearAllSilently === 'function') {
-            window.PinnedTrips.clearAllSilently();
-          } else if (window.PinnedTrips) {
-            const removedItems = [...window.PinnedTrips.pinnedItems];
-            window.PinnedTrips.pinnedItems = [];
+          console.log('Notification dismissed from shade - disabling notifications without unpinning');
+          if (window.PinnedTrips && Array.isArray(window.PinnedTrips.pinnedItems)) {
+            window.PinnedTrips.pinnedItems.forEach(item => {
+              item.notificationEnabled = false;
+            });
             window.PinnedTrips.save();
-            if (window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
-              removedItems.forEach(item => {
-                window.Alarms.removeAlarmByStopAndLine(item.stopCode, item.lineId);
-              });
-            }
-            if (window.AndroidBridge && typeof window.AndroidBridge.stopLiveTracking === 'function') {
-              try { window.AndroidBridge.stopLiveTracking(); } catch (e) {}
-            }
             window.PinnedTrips.updateLiveAndroidNotification();
             if (this.ticker) this.ticker.render();
           }

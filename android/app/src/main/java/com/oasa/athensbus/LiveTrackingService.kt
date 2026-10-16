@@ -116,18 +116,25 @@ class LiveTrackingService : Service() {
             }
             context.startService(intent)
         }
+
+        fun stopServiceOnly(context: Context) {
+            val intent = Intent(context, LiveTrackingService::class.java).apply {
+                action = ACTION_STOP_SERVICE_ONLY
+            }
+            context.startService(intent)
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
-            val stopToUnpin = intent.getStringExtra(EXTRA_STOP_CODE) ?: stopCode
-            val lineToUnpin = intent.getStringExtra(EXTRA_LINE_ID) ?: lineId
-            if (stopToUnpin.isNotBlank() && lineToUnpin.isNotBlank()) {
-                MainActivity.currentInstance?.unpinAndDismiss(stopToUnpin, lineToUnpin)
+            val stopToDisable = intent.getStringExtra(EXTRA_STOP_CODE) ?: stopCode
+            val lineToDisable = intent.getStringExtra(EXTRA_LINE_ID) ?: lineId
+            if (stopToDisable.isNotBlank() && lineToDisable.isNotBlank()) {
+                MainActivity.currentInstance?.disableNotificationForPin(stopToDisable, lineToDisable)
             } else {
-                MainActivity.currentInstance?.unpinAllAndDismiss()
+                MainActivity.currentInstance?.disableAllNotifications()
             }
             pollingJob?.cancel()
             pollingJob = null

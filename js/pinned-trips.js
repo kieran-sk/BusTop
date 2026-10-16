@@ -55,15 +55,10 @@ class PinnedTripsManager {
 
     if (item.notificationEnabled) {
       this.showToast(`🔔 Ενεργοποιήθηκε η ειδοποίηση για ${item.lineId}`);
-      if (this.activePinId === pinId || this.pinnedItems.length === 1) {
-        this.updateLiveAndroidNotification();
-      }
+      this.updateLiveAndroidNotification();
     } else {
       this.showToast(`🔕 Απενεργοποιήθηκε η ειδοποίηση για ${item.lineId}`);
-      if (this.activePinId === pinId) {
-        // If this active pin's notification was turned off, clear or refresh notification
-        this.updateLiveAndroidNotification();
-      }
+      this.updateLiveAndroidNotification();
     }
   }
 
@@ -280,7 +275,7 @@ class PinnedTripsManager {
         targetArrivalTimestamp,
         arrivalKey,
         pinnedAt: now,
-        notificationEnabled: true
+        notificationEnabled: false
       };
       this.pinnedItems.push(newItem);
       this.activePinId = newItem.id;
@@ -301,32 +296,7 @@ class PinnedTripsManager {
         window.Alarms.removeAlarmByStopAndLine(stopCode, lineId);
       }
 
-      // Start Android Live Tracking Notification for this pinned bus
-      if (window.AndroidBridge && typeof window.AndroidBridge.startLiveTracking === 'function') {
-        try {
-          let walkMins = 0;
-          if (currentStop.distanceMeters) {
-            walkMins = Math.ceil(currentStop.distanceMeters / 80) + 2;
-          }
-          window.AndroidBridge.startLiveTracking(
-            String(stopCode),
-            String(lineId),
-            String(routeCode || ''),
-            String(newItem.stopName),
-            String(cleanDest),
-            Number(walkMins),
-            0,
-            false,
-            Number(busMins),
-            String(newItem.vehCode || ''),
-            String(newItem.departureTime || ''),
-            String(newItem.estimatedArrivalTime || '')
-          );
-        } catch (e) {
-          console.warn('AndroidBridge startLiveTracking error:', e);
-        }
-      }
-
+      // Update notifications only if there are other pins with notificationEnabled: true
       this.updateLiveAndroidNotification();
     }
 

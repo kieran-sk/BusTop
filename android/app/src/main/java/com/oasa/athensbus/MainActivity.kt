@@ -261,6 +261,50 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    fun disableNotificationForPin(stopCode: String, lineId: String) {
+        runOnUiThread {
+            if (this::webView.isInitialized) {
+                val cleanStop = stopCode.replace("'", "\\'")
+                val cleanLine = lineId.replace("'", "\\'")
+                val js = """
+                    (function() {
+                        if (window.PinnedTrips && Array.isArray(window.PinnedTrips.pinnedItems)) {
+                            const item = window.PinnedTrips.pinnedItems.find(p =>
+                                String(p.stopCode).trim() === '$cleanStop' &&
+                                String(p.lineId).trim().toUpperCase() === '$cleanLine'.toUpperCase()
+                            );
+                            if (item) {
+                                item.notificationEnabled = false;
+                                window.PinnedTrips.save();
+                                window.PinnedTrips.updateLiveAndroidNotification();
+                            }
+                        }
+                    })();
+                """.trimIndent()
+                webView.evaluateJavascript(js, null)
+            }
+        }
+    }
+
+    fun disableAllNotifications() {
+        runOnUiThread {
+            if (this::webView.isInitialized) {
+                val js = """
+                    (function() {
+                        if (window.PinnedTrips && Array.isArray(window.PinnedTrips.pinnedItems)) {
+                            window.PinnedTrips.pinnedItems.forEach(item => {
+                                item.notificationEnabled = false;
+                            });
+                            window.PinnedTrips.save();
+                            window.PinnedTrips.updateLiveAndroidNotification();
+                        }
+                    })();
+                """.trimIndent()
+                webView.evaluateJavascript(js, null)
+            }
+        }
+    }
+
     fun unpinAndDismiss(stopCode: String, lineId: String) {
         runOnUiThread {
             if (this::webView.isInitialized) {
@@ -527,7 +571,7 @@ class MainActivity : FragmentActivity() {
         @JavascriptInterface
         fun stopLiveTracking() {
             try {
-                LiveTrackingService.stop(context)
+                LiveTrackingService.stopServiceOnly(context)
                 AlarmRingingService.dismiss(context)
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -538,7 +582,7 @@ class MainActivity : FragmentActivity() {
         fun dismissAlarm() {
             try {
                 AlarmRingingService.dismiss(context)
-                LiveTrackingService.stop(context)
+                LiveTrackingService.stopServiceOnly(context)
                 NotificationHelper.clearLiveArrivalNotification(context)
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -575,7 +619,7 @@ class MainActivity : FragmentActivity() {
         fun clearLiveArrivalNotification() {
             try {
                 NotificationHelper.clearLiveArrivalNotification(context)
-                LiveTrackingService.stop(context)
+                LiveTrackingService.stopServiceOnly(context)
                 AlarmRingingService.dismiss(context)
             } catch (e: Exception) {
                 e.printStackTrace()
