@@ -73,23 +73,19 @@ class AirportTicker {
       if (window.scrollY > 5) {
         isPulling = false;
         const ind = getIndicator();
-        if (ind) {
-          ind.style.height = '0px';
-          ind.style.display = 'none';
-        }
+        if (ind) ind.style.display = 'none';
         return;
       }
       currentY = e.touches[0].clientY;
       const pullDist = Math.max(0, currentY - startY);
-      if (pullDist > 10) {
+      if (pullDist > 12) {
         const ind = getIndicator();
         const icon = getIcon();
         const text = getText();
         if (ind) {
           ind.style.display = 'flex';
-          const visualHeight = Math.min(68, pullDist * 0.55);
-          ind.style.height = `${visualHeight}px`;
-          ind.style.opacity = `${Math.min(1, pullDist / 40)}`;
+          const dampDist = Math.min(threshold + 15, pullDist * 0.4);
+          ind.style.transform = `translateY(${dampDist}px)`;
           if (pullDist >= threshold) {
             if (icon) icon.style.transform = 'rotate(180deg)';
             if (text) text.innerText = 'Αφήστε για ανανέωση...';
@@ -114,10 +110,6 @@ class AirportTicker {
         if (window.App && typeof window.App.triggerHaptic === 'function') {
           window.App.triggerHaptic('medium');
         }
-        if (ind) {
-          ind.style.height = '52px';
-          ind.style.opacity = '1';
-        }
         if (icon) {
           icon.innerHTML = spinnerSvg;
           icon.style.transform = 'none';
@@ -141,26 +133,28 @@ class AirportTicker {
 
         setTimeout(() => {
           if (ind) {
-            ind.style.height = '0px';
             ind.style.opacity = '0';
+            ind.style.transform = 'translateY(0px)';
             setTimeout(() => {
               ind.style.display = 'none';
+              ind.style.opacity = '1';
               if (icon) {
                 icon.innerHTML = downArrowSvg;
                 icon.style.transform = 'rotate(0deg)';
               }
               isRefreshing = false;
-            }, 220);
+            }, 200);
           } else {
             isRefreshing = false;
           }
-        }, 500);
+        }, 550);
       } else {
         if (ind) {
-          ind.style.height = '0px';
           ind.style.opacity = '0';
+          ind.style.transform = 'translateY(0px)';
           setTimeout(() => {
             ind.style.display = 'none';
+            ind.style.opacity = '1';
             if (icon) {
               icon.innerHTML = downArrowSvg;
               icon.style.transform = 'rotate(0deg)';
