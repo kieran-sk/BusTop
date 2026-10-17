@@ -801,17 +801,25 @@ class PinnedTripsManager {
 
       const isNotifOn = item.notificationEnabled !== false;
 
+      const hasAlarm = window.Alarms && Array.isArray(window.Alarms.alarms) && window.Alarms.alarms.some(a => 
+        String(a.stopCode).trim() === String(item.stopCode).trim() && 
+        String(a.lineId).trim().toUpperCase() === String(item.lineId).trim().toUpperCase() &&
+        !a.triggered
+      );
+      const targetMinsForAlarm = displayMinutes !== null ? displayMinutes : (item.initialMinutes || 10);
+      const cleanDest = (item.destination || item.lineDescr || '').replace(/'/g, "\\'");
+
       return `
-        <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem; margin-bottom: 0; background: ${isActiveTracked ? '#f0fdf4' : 'var(--md-sys-color-surface-container)'}; border: 1px solid ${isActiveTracked ? '#86efac' : 'var(--md-sys-color-outline-variant)'}; border-left: 4px solid ${isActiveTracked ? '#16a34a' : (isUrgent ? '#ea580c' : 'var(--md-sys-color-primary)')}; cursor: pointer;" onclick="window.App.switchTab('ticker'); window.App.selectStop('${item.stopCode}', '${cleanStopName}', ${item.stopLat || 'null'}, ${item.stopLng || 'null'});">
+        <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.6rem; padding: 1rem; margin-bottom: 0; background: var(--md-sys-color-surface-container); border: 1px solid ${isActiveTracked ? 'var(--md-sys-color-primary)' : 'var(--md-sys-color-outline-variant)'}; border-left: 4px solid ${isActiveTracked ? 'var(--md-sys-color-primary)' : (isUrgent ? '#ea580c' : 'var(--md-sys-color-outline-variant)')}; cursor: pointer;" onclick="window.App.switchTab('ticker'); window.App.selectStop('${item.stopCode}', '${cleanStopName}', ${item.stopLat || 'null'}, ${item.stopLng || 'null'});">
           <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem;">
             <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
-              <span class="ticker-line-badge" style="font-size: 1rem; min-width: 48px; flex-shrink: 0; ${isActiveTracked ? 'background: #15803d;' : ''}">
+              <span class="ticker-line-badge" style="font-size: 1rem; min-width: 48px; flex-shrink: 0;">
                 ${item.lineId}
               </span>
               <div style="min-width: 0; flex: 1;">
                 <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                   <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: normal; overflow-wrap: normal; hyphens: none;">${item.stopName}</div>
-                  ${isActiveTracked ? `<span class="m3-badge" style="background: #dcfce7; color: #166534; font-size: 0.68rem; font-weight: 800; padding: 1px 6px; border: 1px solid #bbf7d0;">📍 Ενεργό</span>` : ''}
+                  ${isActiveTracked ? `<span class="m3-badge" style="background: var(--md-sys-color-primary-container, #e0f2fe); color: var(--md-sys-color-on-primary-container, #005ac1); font-size: 0.68rem; font-weight: 800; padding: 1px 6px; border: 1px solid rgba(0, 90, 193, 0.2);">📍 Ενεργό</span>` : ''}
                 </div>
                 <div style="font-size: 0.76rem; color: var(--md-sys-color-outline); margin-top: 2px;">
                   ${item.direction ? `<strong style="color: var(--md-sys-color-primary); margin-right: 4px;">${item.direction}</strong> • ` : ''}${item.departureTime ? `<strong style="color: #475569; margin-right: 4px;">🕒 Αναχώρηση: ${item.departureTime}</strong> • ` : ''}Στάση #${item.stopCode} • <span style="color: var(--md-sys-color-primary); text-decoration: underline;">Προβολή στάσης ➜</span>
@@ -819,7 +827,7 @@ class PinnedTripsManager {
               </div>
             </div>
             <div style="text-align: right; flex-shrink: 0;">
-              <span class="m3-badge" style="background: ${isLive ? '#dcfce7' : '#e0f2fe'}; color: ${isLive ? '#15803d' : '#005ac1'}; font-size: 0.72rem; font-weight: 800; padding: 2px 7px;">
+              <span class="m3-badge" style="background: ${isLive ? 'var(--md-sys-color-primary-container, #e0f2fe)' : '#f1f5f9'}; color: ${isLive ? 'var(--md-sys-color-primary, #005ac1)' : '#475569'}; font-size: 0.72rem; font-weight: 800; padding: 2px 7px;">
                 ${isLive ? `⚡ ${isDueNow ? 'ΤΩΡΑ' : `~${formattedTime}`}` : (displayMinutes !== null ? `🕒 ${isDueNow ? 'ΤΩΡΑ' : `~${formattedTime}`}` : (item.departureTime ? `🕒 ${item.departureTime}` : '⏳ Αναμονή'))}
               </span>
             </div>
@@ -830,11 +838,15 @@ class PinnedTripsManager {
             </div>
             <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
               <!-- Notification toggle button -->
-              <button class="m3-btn ${isNotifOn ? 'm3-btn-primary' : 'm3-btn-tonal'}" onclick="event.stopPropagation(); window.PinnedTrips.toggleNotification('${item.id}')" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; border-radius: 9999px; gap: 4px; display: inline-flex; align-items: center; ${isNotifOn ? 'background: #16a34a; border-color: #16a34a; color: #ffffff;' : 'color: #64748b;'}" title="Ενεργοποίηση/Απενεργοποίηση ειδοποίησης για αυτή την άφιξη">
+              <button class="m3-btn ${isNotifOn ? 'm3-btn-primary' : 'm3-btn-tonal'}" onclick="event.stopPropagation(); window.PinnedTrips.toggleNotification('${item.id}')" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; border-radius: 9999px; gap: 4px; display: inline-flex; align-items: center;" title="Ενεργοποίηση/Απενεργοποίηση συνεχούς ειδοποίησης για αυτή την άφιξη">
                 ${isNotifOn ? '🔔 Ειδοποίηση ON' : '🔕 Ειδοποίηση OFF'}
               </button>
+              <!-- Alarm time selection dialog button -->
+              <button class="m3-btn ${hasAlarm ? 'm3-btn-primary' : 'm3-btn-tonal'}" onclick="event.stopPropagation(); window.App.openAlarmDialog('${item.lineId}', '${item.routeCode || ''}', ${targetMinsForAlarm}, '${cleanDest}', '${item.stopCode}', '${cleanStopName}');" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; border-radius: 9999px; gap: 4px; display: inline-flex; align-items: center;" title="Ορισμός ξυπνητηριού / ειδοποίησης αντίστροφης μέτρησης">
+                ⏰ ${hasAlarm ? 'Ξυπνητήρι ON' : 'Ξυπνητήρι'}
+              </button>
               ${!isActiveTracked ? `
-                <button class="m3-btn m3-btn-outlined" onclick="event.stopPropagation(); window.PinnedTrips.setActivePin('${item.id}')" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; border-radius: 9999px; border-color: #005ac1; color: #005ac1;" title="Ορισμός ως κύρια γραμμή για την ειδοποίηση Android">
+                <button class="m3-btn m3-btn-outlined" onclick="event.stopPropagation(); window.PinnedTrips.setActivePin('${item.id}')" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; border-radius: 9999px; border-color: var(--md-sys-color-primary); color: var(--md-sys-color-primary);" title="Ορισμός ως κύρια γραμμή για την ειδοποίηση Android">
                   📍 Εστίαση
                 </button>
               ` : ''}

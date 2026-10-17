@@ -1306,7 +1306,7 @@ class AppController {
     this.openLineTimetableBothDirections(lineCode, lineId, lineDescr);
   }
 
-  openAlarmDialog(lineId, routeCode, busMinutes, lineDescr = '') {
+  openAlarmDialog(lineId, routeCode, busMinutes, lineDescr = '', stopCode = null, stopName = null) {
     const modal = document.getElementById('set-alarm-modal');
     if (!modal) return;
 
@@ -1316,8 +1316,8 @@ class AppController {
     modal.dataset.routeCode = routeCode;
     modal.dataset.dueMins = busMinutes;
     modal.dataset.lineDescr = lineDescr || '';
-    modal.dataset.stopCode = this.currentStop ? this.currentStop.StopCode : '';
-    modal.dataset.stopName = this.currentStop ? (this.currentStop.StopDescr || '') : '';
+    modal.dataset.stopCode = stopCode || (this.currentStop ? this.currentStop.StopCode : '');
+    modal.dataset.stopName = stopName || (this.currentStop ? (this.currentStop.StopDescr || '') : '');
 
     // Reset preset chips to default 5 mins
     this.selectAlarmPreset(5);

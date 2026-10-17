@@ -197,7 +197,6 @@ object NotificationHelper {
                 .setSmallIcon(R.drawable.ic_notification_bus)
                 .setContentTitle(title)
                 .setContentText(content)
-                .setSubText(shortText)
                 .setStyle(
                     Notification.BigTextStyle()
                         .bigText(bigText)
@@ -239,7 +238,6 @@ object NotificationHelper {
                 .setSmallIcon(R.drawable.ic_notification_bus)
                 .setContentTitle(title)
                 .setContentText(content)
-                .setSubText(shortText)
                 .setStyle(
                     NotificationCompat.BigTextStyle()
                         .bigText(bigText)
