@@ -34,9 +34,52 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
+  <!-- Critical Inline CSS for Instant Zero-Delay Splash Screen -->
+  <style>
+    #app-splash-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 999999;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.25rem;
+      user-select: none;
+      -webkit-user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+      transition: opacity 0.35s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.35s ease;
+    }
+    #app-splash-screen.splash-hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .splash-logo-bounce {
+      animation: splashLogoPop 0.85s cubic-bezier(0.34, 1.56, 0.64, 1) infinite alternate;
+    }
+    @keyframes splashLogoPop {
+      0% { transform: scale(0.97) translateY(0); }
+      100% { transform: scale(1.03) translateY(-5px); }
+    }
+    .m3-pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #005ac1;
+      animation: pulseAnimation 1.6s infinite ease-in-out;
+    }
+    @keyframes pulseAnimation {
+      0% { transform: scale(0.85); opacity: 0.9; }
+      50% { transform: scale(1.35); opacity: 0.35; }
+      100% { transform: scale(0.85); opacity: 0.9; }
+    }
+  </style>
+
   <!-- Stylesheets (Relative paths with cache-busting for PWA updates) -->
-  <link rel="stylesheet" href="css/m3-expressive.css?v=20261008_1430">
-  <link rel="stylesheet" href="css/airport-ticker.css?v=20261008_1430">
+  <link rel="stylesheet" href="css/m3-expressive.css?v=20261017_2200">
+  <link rel="stylesheet" href="css/airport-ticker.css?v=20261017_2200">
   <script>
     if (window.AndroidBridge) {
       document.documentElement.classList.add('is-android-app');
@@ -123,15 +166,17 @@
     <!-- ================= 1. TICKER & DEPARTURES TAB ================= -->
     <section id="section-ticker" class="app-section" style="display: none;">
       
-      <!-- Pull-to-Refresh Visual Indicator (M3 Elevated Floating Pill) -->
-      <div id="ticker-pull-indicator" style="display: none; justify-content: center; align-items: center; gap: 8px; padding: 7px 16px; font-size: 0.82rem; font-weight: 700; color: var(--md-sys-color-primary, #005ac1); background: #ffffff; border: 1px solid rgba(203, 213, 225, 0.9); border-radius: 9999px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12); width: fit-content; margin: 0 auto 0.6rem auto; pointer-events: none; transition: transform 0.15s cubic-bezier(0.2, 0, 0, 1), opacity 0.15s ease; z-index: 1000; position: relative;">
-        <span id="ticker-pull-icon" style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); color: var(--md-sys-color-primary, #005ac1);">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <polyline points="19 12 12 19 5 12"></polyline>
-          </svg>
-        </span>
-        <span id="ticker-pull-text">Τραβήξτε για ανανέωση...</span>
+      <!-- Pull-to-Refresh Visual Slot (Displays cleanly in the empty space created by dragging down) -->
+      <div id="ticker-pull-indicator" style="display: none; height: 0px; overflow: hidden; justify-content: center; align-items: center; width: 100%; margin: 0 auto; pointer-events: none; transition: height 0.15s cubic-bezier(0.2, 0, 0, 1), opacity 0.15s ease; position: relative;">
+        <div style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; font-size: 0.82rem; font-weight: 700; color: var(--md-sys-color-primary, #005ac1); background: var(--md-sys-color-surface-container, #ffffff); border: 1px solid var(--md-sys-color-outline-variant, #e2e8f0); border-radius: 9999px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);">
+          <span id="ticker-pull-icon" style="display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); color: var(--md-sys-color-primary, #005ac1);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <polyline points="19 12 12 19 5 12"></polyline>
+            </svg>
+          </span>
+          <span id="ticker-pull-text">Τραβήξτε για ανανέωση...</span>
+        </div>
       </div>
 
       <!-- Selected Stop Header Card -->

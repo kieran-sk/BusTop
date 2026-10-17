@@ -558,20 +558,16 @@ class AppController {
 
   /**
    * Home Map Scroll Dynamics:
-   * 1. Shrinks map to half height (~160px) when scrolling through stops below it
-   * 2. Detects stops passing through middle of viewport and highlights their map pin
+   * Shrinks map to half height (~160px) when scrolling through stops below it
    */
   setupHomepageScrollEffects() {
-    let scrollTimeout = null;
-    let lastHighlightedCode = null;
-
     const handleScroll = () => {
       const mapWrapper = document.getElementById('map-card-wrapper');
       if (!mapWrapper) return;
 
       const scrollY = window.scrollY || document.documentElement.scrollTop || 0;
 
-      // 1. Shrink map on mobile when user scrolls down > 60px into the stops list
+      // Shrink map on mobile when user scrolls down > 60px into the stops list
       if (scrollY > 60) {
         if (!mapWrapper.classList.contains('map-shrunk')) {
           mapWrapper.classList.add('map-shrunk');
@@ -587,42 +583,6 @@ class AppController {
           }
         }
       }
-
-      // 2. Highlight stops as user scrolls through them below the map
-      if (scrollTimeout) cancelAnimationFrame(scrollTimeout);
-      scrollTimeout = requestAnimationFrame(() => {
-        const cards = document.querySelectorAll('.stop-interactive-card[data-stop-code]');
-        if (!cards || cards.length === 0) return;
-
-        const viewportCenterY = window.innerHeight * 0.45;
-        let closestCard = null;
-        let minDiff = 999999;
-
-        cards.forEach(card => {
-          const rect = card.getBoundingClientRect();
-          // Card center Y relative to viewport
-          const cardCenterY = rect.top + rect.height / 2;
-          const diff = Math.abs(cardCenterY - viewportCenterY);
-          if (diff < minDiff && rect.bottom > 60 && rect.top < window.innerHeight - 60) {
-            minDiff = diff;
-            closestCard = card;
-          }
-        });
-
-        if (closestCard) {
-          const stopCode = closestCard.dataset.stopCode;
-          if (stopCode && stopCode !== lastHighlightedCode) {
-            lastHighlightedCode = stopCode;
-            // Highlight list card
-            cards.forEach(c => c.classList.remove('stop-card-active-scrolled'));
-            closestCard.classList.add('stop-card-active-scrolled');
-            // Highlight map marker pin
-            if (this.mapManager && typeof this.mapManager.highlightStopMarker === 'function') {
-              this.mapManager.highlightStopMarker(stopCode);
-            }
-          }
-        }
-      });
     };
 
     window.addEventListener('scroll', handleScroll, { passive: true });
