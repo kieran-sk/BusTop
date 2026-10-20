@@ -170,10 +170,10 @@ object NotificationHelper {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val timeFormatted = formatMinutesHuman(kotlin.math.max(0, minutesAway))
-        val shortText = if (minutesAway <= 0) "0'" else "${minutesAway}'"
+        val timeFormatted = if (minutesAway <= 0) "🏁 Αναχώρησε" else formatMinutesHuman(minutesAway)
+        val shortText = if (minutesAway <= 0) "🏁" else "${minutesAway}'"
         val cleanDest = cleanDestination(destination)
-        val title = "$lineId σε $timeFormatted"
+        val title = if (minutesAway <= 0) "$lineId 🏁 Αναχώρησε" else "$lineId σε $timeFormatted"
         val content = if (cleanDest.isNotBlank()) "προς $cleanDest • $stopName" else stopName
         val bigText = if (cleanDest.isNotBlank()) "προς $cleanDest\n$stopName" else stopName
 

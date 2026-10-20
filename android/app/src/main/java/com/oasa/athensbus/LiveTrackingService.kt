@@ -429,10 +429,10 @@ class LiveTrackingService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val timeFormatted = NotificationHelper.formatMinutesHuman(kotlin.math.max(0, mins))
-        val shortText = if (mins <= 0) "0'" else "${mins}'"
+        val timeFormatted = if (mins <= 0) "🏁 Αναχώρησε" else NotificationHelper.formatMinutesHuman(mins)
+        val shortText = if (mins <= 0) "🏁" else "${mins}'"
         val cleanDest = NotificationHelper.cleanDestination(destination)
-        val title = "$lineId σε $timeFormatted"
+        val title = if (mins <= 0) "$lineId 🏁 Αναχώρησε" else "$lineId σε $timeFormatted"
         val content = if (cleanDest.isNotBlank()) "προς $cleanDest • $stopName" else stopName
         val bigText = if (cleanDest.isNotBlank()) "προς $cleanDest\n$stopName" else stopName
 

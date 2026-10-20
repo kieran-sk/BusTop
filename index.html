@@ -59,8 +59,8 @@
   </style>
 
   <!-- Stylesheets (Relative paths with cache-busting for PWA updates) -->
-  <link rel="stylesheet" href="css/m3-expressive.css?v=20261017_2300">
-  <link rel="stylesheet" href="css/airport-ticker.css?v=20261017_2300">
+  <link rel="stylesheet" href="css/m3-expressive.css?v=20261020_2200">
+  <link rel="stylesheet" href="css/airport-ticker.css?v=20261020_2200">
   <script>
     if (window.AndroidBridge) {
       document.documentElement.classList.add('is-android-app');
@@ -298,23 +298,38 @@
           </svg>
         </div>
         <div>
-          <h3 style="font-size: 1.15rem; font-weight: 800;">Ρύθμιση Ειδοποίησης Άφιξης</h3>
+          <h3 style="font-size: 1.15rem; font-weight: 800;">Προσαρμοσμένη Ειδοποίηση Άφιξης</h3>
           <div style="font-size: 0.8rem; color: var(--md-sys-color-outline); margin-top: 2px;">
-            Γραμμή <span id="modal-alarm-line" style="font-weight: 800; color: var(--md-sys-color-primary);">--</span> • Άφιξη σε: 
-            <span id="modal-alarm-due" style="font-weight: 800; color: var(--md-sys-color-primary);">--</span>
+            Λεωφορείο <span id="modal-alarm-line" style="font-weight: 800; color: var(--md-sys-color-primary);">--</span> από <span id="modal-alarm-stop" style="font-weight: 800; color: var(--md-sys-color-on-surface);">--</span>
           </div>
         </div>
       </div>
 
-      <p style="font-size: 0.875rem; color: var(--md-sys-color-on-surface-variant); margin-bottom: 1.25rem; line-height: 1.5;">
-        Ορίστε πόσα λεπτά πριν θέλετε να ειδοποιηθείτε. Θα σταλεί ηχητική ειδοποίηση, δόνηση και ειδοποίηση συστήματος όταν το λεωφορείο φτάσει στο επιλεγμένο όριο (ακόμα και εκτός εφαρμογής).
-      </p>
+      <!-- Bus X from Stop Y in Z minutes preview card -->
+      <div style="background: var(--md-sys-color-surface-container, #f1f5f9); border: 1.5px solid var(--md-sys-color-primary-container, #bae6fd); border-radius: 12px; padding: 0.75rem 1rem; margin-bottom: 1.1rem; display: flex; align-items: center; gap: 0.65rem;">
+        <span style="font-size: 1.4rem;">🔔</span>
+        <div style="font-size: 0.88rem; color: var(--md-sys-color-on-surface); line-height: 1.4;">
+          Ειδοποίηση για: <strong id="modal-alarm-rule-preview" style="color: var(--md-sys-color-primary);">Λεωφορείο X από στάση Y σε Z λεπτά</strong>
+        </div>
+      </div>
+
+      <!-- Inputs for Custom Bus X and Stop Y (editable when opened manually or pre-filled) -->
+      <div id="modal-alarm-custom-fields" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-bottom: 1rem;">
+        <div>
+          <label style="display: block; font-size: 0.72rem; font-weight: 700; color: var(--md-sys-color-outline); margin-bottom: 0.3rem; text-transform: uppercase;">Γραμμη (X):</label>
+          <input type="text" id="alarm-line-custom" placeholder="π.χ. 040, 608" oninput="window.App.updateAlarmPreview()" style="width: 100%; padding: 0.55rem 0.75rem; border-radius: 8px; border: 1.5px solid var(--md-sys-color-outline-variant); font-size: 0.95rem; font-weight: 800; background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface); outline: none; box-sizing: border-box;">
+        </div>
+        <div>
+          <label style="display: block; font-size: 0.72rem; font-weight: 700; color: var(--md-sys-color-outline); margin-bottom: 0.3rem; text-transform: uppercase;">Σταση (Y):</label>
+          <input type="text" id="alarm-stop-custom" placeholder="π.χ. 200021 ή Όνομα" oninput="window.App.updateAlarmPreview()" style="width: 100%; padding: 0.55rem 0.75rem; border-radius: 8px; border: 1.5px solid var(--md-sys-color-outline-variant); font-size: 0.95rem; font-weight: 700; background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface); outline: none; box-sizing: border-box;">
+        </div>
+      </div>
 
       <div style="margin-bottom: 1.25rem;">
-        <label style="display: block; font-size: 0.8rem; font-weight: 700; color: var(--md-sys-color-outline); margin-bottom: 0.5rem; text-transform: uppercase;">
-          Προεπιλεγμενα Ορια Ειδοποιησης:
+        <label style="display: block; font-size: 0.75rem; font-weight: 700; color: var(--md-sys-color-outline); margin-bottom: 0.5rem; text-transform: uppercase;">
+          Χρονος Ειδοποιησης (σε Z λεπτα πριν την αφιξη):
         </label>
-        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem;">
+        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.85rem;">
           <button type="button" class="m3-filter-chip" onclick="window.App.selectAlarmPreset(3)">3 λεπτά</button>
           <button type="button" class="m3-filter-chip active" onclick="window.App.selectAlarmPreset(5)">5 λεπτά</button>
           <button type="button" class="m3-filter-chip" onclick="window.App.selectAlarmPreset(7)">7 λεπτά</button>
@@ -323,12 +338,9 @@
           <button type="button" class="m3-filter-chip" onclick="window.App.selectAlarmPreset(20)">20 λεπτά</button>
         </div>
 
-        <label style="display: block; font-size: 0.8rem; font-weight: 700; color: var(--md-sys-color-outline); margin-bottom: 0.5rem; text-transform: uppercase;">
-          Η Εισαγετε Προσαρμοσμενο Χρονο (Λεπτα):
-        </label>
         <div style="display: flex; align-items: center; gap: 0.75rem;">
-          <input type="number" id="alarm-threshold-custom" min="1" max="60" value="5" style="width: 100px; padding: 0.65rem 0.85rem; border-radius: var(--md-sys-shape-corner-medium); border: 1.5px solid var(--md-sys-color-outline-variant); font-size: 1.1rem; font-weight: 800; font-family: inherit; background: var(--md-sys-color-surface); color: var(--md-sys-color-primary); outline: none; text-align: center;">
-          <span style="font-size: 0.9rem; font-weight: 700; color: var(--md-sys-color-on-surface);">λεπτά πριν την άφιξη</span>
+          <input type="number" id="alarm-threshold-custom" min="1" max="60" value="5" oninput="window.App.updateAlarmPreview()" style="width: 90px; padding: 0.55rem 0.75rem; border-radius: var(--md-sys-shape-corner-medium); border: 1.5px solid var(--md-sys-color-outline-variant); font-size: 1.1rem; font-weight: 800; font-family: inherit; background: var(--md-sys-color-surface); color: var(--md-sys-color-primary); outline: none; text-align: center;">
+          <span style="font-size: 0.88rem; font-weight: 700; color: var(--md-sys-color-on-surface);">λεπτά πριν (Z)</span>
         </div>
       </div>
 
@@ -591,14 +603,14 @@
   </nav>
 
   <!-- Scripts (Cache-busted with defer for non-blocking execution) -->
-  <script defer src="js/api.js?v=20261008_1700"></script>
-  <script defer src="js/map-manager.js?v=20261008_1700"></script>
-  <script defer src="js/ticker.js?v=20261008_1700"></script>
-  <script defer src="js/alarms.js?v=20261008_1700"></script>
-  <script defer src="js/pinned-trips.js?v=20261008_1700"></script>
-  <script defer src="js/timetable.js?v=20261008_1700"></script>
-  <script defer src="js/search.js?v=20261008_1700"></script>
-  <script defer src="js/favorites.js?v=20261008_1700"></script>
-  <script defer src="js/app.js?v=20261008_1700"></script>
+  <script defer src="js/api.js?v=20261020_2200"></script>
+  <script defer src="js/map-manager.js?v=20261020_2200"></script>
+  <script defer src="js/ticker.js?v=20261020_2200"></script>
+  <script defer src="js/alarms.js?v=20261020_2200"></script>
+  <script defer src="js/pinned-trips.js?v=20261020_2200"></script>
+  <script defer src="js/timetable.js?v=20261020_2200"></script>
+  <script defer src="js/search.js?v=20261020_2200"></script>
+  <script defer src="js/favorites.js?v=20261020_2200"></script>
+  <script defer src="js/app.js?v=20261020_2200"></script>
 </body>
 </html>
