@@ -770,8 +770,7 @@ fun ProjectedTabScreen(
             if (arrivals.isEmpty()) {
                 item {
                     Text(
-                        text = "Δεν υπάρχουν
-προγραμματισμένες αφίξεις",
+                        text = "Δεν υπάρχουν προγραμματισμένες αφίξεις",
                         fontSize = 11.sp,
                         color = PhoneTextMuted,
                         textAlign = TextAlign.Center,
