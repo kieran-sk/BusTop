@@ -495,34 +495,41 @@ class AirportTicker {
 
     return `
       <div class="ticker-row" onclick="if(window.App && window.App.triggerHaptic) window.App.triggerHaptic('tick'); window.App.openLineTimetableBothDirections('${arr.line_code}', '${arr.line_id}', '${safeDescr}')" title="Κλικ για προβολή πλήρους δρομολογίου και στάσεων">
-        <!-- Top Section: Line Badge, Destination, Direction & Full Route Description with Scheduled Departure -->
-        <div class="ticker-row-top" style="align-items: flex-start; gap: 0.75rem;">
+        <!-- Top Section: Arrival Counter (Top Left), Line Badge, Destination & Direction -->
+        <div class="ticker-row-top" style="align-items: center; gap: 0.65rem;">
+          <!-- Arrival Counter (Top Left) -->
+          <div class="ticker-cell-due" style="display: inline-flex; flex-direction: row; align-items: center; gap: 4px; flex-shrink: 0;" title="Εκτιμώμενος χρόνος άφιξης στη στάση">
+            ${dueDisplay}
+          </div>
+
           <div class="ticker-cell-line">
             <span class="ticker-line-badge">
               ${arr.line_id}
             </span>
           </div>
+
           <div class="ticker-dest-info" style="flex: 1; min-width: 0;">
             <!-- Destination & Direction in a single clean line -->
             <div class="ticker-dest-title-row" style="display: flex; align-items: center; gap: 6px; flex-wrap: nowrap;">
-              <span class="ticker-dest-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 800; font-size: 0.96rem;">${arr.destination || lineDescr}</span>
-              <span style="font-size: 1rem; line-height: 1; flex-shrink: 0;">${directionText}</span>
-            </div>
-            <!-- Full Route Description using all horizontal space, followed by scheduled departure / GPS status -->
-            <div class="ticker-dest-sub" style="margin-top: 3px; font-size: 0.74rem; color: #64748b; line-height: 1.35;">
-              ${lineDescr && arr.destination && lineDescr !== arr.destination ? `<span style="color: #475569; font-weight: 600;">${lineDescr}</span>` : ''}
-              ${arr.departure_time ? `<span style="color: #0f172a; font-weight: 700; margin-left: ${lineDescr && arr.destination && lineDescr !== arr.destination ? '6px' : '0'}; display: inline-flex; align-items: center; gap: 3px;">🕒 ${arr.departure_time}</span>` : ''}
-              ${isLive ? `
-                <span style="color: #059669; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; margin-left: 6px;">
-                  <span class="m3-pulse-dot" style="width: 5px; height: 5px; background: #059669;"></span>
-                  GPS${reportAgo ? ` (${reportAgo})` : ''}${arr.veh_code ? ` #${arr.veh_code}` : ''}
-                </span>
-              ` : ''}
+              <span class="ticker-dest-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 800; font-size: 0.95rem;">${arr.destination || lineDescr}</span>
+              <span style="font-size: 0.95rem; line-height: 1; flex-shrink: 0;">${directionText}</span>
             </div>
           </div>
         </div>
 
-        <!-- Bottom Section: Commute Advice, Arrival Counter (moved to bottom) & Action Buttons -->
+        <!-- Full Route Description using all horizontal space, followed by scheduled departure / GPS status -->
+        <div class="ticker-dest-sub" style="margin-top: 4px; font-size: 0.74rem; color: #64748b; line-height: 1.35;">
+          ${lineDescr && arr.destination && lineDescr !== arr.destination ? `<span style="color: #475569; font-weight: 600;">${lineDescr}</span>` : ''}
+          ${arr.departure_time ? `<span style="color: #0f172a; font-weight: 700; margin-left: ${lineDescr && arr.destination && lineDescr !== arr.destination ? '6px' : '0'}; display: inline-flex; align-items: center; gap: 3px;">🕒 ${arr.departure_time}</span>` : ''}
+          ${isLive ? `
+            <span style="color: #059669; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; margin-left: 6px;">
+              <span class="m3-pulse-dot" style="width: 5px; height: 5px; background: #059669;"></span>
+              GPS${reportAgo ? ` (${reportAgo})` : ''}${arr.veh_code ? ` #${arr.veh_code}` : ''}
+            </span>
+          ` : ''}
+        </div>
+
+        <!-- Bottom Section: Commute Advice & Emoji Action Buttons (Alarm & Pin) -->
         <div class="ticker-row-bottom" style="margin-top: 0.45rem; padding-top: 0.45rem; border-top: 1px dashed var(--md-sys-color-outline-variant, #e2e8f0); display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
           <div class="ticker-commute-group" style="display: flex; align-items: center; gap: 0.45rem; flex-wrap: wrap;">
             <!-- Commute Buffer / Departure Timing Advice Badge -->
@@ -531,30 +538,16 @@ class AirportTicker {
             </div>
           </div>
 
-          <!-- Arrival Counter flap digits moved to bottom row -->
-          <div class="ticker-cell-due" style="display: flex; flex-direction: row; align-items: center; gap: 6px; margin: 0 auto 0 0;" title="Εκτιμώμενος χρόνος άφιξης στη στάση">
-            <span class="ticker-due-sublabel" style="margin-bottom: 0;">Άφιξη:</span>
-            ${dueDisplay}
-          </div>
+          <div class="ticker-cell-actions" style="display: flex; align-items: center; gap: 0.75rem;">
+            <!-- Alarm Emoji Button -->
+            <span class="ticker-action-emoji" title="${isAlarmSet ? 'Ειδοποίηση ενεργή' : 'Ρύθμιση ειδοποίησης'}" onclick="event.stopPropagation(); const notifDest = '${(arr.destination || safeDescr).replace(/[⬅️➡️←→🔄▲▼]/g, '').trim().replace(/'/g, "\'")}'; window.App.openAlarmDialog('${arr.line_id}', '${arr.route_code}', ${busMins}, notifDest)" style="cursor: pointer; font-size: 1.15rem; padding: 2px 4px; filter: ${isAlarmSet ? 'none' : 'grayscale(70%) opacity(0.65)'};">
+              ⏰
+            </span>
 
-          <div class="ticker-cell-actions">
-            <div class="ticker-cell-alarm">
-              <button class="ticker-alarm-btn ${isAlarmSet ? 'active' : ''}" title="${isAlarmSet ? 'Ειδοποίηση ενεργή' : 'Ρύθμιση ειδοποίησης άφιξης'}" onclick="event.stopPropagation(); const notifDest = '${(arr.destination || safeDescr).replace(/[⬅️➡️←→🔄▲▼]/g, '').trim().replace(/'/g, "\\'")}'; window.App.openAlarmDialog('${arr.line_id}', '${arr.route_code}', ${busMins}, notifDest)">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="${isAlarmSet ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
-                  <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
-                </svg>
-              </button>
-            </div>
-
-            <div class="ticker-cell-pin">
-              <button class="ticker-pin-btn ${isPinned ? 'active' : ''}" title="${isPinned ? 'Καρφιτσωμένο (κλικ για αφαίρεση)' : 'Καρφίτσωμα άφιξης στις Καρφίτσες'}" onclick="event.stopPropagation(); window.App.ticker.togglePinArrival(${arrIdx})">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="${isPinned ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <line x1="12" y1="17" x2="12" y2="22"></line>
-                  <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>
-                </svg>
-              </button>
-            </div>
+            <!-- Pin Emoji Button -->
+            <span class="ticker-action-emoji" title="${isPinned ? 'Καρφιτσωμένο (κλικ για αφαίρεση)' : 'Καρφίτσωμα άφιξης'}" onclick="event.stopPropagation(); window.App.ticker.togglePinArrival(${arrIdx})" style="cursor: pointer; font-size: 1.15rem; padding: 2px 4px; filter: ${isPinned ? 'none' : 'grayscale(70%) opacity(0.55)'};">
+              📌
+            </span>
           </div>
         </div>
       </div>

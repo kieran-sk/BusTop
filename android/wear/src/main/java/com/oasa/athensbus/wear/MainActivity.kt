@@ -8,6 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
@@ -453,6 +454,99 @@ fun WearBusTopApp(
     }
 }
 
+
+// ─── Wear Split-Flap Arrival Digit Board ─────────────────────────────────────
+
+@Composable
+fun WearSplitFlapTile(
+    char: Char,
+    isUrgent: Boolean,
+    isSoon: Boolean
+) {
+    val tileBg = when {
+        isUrgent -> Color(0xFF450A0A) // Deep wine red
+        isSoon -> Color(0xFF052E16)   // Deep dark emerald
+        else -> Color(0xFF0F172A)     // Deep slate flap
+    }
+    val tileBorder = when {
+        isUrgent -> Color(0xFFEF4444)
+        isSoon -> Color(0xFF10B981)
+        else -> Color(0xFF334155)
+    }
+    val textColor = when {
+        isUrgent -> Color(0xFFFCA5A5)
+        isSoon -> Color(0xFF6EE7B7)
+        else -> Color(0xFFF8FAFC)
+    }
+
+    Box(
+        modifier = Modifier
+            .width(13.dp)
+            .height(20.dp)
+            .clip(RoundedCornerShape(3.dp))
+            .background(tileBg)
+            .border(0.75.dp, tileBorder, RoundedCornerShape(3.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = char.toString(),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = textColor,
+            textAlign = TextAlign.Center
+        )
+        // Split-flap horizontal center seam
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(0.6.dp)
+                .background(Color(0x55000000))
+                .align(Alignment.Center)
+        )
+    }
+}
+
+@Composable
+fun WearSplitFlapDisplay(
+    minutes: Int,
+    modifier: Modifier = Modifier
+) {
+    val isUrgent = minutes in 1..3
+    val isSoon = minutes in 4..10
+    val text = when {
+        minutes <= 0 -> "🏁"
+        minutes >= 60 -> {
+            val h = minutes / 60
+            val m = minutes % 60
+            if (m > 0) "${h}h${m}" else "${h}h"
+        }
+        else -> minutes.toString().padStart(2, '0')
+    }
+
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(1.5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        text.forEach { ch ->
+            WearSplitFlapTile(char = ch, isUrgent = isUrgent, isSoon = isSoon)
+        }
+        if (minutes > 0) {
+            Text(
+                text = "'",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Black,
+                color = when {
+                    isUrgent -> Color(0xFFEF4444)
+                    isSoon -> Color(0xFF10B981)
+                    else -> PhoneTextMuted
+                },
+                modifier = Modifier.padding(start = 1.dp)
+            )
+        }
+    }
+}
+
 // ─── TAB 1: Pinned Arrivals (Line, Stop, Direction, Remaining Time) ───────────
 
 @Composable
@@ -490,13 +584,13 @@ fun PinnedTabScreen(
             .focusable(),
         state = listState,
         autoCentering = AutoCenteringParams(itemIndex = 0),
-        contentPadding = PaddingValues(start = 6.dp, end = 6.dp, top = 14.dp, bottom = 22.dp),
+        contentPadding = PaddingValues(start = 2.dp, end = 2.dp, top = 8.dp, bottom = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         scalingParams = ScalingLazyColumnDefaults.scalingParams(
-            edgeScale = 0.88f,
-            edgeAlpha = 0.65f,
-            minTransitionArea = 0.2f,
-            maxTransitionArea = 0.6f
+            edgeScale = 0.94f,
+            edgeAlpha = 0.75f,
+            minTransitionArea = 0.15f,
+            maxTransitionArea = 0.65f
         )
     ) {
         // Minimal subtle title
@@ -506,7 +600,7 @@ fun PinnedTabScreen(
                 fontSize = 11.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = PhonePrimaryBlue,
-                modifier = Modifier.padding(bottom = 4.dp)
+                modifier = Modifier.padding(bottom = 2.dp)
             )
         }
 
@@ -514,7 +608,7 @@ fun PinnedTabScreen(
             item {
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth(0.92f)
+                        .fillMaxWidth(0.96f)
                         .clip(RoundedCornerShape(14.dp))
                         .background(WearCardBg)
                         .padding(14.dp),
@@ -539,65 +633,58 @@ fun PinnedTabScreen(
             }
         } else {
             items(pinnedList) { pin ->
-                Row(
+                // Full-width edge-to-edge card maximizing visibility on round watch screens
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth(0.94f)
-                        .clip(RoundedCornerShape(12.dp))
+                        .fillMaxWidth(0.98f)
+                        .clip(RoundedCornerShape(14.dp))
                         .background(WearCardBg)
-                        .padding(horizontal = 8.dp, vertical = 7.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(horizontal = 9.dp, vertical = 7.dp)
                 ) {
-                    // Left info: Line Pill + Stop + Direction
+                    // Top row: Line Badge + Split-Flap Arrival Time Display
                     Row(
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(6.dp))
                                 .background(PhonePrimaryPill)
-                                .padding(horizontal = 6.dp, vertical = 3.dp)
+                                .padding(horizontal = 7.dp, vertical = 2.5.dp)
                         ) {
                             Text(
                                 text = pin.lineId,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Black,
                                 color = PhonePrimaryText
                             )
                         }
 
-                        Spacer(modifier = Modifier.width(6.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = pin.stopName,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = PhoneTextPrimary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            if (pin.destination.isNotBlank()) {
-                                Text(
-                                    text = "→ ${pin.destination}",
-                                    fontSize = 8.5.sp,
-                                    color = PhoneTextMuted,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
+                        // Split-Flap Arrival Display
+                        WearSplitFlapDisplay(minutes = pin.minutes)
                     }
 
-                    // Right info: Remaining time
+                    Spacer(modifier = Modifier.height(3.dp))
+
+                    // Bottom info: Stop Name & Direction filling full horizontal width
                     Text(
-                        text = if (pin.minutes <= 0) "Τώρα" else "${pin.minutes}'",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Black,
-                        color = if (pin.minutes <= 3) PhoneLiveGreen else PhonePrimaryBlue,
-                        modifier = Modifier.padding(start = 6.dp)
+                        text = pin.stopName,
+                        fontSize = 10.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PhoneTextPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
+                    if (pin.destination.isNotBlank()) {
+                        Text(
+                            text = "→ ${pin.destination}",
+                            fontSize = 9.sp,
+                            color = PhoneTextMuted,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.height(4.dp))
             }
@@ -731,7 +818,7 @@ fun ProjectedTabScreen(
                 items(arrivals) { arr ->
                     Row(
                         modifier = Modifier
-                            .fillMaxWidth(0.94f)
+                            .fillMaxWidth(0.98f)
                             .padding(vertical = 2.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .background(WearCardBg)
@@ -770,14 +857,8 @@ fun ProjectedTabScreen(
                             }
                         }
 
-                        // Minutes
-                        Text(
-                            text = if (arr.minutes == 0) "Τώρα" else "${arr.minutes}'",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Black,
-                            color = if (arr.minutes <= 3) PhoneLiveGreen else PhonePrimaryBlue,
-                            modifier = Modifier.padding(start = 6.dp)
-                        )
+                        // Split-Flap Arrival Display
+                        WearSplitFlapDisplay(minutes = arr.minutes)
                     }
                 }
             }
