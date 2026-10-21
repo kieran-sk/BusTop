@@ -65,6 +65,7 @@ class LiveTrackingService : Service() {
         const val EXTRA_VEH_CODE = "EXTRA_VEH_CODE"
         const val EXTRA_DEPARTURE_TIME = "EXTRA_DEPARTURE_TIME"
         const val EXTRA_ESTIMATED_ARRIVAL_TIME = "EXTRA_ESTIMATED_ARRIVAL_TIME"
+        const val EXTRA_IS_LIVE = "EXTRA_IS_LIVE"
 
         fun start(
             context: Context,
@@ -79,7 +80,8 @@ class LiveTrackingService : Service() {
             initialMinutes: Int = 10,
             vehCode: String = "",
             departureTime: String = "",
-            estimatedArrivalTime: String = ""
+            estimatedArrivalTime: String = "",
+            isLive: Boolean = true
         ) {
             val intent = Intent(context, LiveTrackingService::class.java).apply {
                 action = ACTION_START
@@ -95,6 +97,7 @@ class LiveTrackingService : Service() {
                 putExtra(EXTRA_VEH_CODE, vehCode)
                 putExtra(EXTRA_DEPARTURE_TIME, departureTime)
                 putExtra(EXTRA_ESTIMATED_ARRIVAL_TIME, estimatedArrivalTime)
+                putExtra(EXTRA_IS_LIVE, isLive)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -188,6 +191,7 @@ class LiveTrackingService : Service() {
         if (newVehCode.isNotBlank()) vehCode = newVehCode
         if (newDepTime.isNotBlank()) departureTime = newDepTime
         if (newEstArrTime.isNotBlank()) estimatedArrivalTime = newEstArrTime
+        isLiveTracked = intent?.getBooleanExtra(EXTRA_IS_LIVE, true) ?: true
 
         if (newThreshold <= 0) {
             // Strictly passive pinned trip tracking: 100% silent, alarm triggers permanently disabled

@@ -525,7 +525,8 @@ class MainActivity : FragmentActivity() {
             initialMinutes: Double = 10.0,
             vehCode: String = "",
             departureTime: String = "",
-            estimatedArrivalTime: String = ""
+            estimatedArrivalTime: String = "",
+            isLive: Boolean = true
         ) {
             try {
                 if (thresholdMinutes <= 0.0) {
@@ -561,7 +562,8 @@ class MainActivity : FragmentActivity() {
                     initialMinutes.toInt(),
                     vehCode,
                     departureTime,
-                    estimatedArrivalTime
+                    estimatedArrivalTime,
+                    isLive
                 )
             } catch (e: Exception) {
                 e.printStackTrace()

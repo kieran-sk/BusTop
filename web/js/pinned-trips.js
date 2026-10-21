@@ -300,7 +300,7 @@ class PinnedTripsManager {
         vehCode: arrival.veh_code || null,
         departureTime: arrival.departure_time || null,
         estimatedArrivalTime: arrival.estimated_arrival_time || null,
-        isLive: !!arrival.is_live,
+        isLive: (typeof arrival.is_live === 'boolean' ? arrival.is_live : (!arrival.departure_time && !!arrival.veh_code)),
         initialMinutes: Math.max(0, busMins),
         targetArrivalTimestamp,
         arrivalKey,
@@ -695,7 +695,8 @@ class PinnedTripsManager {
               initMins,
               item.vehCode || '',
               item.departureTime || '',
-              item.estimatedArrivalTime || ''
+              item.estimatedArrivalTime || '',
+              !!isLiveArrival
             );
           }
         } catch (e) {}
