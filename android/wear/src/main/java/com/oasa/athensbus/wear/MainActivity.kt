@@ -476,20 +476,20 @@ enum class ScreenState {
 
 // ─── Clean Expressive Theme Palette (Matching Phone App Exactly) ──────────────
 
-private val PhoneSurfaceBg      = Color(0xFFF8FAFC) // Crisp M3 Slate Canvas
-private val PhoneCardBg         = Color(0xFFFFFFFF) // Pure 100% Solid Card
-private val PhonePrimaryBlue    = Color(0xFF005AC1) // Clean Primary Blue
-private val PhonePrimaryPill    = Color(0xFFD8E2FF) // Clean Light Blue Pill
-private val PhonePrimaryText    = Color(0xFF001A41) // High contrast Deep Blue
-private val PhoneTextPrimary    = Color(0xFF0F172A) // Bold dark slate on cards
-private val PhoneTextMuted      = Color(0xFF64748B) // Subtle secondary text
-private val PhoneBorderSubtle   = Color(0xFFE2E8F0) // Crisp card outline
-private val PhoneLiveGreen      = Color(0xFF10B981) // Phosphor Emerald
-private val PhoneGreenContainer = Color(0xFFECFDF5) // Green subtle pill
-private val PhoneGreenText      = Color(0xFF065F46) // Deep Green text
-private val PhoneAmber          = Color(0xFFF59E0B) // Favorite / Pin Gold
-private val PhoneAmberContainer = Color(0xFFFFFBEB) // Amber subtle container
-private val PhoneAmberText      = Color(0xFF92400E) // Deep Amber text
+private val PhoneSurfaceBg      = Color(0xFF000000) // Pure OLED Black to blend into watch bezel
+private val PhoneCardBg         = Color(0xFF181E29) // Deep Slate / Navy Solid Card
+private val PhonePrimaryBlue    = Color(0xFF38BDF8) // Crisp Electric Blue for AMOLED
+private val PhonePrimaryPill    = Color(0xFF1E3A8A) // Dark Indigo Pill Container
+private val PhonePrimaryText    = Color(0xFF93C5FD) // Crisp light blue badge text
+private val PhoneTextPrimary    = Color(0xFFF8FAFC) // Crisp White for dark background
+private val PhoneTextMuted      = Color(0xFF94A3B8) // Clean muted slate secondary text
+private val PhoneBorderSubtle   = Color(0xFF263345) // Subtle card outline
+private val PhoneLiveGreen      = Color(0xFF34D399) // Phosphor Emerald
+private val PhoneGreenContainer = Color(0xFF064E3B) // Dark Green subtle pill
+private val PhoneGreenText      = Color(0xFF6EE7B7) // High contrast green text
+private val PhoneAmber          = Color(0xFFFBBF24) // Gold / Pin highlight
+private val PhoneAmberContainer = Color(0xFF451A03) // Dark Amber container
+private val PhoneAmberText      = Color(0xFFFDE68A) // High contrast amber text
 
 // ─── Root app composable ──────────────────────────────────────────────────────
 
@@ -675,7 +675,7 @@ fun NearbyStopsListScreen(
                 .focusable(),
             state = listState,
             autoCentering = AutoCenteringParams(itemIndex = 0),
-            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 20.dp),
+            contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 28.dp, bottom = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             scalingParams = ScalingLazyColumnDefaults.scalingParams(
                 edgeScale = 0.88f,
@@ -823,7 +823,7 @@ fun FavoritesListScreen(
                 .focusable(),
             state = listState,
             autoCentering = AutoCenteringParams(itemIndex = 0),
-            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 20.dp),
+            contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 28.dp, bottom = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Header
@@ -1129,7 +1129,7 @@ fun ArrivalsScreen(
                 .focusable(),
             state = listState,
             autoCentering = AutoCenteringParams(itemIndex = 0),
-            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 18.dp),
+            contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 28.dp, bottom = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Header Bar: Stop Name & Favorite Star
@@ -1428,7 +1428,7 @@ fun PinnedListScreen(
                 .focusable(),
             state = listState,
             autoCentering = AutoCenteringParams(itemIndex = 0),
-            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 20.dp),
+            contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 28.dp, bottom = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             scalingParams = ScalingLazyColumnDefaults.scalingParams(
                 edgeScale = 0.88f,
