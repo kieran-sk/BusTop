@@ -6,11 +6,14 @@ import android.os.Bundle
 import android.view.HapticFeedbackConstants
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
@@ -312,38 +315,27 @@ data class PinnedItem(
     val minutes: Int = 0
 )
 
-enum class WatchTab {
-    PINNED,
-    PROJECTED
-}
-
 // ─── Wear OS Dark OLED Aesthetic Theme Palette ──────────────────────────────
 
 private val WearSurfaceBg       = Color(0xFF000000) // Pure OLED Black to blend into watch bezel seamlessly
 private val WearCardBg          = Color(0xFF161C26) // Deep Navy/Slate surface card
-private val WearCardBorder      = Color(0xFF263345) // Subtle edge highlight
 private val PhonePrimaryBlue    = Color(0xFF38BDF8) // Crisp Electric Blue for AMOLED
 private val PhonePrimaryPill    = Color(0xFF1E3A8A) // Dark Indigo Pill Container
 private val PhonePrimaryText    = Color(0xFF93C5FD) // Crisp light blue badge text
 private val PhoneTextPrimary    = Color(0xFFF8FAFC) // Crisp White for dark background
 private val PhoneTextMuted      = Color(0xFF94A3B8) // Clean muted slate secondary text
-private val PhoneBorderSubtle   = Color(0xFF263345) // Subtle card outline
 private val PhoneLiveGreen      = Color(0xFF34D399) // Phosphor Emerald
-private val PhoneGreenContainer = Color(0xFF064E3B) // Dark Green subtle pill
-private val PhoneGreenText      = Color(0xFF6EE7B7) // High contrast green text
-private val PhoneAmber          = Color(0xFFFBBF24) // Gold / Pin highlight
-private val PhoneAmberContainer = Color(0xFF451A03) // Dark Amber container
-private val PhoneAmberText      = Color(0xFFFDE68A) // High contrast amber text
 
-// ─── Root app composable ──────────────────────────────────────────────────────
+// ─── Root app composable with Smooth Swipe Pager Navigation ───────────────────
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun WearBusTopApp(
     onFetchArrivals: suspend (String) -> List<ArrivalItem>,
     onLoadPins: () -> List<PinnedItem>,
     onLoadLastProjected: () -> Pair<WearStopItem, List<ArrivalItem>>?
 ) {
-    var activeTab by remember { mutableStateOf(WatchTab.PINNED) }
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
     var pinnedList by remember { mutableStateOf<List<PinnedItem>>(emptyList()) }
     var projectedStop by remember { mutableStateOf<WearStopItem?>(null) }
     var projectedArrivals by remember { mutableStateOf<List<ArrivalItem>>(emptyList()) }
@@ -363,13 +355,17 @@ fun WearBusTopApp(
             act.companionPinsListener = { newPins, shouldNavigate ->
                 pinnedList = newPins
                 if (shouldNavigate) {
-                    activeTab = WatchTab.PINNED
+                    scope.launch {
+                        pagerState.animateScrollToPage(0)
+                    }
                 }
             }
             act.companionArrivalsListener = { sharedStop, sharedArrivals ->
                 projectedStop = sharedStop
                 projectedArrivals = sharedArrivals
-                activeTab = WatchTab.PROJECTED
+                scope.launch {
+                    pagerState.animateScrollToPage(1)
+                }
             }
         }
     }
@@ -394,99 +390,65 @@ fun WearBusTopApp(
             )
         }
     ) {
-        when (activeTab) {
-            WatchTab.PINNED -> {
-                PinnedTabScreen(
-                    pinnedList = pinnedList,
-                    activeTab = activeTab,
-                    onSelectTab = { activeTab = it },
-                    onRefresh = {
-                        pinnedList = onLoadPins()
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(WearSurfaceBg)
+        ) {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                when (page) {
+                    0 -> {
+                        PinnedTabScreen(
+                            pinnedList = pinnedList,
+                            onRefresh = {
+                                pinnedList = onLoadPins()
+                            }
+                        )
                     }
-                )
-            }
-            WatchTab.PROJECTED -> {
-                ProjectedTabScreen(
-                    stop = projectedStop,
-                    arrivals = projectedArrivals,
-                    activeTab = activeTab,
-                    onSelectTab = { activeTab = it },
-                    onRefresh = {
-                        val sCode = projectedStop?.code
-                        if (sCode != null) {
-                            scope.launch {
-                                val fresh = onFetchArrivals(sCode)
-                                if (fresh.isNotEmpty()) {
-                                    projectedArrivals = fresh
+                    1 -> {
+                        ProjectedTabScreen(
+                            stop = projectedStop,
+                            arrivals = projectedArrivals,
+                            onRefresh = {
+                                val sCode = projectedStop?.code
+                                if (sCode != null) {
+                                    scope.launch {
+                                        val fresh = onFetchArrivals(sCode)
+                                        if (fresh.isNotEmpty()) {
+                                            projectedArrivals = fresh
+                                        }
+                                    }
                                 }
                             }
-                        }
+                        )
                     }
+                }
+            }
+
+            // Minimalist dot indicator at the bottom edge so it takes 0 content space
+            Row(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(if (pagerState.currentPage == 0) 5.dp else 3.5.dp)
+                        .clip(CircleShape)
+                        .background(if (pagerState.currentPage == 0) PhonePrimaryBlue else PhoneTextMuted.copy(alpha = 0.4f))
+                )
+                Box(
+                    modifier = Modifier
+                        .size(if (pagerState.currentPage == 1) 5.dp else 3.5.dp)
+                        .clip(CircleShape)
+                        .background(if (pagerState.currentPage == 1) PhonePrimaryBlue else PhoneTextMuted.copy(alpha = 0.4f))
                 )
             }
-        }
-    }
-}
-
-// ─── Top Tabs Selector Pill ───────────────────────────────────────────────────
-
-@Composable
-fun TabSelectorHeader(
-    activeTab: WatchTab,
-    onSelectTab: (WatchTab) -> Unit,
-    pinnedCount: Int,
-    hasProjected: Boolean
-) {
-    val view = LocalView.current
-    Row(
-        modifier = Modifier
-            .fillMaxWidth(0.92f)
-            .padding(bottom = 8.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Tab 1: Pinned
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .clip(RoundedCornerShape(topStart = 10.dp, bottomStart = 10.dp))
-                .background(if (activeTab == WatchTab.PINNED) PhonePrimaryBlue else WearCardBg)
-                .clickable {
-                    view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-                    onSelectTab(WatchTab.PINNED)
-                }
-                .padding(vertical = 5.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "📌 Pins ($pinnedCount)",
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (activeTab == WatchTab.PINNED) Color.Black else PhoneTextMuted
-            )
-        }
-
-        Spacer(modifier = Modifier.width(2.dp))
-
-        // Tab 2: Projected Live Stop
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .clip(RoundedCornerShape(topEnd = 10.dp, bottomEnd = 10.dp))
-                .background(if (activeTab == WatchTab.PROJECTED) PhonePrimaryBlue else WearCardBg)
-                .clickable {
-                    view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-                    onSelectTab(WatchTab.PROJECTED)
-                }
-                .padding(vertical = 5.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = if (hasProjected) "📡 Στάση 🔴" else "📡 Στάση",
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (activeTab == WatchTab.PROJECTED) Color.Black else PhoneTextMuted
-            )
         }
     }
 }
@@ -496,8 +458,6 @@ fun TabSelectorHeader(
 @Composable
 fun PinnedTabScreen(
     pinnedList: List<PinnedItem>,
-    activeTab: WatchTab,
-    onSelectTab: (WatchTab) -> Unit,
     onRefresh: () -> Unit
 ) {
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
@@ -530,7 +490,7 @@ fun PinnedTabScreen(
             .focusable(),
         state = listState,
         autoCentering = AutoCenteringParams(itemIndex = 0),
-        contentPadding = PaddingValues(start = 6.dp, end = 6.dp, top = 26.dp, bottom = 26.dp),
+        contentPadding = PaddingValues(start = 6.dp, end = 6.dp, top = 14.dp, bottom = 22.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         scalingParams = ScalingLazyColumnDefaults.scalingParams(
             edgeScale = 0.88f,
@@ -539,13 +499,14 @@ fun PinnedTabScreen(
             maxTransitionArea = 0.6f
         )
     ) {
-        // Two-tab selector
+        // Minimal subtle title
         item {
-            TabSelectorHeader(
-                activeTab = activeTab,
-                onSelectTab = onSelectTab,
-                pinnedCount = pinnedList.size,
-                hasProjected = false
+            Text(
+                text = "📌 Καρφίτσες",
+                fontSize = 11.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = PhonePrimaryBlue,
+                modifier = Modifier.padding(bottom = 4.dp)
             )
         }
 
@@ -648,7 +609,7 @@ fun PinnedTabScreen(
                 onClick = onRefresh,
                 label = { Text("Ανανέωση 🔄", fontSize = 10.sp, color = PhoneTextPrimary, fontWeight = FontWeight.Bold) },
                 colors = ChipDefaults.chipColors(backgroundColor = WearCardBg),
-                modifier = Modifier.padding(bottom = 14.dp)
+                modifier = Modifier.padding(bottom = 12.dp)
             )
         }
     }
@@ -660,8 +621,6 @@ fun PinnedTabScreen(
 fun ProjectedTabScreen(
     stop: WearStopItem?,
     arrivals: List<ArrivalItem>,
-    activeTab: WatchTab,
-    onSelectTab: (WatchTab) -> Unit,
     onRefresh: () -> Unit
 ) {
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
@@ -694,7 +653,7 @@ fun ProjectedTabScreen(
             .focusable(),
         state = listState,
         autoCentering = AutoCenteringParams(itemIndex = 0),
-        contentPadding = PaddingValues(start = 6.dp, end = 6.dp, top = 26.dp, bottom = 26.dp),
+        contentPadding = PaddingValues(start = 6.dp, end = 6.dp, top = 14.dp, bottom = 22.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         scalingParams = ScalingLazyColumnDefaults.scalingParams(
             edgeScale = 0.88f,
@@ -703,16 +662,6 @@ fun ProjectedTabScreen(
             maxTransitionArea = 0.6f
         )
     ) {
-        // Two-tab selector
-        item {
-            TabSelectorHeader(
-                activeTab = activeTab,
-                onSelectTab = onSelectTab,
-                pinnedCount = 0,
-                hasProjected = stop != null
-            )
-        }
-
         if (stop == null) {
             item {
                 Column(
@@ -724,7 +673,7 @@ fun ProjectedTabScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Καμία μεταδοθείσα στάση",
+                        text = "📡 Καμία στάση",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
                         color = PhoneTextPrimary,
@@ -759,7 +708,7 @@ fun ProjectedTabScreen(
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = if (stop.street.isNotBlank()) "→ ${stop.street} • ${stop.code}" else "Αφίξεις • #${stop.code}",
+                        text = if (stop.street.isNotBlank()) "→ ${stop.street} • #${stop.code}" else "Αφίξεις • #${stop.code}",
                         fontSize = 9.5.sp,
                         color = PhonePrimaryBlue,
                         fontWeight = FontWeight.Bold
@@ -839,7 +788,7 @@ fun ProjectedTabScreen(
                     onClick = onRefresh,
                     label = { Text("Ανανέωση 🔄", fontSize = 10.sp, color = PhoneTextPrimary, fontWeight = FontWeight.Bold) },
                     colors = ChipDefaults.chipColors(backgroundColor = WearCardBg),
-                    modifier = Modifier.padding(bottom = 14.dp)
+                    modifier = Modifier.padding(bottom = 12.dp)
                 )
             }
         }
