@@ -734,6 +734,42 @@ class MainActivity : FragmentActivity() {
                 }
             }
         }
+        @JavascriptInterface
+        fun launchPinsOnWatch(pinsJson: String) {
+            WatchSyncManager.sendLaunchPins(context, pinsJson) { success ->
+                runOnUiThread {
+                    if (success) {
+                        Toast.makeText(context, "⌚ Οι καρφίτσες στάλθηκαν στο ρολόι!", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "⌚ Δεν βρέθηκε συνδεδεμένο ρολόι", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun syncPinsWithWatch(pinsJson: String) {
+            WatchSyncManager.sendUpdatePins(context, pinsJson)
+        }
+
+        @JavascriptInterface
+        fun shareStopArrivalsWithWatch(stopPayloadJson: String) {
+            WatchSyncManager.shareStopArrivals(context, stopPayloadJson) { success ->
+                runOnUiThread {
+                    if (success) {
+                        Toast.makeText(context, "⌚ Οι αφίξεις στάλθηκαν στο ρολόι!", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "⌚ Δεν βρέθηκε συνδεδεμένο ρολόι", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+
+        @JavascriptInterface
+        fun launchWatchApp() {
+            WatchSyncManager.launchWatchApp(context)
+        }
+
     }
 
     @Deprecated("Deprecated in Java")

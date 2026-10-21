@@ -55,6 +55,92 @@ import kotlin.math.abs
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        var instance: MainActivity? = null
+    }
+
+    var companionArrivalsListener: ((WearStopItem, List<ArrivalItem>) -> Unit)? = null
+    var companionPinsListener: ((List<PinnedItem>, Boolean) -> Unit)? = null
+
+    override fun onDestroy() {
+        if (instance === this) {
+            instance = null
+        }
+        super.onDestroy()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleCompanionIntent(intent)
+    }
+
+    private fun handleCompanionIntent(intent: Intent?) {
+        if (intent == null) return
+        val payload = intent.getStringExtra(WearCompanionListenerService.EXTRA_PAYLOAD) ?: return
+        when (intent.action) {
+            WearCompanionListenerService.ACTION_SYNC_PINS -> {
+                onPinsReceived(payload, shouldNavigateToPins = true)
+            }
+            WearCompanionListenerService.ACTION_SHOW_ARRIVALS -> {
+                onArrivalsReceived(payload)
+            }
+        }
+    }
+
+    fun onPinsReceived(jsonStr: String, shouldNavigateToPins: Boolean = false) {
+        try {
+            val list = mutableListOf<PinnedItem>()
+            val arr = JSONArray(jsonStr)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val stopCode = obj.optString("stopCode", obj.optString("code", ""))
+                val lineId = obj.optString("lineId", obj.optString("line", "BUS"))
+                val stopName = obj.optString("stopName", "Στάση $stopCode")
+                if (stopCode.isNotEmpty() && lineId.isNotEmpty()) {
+                    list.add(PinnedItem(stopCode = stopCode, stopName = stopName, lineId = lineId))
+                }
+            }
+            runOnUiThread {
+                companionPinsListener?.invoke(list, shouldNavigateToPins)
+            }
+        } catch (_: Exception) {}
+    }
+
+    fun onArrivalsReceived(jsonStr: String) {
+        try {
+            val obj = JSONObject(jsonStr)
+            val stopCode = obj.optString("stopCode", "")
+            val stopName = obj.optString("stopName", "Στάση $stopCode")
+            val stopStreet = obj.optString("stopStreet", "")
+            val stopLat = obj.optDouble("stopLat", 0.0)
+            val stopLng = obj.optDouble("stopLng", 0.0)
+
+            val arrivalsList = mutableListOf<ArrivalItem>()
+            val arrJson = obj.optJSONArray("arrivals")
+            if (arrJson != null) {
+                for (i in 0 until arrJson.length()) {
+                    val aObj = arrJson.getJSONObject(i)
+                    val line = aObj.optString("line_id", aObj.optString("line", "BUS"))
+                    val mins = if (aObj.has("btime2")) aObj.optInt("btime2", 0) else aObj.optInt("minutes", 0)
+                    val dest = aObj.optString("destination", aObj.optString("route_descr", ""))
+                    arrivalsList.add(ArrivalItem(line = line, minutes = mins, destination = dest))
+                }
+            }
+            val stopItem = WearStopItem(
+                code = stopCode,
+                name = stopName,
+                street = stopStreet,
+                lat = stopLat,
+                lng = stopLng
+            )
+            runOnUiThread {
+                companionArrivalsListener?.invoke(stopItem, arrivalsList)
+            }
+        } catch (_: Exception) {}
+    }
+
+
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(8, TimeUnit.SECONDS)
@@ -65,6 +151,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        instance = this
+        handleCompanionIntent(intent)
         setContent {
             WearBusTopApp(
                 onFetchNearbyStops = { fetchNearbyStopsList() },
@@ -384,6 +472,7 @@ data class PinnedItem(
 enum class ScreenState {
     FEED,
     FAVORITES,
+    PINNED,
     ARRIVALS
 }
 
@@ -421,6 +510,25 @@ fun WearBusTopApp(
     var currentScreen by remember { mutableStateOf(ScreenState.FEED) }
     var selectedStop by remember { mutableStateOf<WearStopItem?>(null) }
     val scope = rememberCoroutineScope()
+
+    // Register tandem companion hooks
+    LaunchedEffect(Unit) {
+        val act = MainActivity.instance
+        if (act != null) {
+            act.companionPinsListener = { newPins, shouldNavigate ->
+                pinnedList = newPins
+                if (shouldNavigate) {
+                    currentScreen = ScreenState.PINNED
+                }
+            }
+            act.companionArrivalsListener = { sharedStop, sharedArrivals ->
+                selectedStop = sharedStop
+                arrivalsMap[sharedStop.code] = sharedArrivals
+                currentScreen = ScreenState.ARRIVALS
+            }
+        }
+    }
+
 
     suspend fun loadAll() {
         isLoading = true
@@ -475,6 +583,29 @@ fun WearBusTopApp(
     }
 
     when (currentScreen) {
+
+        ScreenState.PINNED -> {
+            PinnedListScreen(
+                pinnedList = pinnedList,
+                onBack = { currentScreen = ScreenState.FEED },
+                onRefresh = {
+                    pinnedList = onLoadPins()
+                },
+                onStopTap = { pin ->
+                    // Find or construct stop item and open its arrivals
+                    val matching = stops.find { it.code == pin.stopCode } ?: WearStopItem(
+                        code = pin.stopCode,
+                        name = pin.stopName
+                    )
+                    selectedStop = matching
+                    currentScreen = ScreenState.ARRIVALS
+                    scope.launch {
+                        arrivalsMap[pin.stopCode] = onFetchArrivals(pin.stopCode)
+                    }
+                }
+            )
+        }
+
         ScreenState.ARRIVALS -> {
             if (selectedStop != null) {
                 ArrivalsScreen(
@@ -524,6 +655,7 @@ fun WearBusTopApp(
                     currentScreen = ScreenState.ARRIVALS
                 },
                 onOpenFavorites = { currentScreen = ScreenState.FAVORITES },
+                onOpenPins = { currentScreen = ScreenState.PINNED },
                 onToggleFavorite = { stop -> handleToggleFavorite(stop) },
                 onRefresh = { scope.launch { loadAll() } }
             )
@@ -541,6 +673,7 @@ fun NearbyStopsListScreen(
     isLoading: Boolean,
     onStopTap: (WearStopItem) -> Unit,
     onOpenFavorites: () -> Unit,
+    onOpenPins: () -> Unit,
     onToggleFavorite: (WearStopItem) -> Unit,
     onRefresh: () -> Unit
 ) {
@@ -642,6 +775,7 @@ fun NearbyStopsListScreen(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(PhoneAmberContainer)
+                                    .clickable { onOpenPins() }
                                     .padding(horizontal = 5.dp, vertical = 2.dp)
                             ) {
                                 Text(
@@ -1288,6 +1422,196 @@ fun EmptyScreen(onRefresh: () -> Unit) {
                 label = { Text("Ανανέωση 🔄", fontSize = 11.sp, color = PhoneTextPrimary, fontWeight = FontWeight.Bold) },
                 colors = ChipDefaults.chipColors(backgroundColor = PhoneCardBg)
             )
+        }
+    }
+}
+
+
+// ─── Dedicated Pinned Pins Screen (Hevy Tandem Companion View) ───────────────
+
+@Composable
+fun PinnedListScreen(
+    pinnedList: List<PinnedItem>,
+    onBack: () -> Unit,
+    onRefresh: () -> Unit,
+    onStopTap: (PinnedItem) -> Unit
+) {
+    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
+    val focusRequester = remember { FocusRequester() }
+    val coroutineScope = rememberCoroutineScope()
+    val view = LocalView.current
+    var rotaryAccumulator by remember { mutableFloatStateOf(0f) }
+    val tickThreshold = 18f
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
+    Scaffold(
+        timeText = {
+            TimeText(
+                modifier = Modifier.fillMaxWidth(),
+                timeTextStyle = TimeTextDefaults.timeTextStyle(fontSize = 10.sp, color = PhoneTextMuted)
+            )
+        },
+        positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
+    ) {
+        ScalingLazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(PhoneSurfaceBg)
+                .onRotaryScrollEvent {
+                    rotaryAccumulator += it.verticalScrollPixels
+                    if (abs(rotaryAccumulator) >= tickThreshold) {
+                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                        rotaryAccumulator = 0f
+                    }
+                    coroutineScope.launch {
+                        listState.scrollBy(it.verticalScrollPixels)
+                    }
+                    true
+                }
+                .focusRequester(focusRequester)
+                .focusable(),
+            state = listState,
+            autoCentering = AutoCenteringParams(itemIndex = 0),
+            contentPadding = PaddingValues(horizontal = 6.dp, vertical = 20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            scalingParams = ScalingLazyColumnDefaults.scalingParams(
+                edgeScale = 0.88f,
+                edgeAlpha = 0.65f,
+                minTransitionArea = 0.2f,
+                maxTransitionArea = 0.6f
+            )
+        ) {
+            // Header Bar
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth(0.92f)
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "📌",
+                            fontSize = 11.sp,
+                            modifier = Modifier.padding(end = 4.dp)
+                        )
+                        Text(
+                            text = "Καρφίτσες (${pinnedList.size})",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = PhoneAmberText
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(PhoneCardBg)
+                            .clickable { onBack() }
+                            .padding(4.dp)
+                    ) {
+                        Text(text = "✕", fontSize = 10.sp, color = PhoneTextMuted, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+
+            if (pinnedList.isEmpty()) {
+                item {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth(0.92f)
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(PhoneCardBg)
+                            .padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Δεν υπάρχουν καρφίτσες",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = PhoneTextPrimary,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Καρφιτσώστε μια άφιξη από το κινητό ή το ρολόι",
+                            fontSize = 9.sp,
+                            color = PhoneTextMuted,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            } else {
+                items(pinnedList) { pin ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth(0.94f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(PhoneCardBg)
+                            .clickable { onStopTap(pin) }
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(PhonePrimaryPill)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = pin.lineId,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = PhonePrimaryText
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Column {
+                                Text(
+                                    text = pin.stopName,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = PhoneTextPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "#${pin.stopCode}",
+                                    fontSize = 9.sp,
+                                    color = PhoneTextMuted
+                                )
+                            }
+                        }
+                        Text(
+                            text = "➜",
+                            fontSize = 12.sp,
+                            color = PhonePrimaryBlue,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(5.dp))
+                }
+            }
+
+            // Bottom Back Button
+            item {
+                Spacer(modifier = Modifier.height(6.dp))
+                CompactChip(
+                    onClick = onBack,
+                    label = { Text("⬅ Πίσω", fontSize = 11.sp, color = PhoneTextPrimary, fontWeight = FontWeight.Bold) },
+                    colors = ChipDefaults.chipColors(backgroundColor = PhoneCardBg),
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+            }
         }
     }
 }

@@ -90,4 +90,7 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.8.0")
+
+    // Google Play Services Wearable Data Layer API (Phone <-> Wear OS tandem communication)
+    implementation("com.google.android.gms:play-services-wearable:18.2.0")
 }

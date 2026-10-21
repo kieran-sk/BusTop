@@ -1507,6 +1507,49 @@ class AppController {
   /**
    * Direct navigation handler from top stop banner
    */
+  /**
+   * Share upcoming arrivals of the current stop directly with the Wear OS watch companion
+   */
+  shareCurrentStopWithWatch() {
+    if (!this.currentStop) return;
+    const sCode = String(this.currentStop.StopCode || '').trim();
+    const sName = this.currentStop.StopDescr || `Στάση #${sCode}`;
+    const sStreet = this.currentStop.StopStreet || '';
+    const sLat = parseFloat(this.currentStop.StopLat) || 0;
+    const sLng = parseFloat(this.currentStop.StopLng) || 0;
+
+    const arrivals = (this.ticker && Array.isArray(this.ticker.arrivals)) ? this.ticker.arrivals : [];
+
+    const payload = {
+      stopCode: sCode,
+      stopName: sName,
+      stopStreet: sStreet,
+      stopLat: sLat,
+      stopLng: sLng,
+      arrivals: arrivals.slice(0, 15).map(a => ({
+        line_id: a.line_id || a.LineID || 'BUS',
+        btime2: typeof a.btime2 === 'number' ? a.btime2 : 0,
+        destination: a.destination || a.route_descr || '',
+        is_live: !!a.is_live
+      }))
+    };
+
+    if (window.AndroidBridge && typeof window.AndroidBridge.shareStopArrivalsWithWatch === 'function') {
+      try {
+        window.AndroidBridge.shareStopArrivalsWithWatch(JSON.stringify(payload));
+        this.triggerHaptic('success');
+      } catch (e) {
+        console.error('Failed to share stop with watch:', e);
+      }
+    } else {
+      if (window.PinnedTrips && typeof window.PinnedTrips.showToast === 'function') {
+        window.PinnedTrips.showToast('⌚ Κοινοποίηση διαθέσιμη μόνο στην εφαρμογή Android');
+      } else {
+        alert('Η κοινοποίηση στο ρολόι είναι διαθέσιμη μέσω της εφαρμογής Android.');
+      }
+    }
+  }
+
   navigateCurrentStopToGoogleMaps() {
     if (!this.currentStop) return;
     const sName = this.currentStop.StopDescr || `Στάση #${this.currentStop.StopCode}`;

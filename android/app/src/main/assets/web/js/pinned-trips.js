@@ -32,6 +32,28 @@ class PinnedTripsManager {
     }
     this.updateBadge();
     this.renderUI();
+    this.syncPinsToWatch(false);
+  }
+
+  syncPinsToWatch(launchWatch = false) {
+    if (window.AndroidBridge) {
+      try {
+        const payload = JSON.stringify(this.pinnedItems.map(p => ({
+          stopCode: p.stopCode,
+          stopName: p.stopName,
+          lineId: p.lineId,
+          destination: p.destination || p.lineDescr || '',
+          minutes: p.initialMinutes || 0
+        })));
+        if (launchWatch && typeof window.AndroidBridge.launchPinsOnWatch === 'function') {
+          window.AndroidBridge.launchPinsOnWatch(payload);
+        } else if (typeof window.AndroidBridge.syncPinsWithWatch === 'function') {
+          window.AndroidBridge.syncPinsWithWatch(payload);
+        }
+      } catch (e) {
+        console.warn('Could not sync pins to watch:', e);
+      }
+    }
   }
 
   setActivePin(pinId) {
@@ -275,7 +297,7 @@ class PinnedTripsManager {
         targetArrivalTimestamp,
         arrivalKey,
         pinnedAt: now,
-        notificationEnabled: false
+        notificationEnabled: true
       };
       this.pinnedItems.push(newItem);
       this.activePinId = newItem.id;
@@ -283,6 +305,7 @@ class PinnedTripsManager {
 
       const timeLabel = arrival.departure_time ? ` (${arrival.departure_time})` : (typeof busMins === 'number' ? (busMins === 0 ? ' (ΤΩΡΑ)' : ` (σε ${busMins}')`) : '');
       this.showToast(`📌 Καρφιτσώθηκε: ${lineId}${timeLabel}`);
+      this.syncPinsToWatch(true);
       if (window.App && typeof window.App.triggerHaptic === 'function') {
         window.App.triggerHaptic('success');
       }
@@ -611,8 +634,8 @@ class PinnedTripsManager {
       const match = targetMatch;
       const mins = targetMins;
       const cleanDest = this.getCleanDestination(item);
-      const minsDisplay = (typeof mins === 'number' && mins > 0) ? `${mins}'` : "0'";
-      const title = `${item.lineId} σε ${minsDisplay}`;
+      const minsDisplay = (typeof mins === 'number' && mins > 0) ? `${mins}'` : '🏁 Αναχώρησε';
+      const title = (typeof mins === 'number' && mins <= 0) ? `${item.lineId} 🏁 Αναχώρησε` : `${item.lineId} σε ${minsDisplay}`;
       const body = cleanDest ? `προς ${cleanDest}\n${item.stopName}` : item.stopName;
 
       // Update Service Worker Live Ongoing Notification
@@ -752,9 +775,14 @@ class PinnedTripsManager {
           <p style="color: var(--md-sys-color-outline); font-size: 0.85rem; max-width: 380px; margin: 0 auto 1.25rem; line-height: 1.4;">
             Πατήστε το εικονίδιο καρφίτσας δίπλα σε οποιαδήποτε άφιξη στον πίνακα δρομολογίων για να παρακολουθείτε ζωντανά το λεωφορείο και να λαμβάνετε ειδοποιήσεις.
           </p>
-          <button class="m3-btn m3-btn-primary" style="border-radius: 9999px; padding: 0.5rem 1.2rem; font-weight: 800;" onclick="window.App.switchTab('ticker')">
-            Προβολή Αφίξεων ➜
-          </button>
+          <div style="display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap;">
+            <button class="m3-btn m3-btn-primary" style="border-radius: 9999px; padding: 0.5rem 1.2rem; font-weight: 800;" onclick="window.App.switchTab('ticker')">
+              Προβολή Αφίξεων ➜
+            </button>
+            <button class="m3-btn m3-btn-tonal" style="border-radius: 9999px; padding: 0.5rem 1.1rem; font-weight: 800;" onclick="window.App.openAlarmDialog()">
+              ⏰ Προσαρμοσμένη Ειδοποίηση (X από Y σε Z')
+            </button>
+          </div>
         </div>
       `;
       return;
@@ -788,9 +816,9 @@ class PinnedTripsManager {
       const cleanStopName = (item.stopName || '').replace(/'/g, "\\'");
       const cleanLineDescr = (item.lineDescr || '').replace(/'/g, "\\'");
       const displayMinutes = (matchingArr && typeof matchingArr.btime2 === 'number') ? matchingArr.btime2 : null;
-      const isDueNow = displayMinutes === 0;
-      const formattedTime = isDueNow
-        ? 'ΤΩΡΑ'
+      const isDeparted = (displayMinutes !== null && displayMinutes <= 0);
+      const formattedTime = isDeparted
+        ? '🏁 Αναχώρησε'
         : (displayMinutes !== null 
             ? this.formatMinutesHuman(displayMinutes) 
             : (matchingArr && matchingArr.estimated_arrival_time 
@@ -828,7 +856,7 @@ class PinnedTripsManager {
             </div>
             <div style="text-align: right; flex-shrink: 0;">
               <span class="m3-badge" style="background: ${isLive ? 'var(--md-sys-color-primary-container, #e0f2fe)' : '#f1f5f9'}; color: ${isLive ? 'var(--md-sys-color-primary, #005ac1)' : '#475569'}; font-size: 0.72rem; font-weight: 800; padding: 2px 7px;">
-                ${isLive ? `⚡ ${isDueNow ? 'ΤΩΡΑ' : `~${formattedTime}`}` : (displayMinutes !== null ? `🕒 ${isDueNow ? 'ΤΩΡΑ' : `~${formattedTime}`}` : (item.departureTime ? `🕒 ${item.departureTime}` : '⏳ Αναμονή'))}
+                ${isDeparted ? '🏁 Αναχώρησε' : (isLive ? `⚡ ~${formattedTime}` : (displayMinutes !== null ? `🕒 ~${formattedTime}` : (item.departureTime ? `🕒 ${item.departureTime}` : '⏳ Αναμονή')))}
               </span>
             </div>
           </div>
@@ -886,6 +914,9 @@ class PinnedTripsManager {
           <div style="font-size: 0.8rem; color: #64748b; margin-top: 2px;">${this.pinnedItems.length} παρακολουθούμενες γραμμές με ζωντανές ειδοποιήσεις άφιξης</div>
         </div>
         <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+          <button class="m3-btn m3-btn-tonal" style="font-size: 0.75rem; padding: 4px 12px; border-radius: 9999px; font-weight: 700;" onclick="window.App.openAlarmDialog()">
+            + Προσαρμοσμένη Ειδοποίηση
+          </button>
           <button class="m3-btn m3-btn-outlined" style="font-size: 0.75rem; padding: 3px 10px; border-radius: 9999px; color: var(--md-sys-color-error); border-color: #ef4444;" onclick="window.PinnedTrips.clearAll()">
             🗑️ Διαγραφή Όλων
           </button>

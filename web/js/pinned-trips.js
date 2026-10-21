@@ -32,6 +32,28 @@ class PinnedTripsManager {
     }
     this.updateBadge();
     this.renderUI();
+    this.syncPinsToWatch(false);
+  }
+
+  syncPinsToWatch(launchWatch = false) {
+    if (window.AndroidBridge) {
+      try {
+        const payload = JSON.stringify(this.pinnedItems.map(p => ({
+          stopCode: p.stopCode,
+          stopName: p.stopName,
+          lineId: p.lineId,
+          destination: p.destination || p.lineDescr || '',
+          minutes: p.initialMinutes || 0
+        })));
+        if (launchWatch && typeof window.AndroidBridge.launchPinsOnWatch === 'function') {
+          window.AndroidBridge.launchPinsOnWatch(payload);
+        } else if (typeof window.AndroidBridge.syncPinsWithWatch === 'function') {
+          window.AndroidBridge.syncPinsWithWatch(payload);
+        }
+      } catch (e) {
+        console.warn('Could not sync pins to watch:', e);
+      }
+    }
   }
 
   setActivePin(pinId) {
@@ -283,6 +305,7 @@ class PinnedTripsManager {
 
       const timeLabel = arrival.departure_time ? ` (${arrival.departure_time})` : (typeof busMins === 'number' ? (busMins === 0 ? ' (ΤΩΡΑ)' : ` (σε ${busMins}')`) : '');
       this.showToast(`📌 Καρφιτσώθηκε: ${lineId}${timeLabel}`);
+      this.syncPinsToWatch(true);
       if (window.App && typeof window.App.triggerHaptic === 'function') {
         window.App.triggerHaptic('success');
       }

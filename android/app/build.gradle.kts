@@ -90,4 +90,9 @@ dependencies {
 
     // WebKit for hybrid container
     implementation("androidx.webkit:webkit:1.11.0")
+
+    // Google Play Services Wearable Data Layer API (Phone <-> Wear OS tandem communication)
+    implementation("com.google.android.gms:play-services-wearable:18.2.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.google.code.gson:gson:2.10.1")
 }

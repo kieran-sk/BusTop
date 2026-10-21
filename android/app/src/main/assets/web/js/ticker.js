@@ -905,8 +905,14 @@ class AirportTicker {
     let rowsHtml = '';
     if (this.arrivals.length === 0) {
       rowsHtml = `
-        <div style="padding: 2.5rem 1rem; text-align: center; color: #64748b; font-size: 0.9rem;">
-          Δεν βρέθηκαν προγραμματισμένες αφίξεις για αυτή τη στάση.
+        <div style="padding: 2.5rem 1.25rem; text-align: center; color: #64748b; font-size: 0.95rem;">
+          <div class="m3-pulse-dot" style="width: 12px; height: 12px; margin: 0 auto 0.85rem; background: var(--md-sys-color-primary, #005ac1);"></div>
+          <div style="font-weight: 700; color: var(--md-sys-color-on-surface, #0f172a); margin-bottom: 0.35rem; font-size: 1rem;">
+            Η σύνδεση είναι αργή και η φόρτωση βρίσκεται σε εξέλιξη...
+          </div>
+          <div style="font-size: 0.82rem; color: #64748b; line-height: 1.4;">
+            Ανάκτηση αφίξεων και δρομολογίων σε πραγματικό χρόνο. Παρακαλώ περιμένετε.
+          </div>
         </div>
       `;
     } else if (this.modeFilter === 'live' && visibleArrivals.length === 0) {

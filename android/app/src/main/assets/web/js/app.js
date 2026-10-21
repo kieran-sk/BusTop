@@ -1266,28 +1266,54 @@ class AppController {
     this.openLineTimetableBothDirections(lineCode, lineId, lineDescr);
   }
 
-  openAlarmDialog(lineId, routeCode, busMinutes, lineDescr = '', stopCode = null, stopName = null) {
+  openAlarmDialog(lineId = '', routeCode = '', busMinutes = 10, lineDescr = '', stopCode = null, stopName = null) {
     const modal = document.getElementById('set-alarm-modal');
     if (!modal) return;
 
-    modal.querySelector('#modal-alarm-line').innerText = lineId;
-    modal.querySelector('#modal-alarm-due').innerText = `${busMinutes} λεπτά`;
-    modal.dataset.lineId = lineId;
-    modal.dataset.routeCode = routeCode;
+    const finalStopCode = stopCode || (this.currentStop ? this.currentStop.StopCode : '') || '200021';
+    const finalStopName = stopName || (this.currentStop ? (this.currentStop.StopDescr || '') : '') || `Στάση #${finalStopCode}`;
+    const finalLineId = lineId || (this.currentStop && this.currentStop.serving_lines && this.currentStop.serving_lines[0] ? this.currentStop.serving_lines[0].LineID : '') || '040';
+
+    const lineSpan = modal.querySelector('#modal-alarm-line');
+    if (lineSpan) lineSpan.innerText = finalLineId;
+    const stopSpan = modal.querySelector('#modal-alarm-stop');
+    if (stopSpan) stopSpan.innerText = finalStopName;
+
+    const lineInput = document.getElementById('alarm-line-custom');
+    if (lineInput) lineInput.value = finalLineId;
+    const stopInput = document.getElementById('alarm-stop-custom');
+    if (stopInput) stopInput.value = finalStopName;
+
+    modal.dataset.lineId = finalLineId;
+    modal.dataset.routeCode = routeCode || '';
     modal.dataset.dueMins = busMinutes;
     modal.dataset.lineDescr = lineDescr || '';
-    modal.dataset.stopCode = stopCode || (this.currentStop ? this.currentStop.StopCode : '');
-    modal.dataset.stopName = stopName || (this.currentStop ? (this.currentStop.StopDescr || '') : '');
+    modal.dataset.stopCode = finalStopCode;
+    modal.dataset.stopName = finalStopName;
 
     // Reset preset chips to default 5 mins
     this.selectAlarmPreset(5);
 
-    // Default continuous alarm to checked
-    const continuousCheck = document.getElementById('alarm-ring-until-dismissed');
-    if (continuousCheck) continuousCheck.checked = true;
-
     modal.classList.add('open');
     this.updateBackButtonsVisibility();
+    this.updateAlarmPreview();
+  }
+
+  updateAlarmPreview() {
+    const modal = document.getElementById('set-alarm-modal');
+    if (!modal) return;
+    const lineInput = document.getElementById('alarm-line-custom');
+    const stopInput = document.getElementById('alarm-stop-custom');
+    const timeInput = document.getElementById('alarm-threshold-custom');
+    const previewEl = document.getElementById('modal-alarm-rule-preview');
+
+    const busX = (lineInput && lineInput.value.trim()) ? lineInput.value.trim().toUpperCase() : (modal.dataset.lineId || 'X');
+    const stopY = (stopInput && stopInput.value.trim()) ? stopInput.value.trim() : (modal.dataset.stopName || 'Y');
+    const minsZ = (timeInput && timeInput.value.trim()) ? timeInput.value.trim() : '5';
+
+    if (previewEl) {
+      previewEl.innerText = `Λεωφορείο ${busX} από στάση ${stopY} σε ${minsZ} λεπτά`;
+    }
   }
 
   selectAlarmPreset(mins) {
@@ -1309,13 +1335,16 @@ class AppController {
     const modal = document.getElementById('set-alarm-modal');
     if (!modal) return;
 
-    const lineId = modal.dataset.lineId;
-    const routeCode = modal.dataset.routeCode;
+    const lineInput = document.getElementById('alarm-line-custom');
+    const stopInput = document.getElementById('alarm-stop-custom');
+    const customInput = document.getElementById('alarm-threshold-custom');
+
+    const lineId = (lineInput && lineInput.value.trim()) ? lineInput.value.trim().toUpperCase() : (modal.dataset.lineId || 'BUS');
+    const stopName = (stopInput && stopInput.value.trim()) ? stopInput.value.trim() : (modal.dataset.stopName || 'Στάση ΟΑΣΑ');
+    const stopCode = modal.dataset.stopCode || (this.currentStop ? this.currentStop.StopCode : lineId);
+    const routeCode = modal.dataset.routeCode || '';
     const dueMins = parseInt(modal.dataset.dueMins, 10) || 10;
     const lineDescr = modal.dataset.lineDescr || '';
-    const stopCode = modal.dataset.stopCode || (this.currentStop ? this.currentStop.StopCode : '');
-    const stopName = modal.dataset.stopName || (this.currentStop ? this.currentStop.StopDescr : '') || 'Στάση ΟΑΣΑ';
-    const customInput = document.getElementById('alarm-threshold-custom');
     const threshold = customInput ? (parseInt(customInput.value, 10) || 5) : 5;
     const ringUntilDismissed = true; // Always trigger loud siren alarm when threshold is reached
 
@@ -1478,6 +1507,49 @@ class AppController {
   /**
    * Direct navigation handler from top stop banner
    */
+  /**
+   * Share upcoming arrivals of the current stop directly with the Wear OS watch companion
+   */
+  shareCurrentStopWithWatch() {
+    if (!this.currentStop) return;
+    const sCode = String(this.currentStop.StopCode || '').trim();
+    const sName = this.currentStop.StopDescr || `Στάση #${sCode}`;
+    const sStreet = this.currentStop.StopStreet || '';
+    const sLat = parseFloat(this.currentStop.StopLat) || 0;
+    const sLng = parseFloat(this.currentStop.StopLng) || 0;
+
+    const arrivals = (this.ticker && Array.isArray(this.ticker.arrivals)) ? this.ticker.arrivals : [];
+
+    const payload = {
+      stopCode: sCode,
+      stopName: sName,
+      stopStreet: sStreet,
+      stopLat: sLat,
+      stopLng: sLng,
+      arrivals: arrivals.slice(0, 15).map(a => ({
+        line_id: a.line_id || a.LineID || 'BUS',
+        btime2: typeof a.btime2 === 'number' ? a.btime2 : 0,
+        destination: a.destination || a.route_descr || '',
+        is_live: !!a.is_live
+      }))
+    };
+
+    if (window.AndroidBridge && typeof window.AndroidBridge.shareStopArrivalsWithWatch === 'function') {
+      try {
+        window.AndroidBridge.shareStopArrivalsWithWatch(JSON.stringify(payload));
+        this.triggerHaptic('success');
+      } catch (e) {
+        console.error('Failed to share stop with watch:', e);
+      }
+    } else {
+      if (window.PinnedTrips && typeof window.PinnedTrips.showToast === 'function') {
+        window.PinnedTrips.showToast('⌚ Κοινοποίηση διαθέσιμη μόνο στην εφαρμογή Android');
+      } else {
+        alert('Η κοινοποίηση στο ρολόι είναι διαθέσιμη μέσω της εφαρμογής Android.');
+      }
+    }
+  }
+
   navigateCurrentStopToGoogleMaps() {
     if (!this.currentStop) return;
     const sName = this.currentStop.StopDescr || `Στάση #${this.currentStop.StopCode}`;

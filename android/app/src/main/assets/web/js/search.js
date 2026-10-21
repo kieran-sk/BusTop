@@ -581,8 +581,48 @@ class SearchManager {
 
     if (this.nearbyStops.length === 0) {
       container.innerHTML = `
-        <div style="padding: 2rem; text-align: center; color: #64748b; font-size: 0.9rem;">
-          Δεν βρέθηκαν στάσεις κοντά σας στην περιοχή Αθηνών.
+        <div style="padding: 2.25rem 1.25rem; text-align: center; color: #64748b; font-size: 0.95rem; background: var(--md-sys-color-surface-container, #f8fafc); border: 1px solid var(--md-sys-color-outline-variant, #e2e8f0); border-radius: 16px; margin: 0.5rem 0;">
+          <div style="margin: 0 auto 1rem; width: 84px; height: 84px; display: flex; align-items: center; justify-content: center;">
+            <svg width="76" height="76" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="filter: drop-shadow(0 4px 6px rgba(0,0,0,0.06));">
+              <style>
+                @keyframes doodleBusBounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+                @keyframes doodleWheelSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                @keyframes doodleSignalWave { 0%, 100% { opacity: 0.25; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.05); } }
+                .doodle-bus { animation: doodleBusBounce 2.2s ease-in-out infinite; }
+                .doodle-wheel { transform-origin: center; animation: doodleWheelSpin 1.6s linear infinite; }
+                .doodle-signal { transform-origin: 50% 20%; animation: doodleSignalWave 1.8s ease-in-out infinite; }
+              </style>
+              <g class="doodle-signal">
+                <path d="M38 22 C45 15 55 15 62 22" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none" stroke-dasharray="2 4"/>
+                <path d="M43 27 C47 22 53 22 57 27" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+                <circle cx="50" cy="31" r="2.5" fill="#0284c7"/>
+              </g>
+              <g class="doodle-bus">
+                <rect x="22" y="36" width="56" height="38" rx="10" fill="#ffffff" stroke="#0284c7" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M26 42 H74 V53 H26 Z" fill="#e0f2fe" stroke="#0284c7" stroke-width="2.5" stroke-linejoin="round"/>
+                <line x1="42" y1="42" x2="42" y2="53" stroke="#0284c7" stroke-width="2"/>
+                <line x1="58" y1="42" x2="58" y2="53" stroke="#0284c7" stroke-width="2"/>
+                <circle cx="30" cy="62" r="3" fill="#fbbf24" stroke="#d97706" stroke-width="1.5"/>
+                <circle cx="70" cy="62" r="3" fill="#fbbf24" stroke="#d97706" stroke-width="1.5"/>
+                <line x1="40" y1="63" x2="60" y2="63" stroke="#0284c7" stroke-width="2.5" stroke-linecap="round"/>
+                <line x1="22" y1="67" x2="78" y2="67" stroke="#0284c7" stroke-width="2.5"/>
+                <g class="doodle-wheel" style="transform-origin: 34px 74px;">
+                  <circle cx="34" cy="74" r="7" fill="#334155" stroke="#0284c7" stroke-width="2"/>
+                  <circle cx="34" cy="74" r="2.5" fill="#ffffff"/>
+                </g>
+                <g class="doodle-wheel" style="transform-origin: 66px 74px;">
+                  <circle cx="66" cy="74" r="7" fill="#334155" stroke="#0284c7" stroke-width="2"/>
+                  <circle cx="66" cy="74" r="2.5" fill="#ffffff"/>
+                </g>
+              </g>
+            </svg>
+          </div>
+          <div style="font-weight: 800; font-size: 1.05rem; color: var(--md-sys-color-on-surface, #0f172a); margin-bottom: 0.35rem;">
+            Αναζήτηση στάσεων κοντά σας...
+          </div>
+          <div style="font-size: 0.82rem; color: #64748b; line-height: 1.4; max-width: 320px; margin: 0 auto;">
+            Γίνεται φόρτωση των κοντινών στάσεων και γραμμών. Παρακαλώ περιμένετε μια στιγμή.
+          </div>
         </div>
       `;
       return;
