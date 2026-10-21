@@ -615,6 +615,7 @@ fun WearBusTopApp(
             }
         }
     }
+}
 
 // ─── Nearby Stops Feed (Immediate default screen with Crown Scrolling) ───────
 
