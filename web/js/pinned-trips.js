@@ -907,9 +907,9 @@ class PinnedTripsManager {
               <span onclick="event.stopPropagation(); window.App.openAlarmDialog('${item.lineId}', '${item.routeCode || ''}', ${targetMinsForAlarm}, '${cleanDest}', '${item.stopCode}', '${cleanStopName}');" style="cursor: pointer; font-size: 1.15rem; padding: 2px 4px; filter: ${hasAlarm ? 'none' : 'grayscale(70%) opacity(0.65)'};" title="${hasAlarm ? 'Ξυπνητήρι ενεργό' : 'Ορισμός ξυπνητηριού'}">
                 ⏰
               </span>
-              <!-- Remove emoji -->
-              <span onclick="event.stopPropagation(); window.PinnedTrips.removePin('${item.id}')" style="cursor: pointer; font-size: 1.05rem; padding: 2px 4px; color: #ef4444;" title="Αφαίρεση καρφίτσας">
-                🗑️
+              <!-- Remove emoji (X) -->
+              <span onclick="event.stopPropagation(); window.PinnedTrips.removePin('${item.id}')" style="cursor: pointer; font-size: 1.15rem; font-weight: 800; padding: 2px 5px; color: #ef4444; line-height: 1;" title="Αφαίρεση καρφίτσας">
+                ✕
               </span>
             </div>
           </div>
