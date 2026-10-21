@@ -855,7 +855,7 @@ class PinnedTripsManager {
               <div style="min-width: 0; flex: 1;">
                 <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                   <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: normal; overflow-wrap: normal; hyphens: none;">${item.stopName}</div>
-                  ${isActiveTracked ? `<span class="m3-badge" style="background: var(--md-sys-color-primary-container, #e0f2fe); color: var(--md-sys-color-on-primary-container, #005ac1); font-size: 0.68rem; font-weight: 800; padding: 1px 6px; border: 1px solid rgba(0, 90, 193, 0.2);">📍 Ενεργό</span>` : ''}
+                  
                 </div>
                 <div style="font-size: 0.76rem; color: var(--md-sys-color-outline); margin-top: 2px;">
                   ${item.direction ? `<strong style="color: var(--md-sys-color-primary); margin-right: 4px;">${item.direction}</strong> • ` : ''}${item.departureTime ? `<strong style="color: #475569; margin-right: 4px;">🕒 Αναχώρηση: ${item.departureTime}</strong> • ` : ''}Στάση #${item.stopCode} • <span style="color: var(--md-sys-color-primary); text-decoration: underline;">Προβολή στάσης ➜</span>
@@ -868,27 +868,23 @@ class PinnedTripsManager {
               </span>
             </div>
           </div>
-          <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px dashed var(--md-sys-color-outline-variant); padding-top: 0.5rem; font-size: 0.8rem; color: var(--md-sys-color-outline); flex-wrap: wrap; gap: 0.4rem;">
-            <div>
-              🚶 <strong style="color: var(--md-sys-color-on-surface);">${walkMins}'</strong> (${walkDistanceM}μ. περπάτημα)
+          <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px dashed var(--md-sys-color-outline-variant); padding-top: 0.45rem; font-size: 0.8rem; color: var(--md-sys-color-outline);">
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+              <span>🚶 <strong style="color: var(--md-sys-color-on-surface);">${walkMins}'</strong> (${walkDistanceM}μ.)</span>
             </div>
-            <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
-              <!-- Notification toggle button -->
-              <button class="m3-btn ${isNotifOn ? 'm3-btn-primary' : 'm3-btn-tonal'}" onclick="event.stopPropagation(); window.PinnedTrips.toggleNotification('${item.id}')" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; border-radius: 9999px; gap: 4px; display: inline-flex; align-items: center;" title="Ενεργοποίηση/Απενεργοποίηση συνεχούς ειδοποίησης για αυτή την άφιξη">
-                ${isNotifOn ? '🔔 Ειδοποίηση ON' : '🔕 Ειδοποίηση OFF'}
-              </button>
-              <!-- Alarm time selection dialog button -->
-              <button class="m3-btn ${hasAlarm ? 'm3-btn-primary' : 'm3-btn-tonal'}" onclick="event.stopPropagation(); window.App.openAlarmDialog('${item.lineId}', '${item.routeCode || ''}', ${targetMinsForAlarm}, '${cleanDest}', '${item.stopCode}', '${cleanStopName}');" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; border-radius: 9999px; gap: 4px; display: inline-flex; align-items: center;" title="Ορισμός ξυπνητηριού / ειδοποίησης αντίστροφης μέτρησης">
-                ⏰ ${hasAlarm ? 'Ξυπνητήρι ON' : 'Ξυπνητήρι'}
-              </button>
-              ${!isActiveTracked ? `
-                <button class="m3-btn m3-btn-outlined" onclick="event.stopPropagation(); window.PinnedTrips.setActivePin('${item.id}')" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; border-radius: 9999px; border-color: var(--md-sys-color-primary); color: var(--md-sys-color-primary);" title="Ορισμός ως κύρια γραμμή για την ειδοποίηση Android">
-                  📍 Εστίαση
-                </button>
-              ` : ''}
-              <button class="m3-btn m3-btn-tonal" onclick="event.stopPropagation(); window.PinnedTrips.removePin('${item.id}')" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; border-radius: 9999px; color: #64748b;">
-                ✕ Αφαίρεση
-              </button>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <!-- Notification toggle emoji -->
+              <span onclick="event.stopPropagation(); window.PinnedTrips.toggleNotification('${item.id}')" style="cursor: pointer; font-size: 1.15rem; padding: 2px 4px; filter: ${isNotifOn ? 'none' : 'grayscale(100%) opacity(0.5)'};" title="${isNotifOn ? 'Ειδοποίηση ενεργή (πατήστε για απενεργοποίηση)' : 'Ειδοποίηση ανενεργή (πατήστε για ενεργοποίηση)'}">
+                ${isNotifOn ? '🔔' : '🔕'}
+              </span>
+              <!-- Alarm emoji dialog -->
+              <span onclick="event.stopPropagation(); window.App.openAlarmDialog('${item.lineId}', '${item.routeCode || ''}', ${targetMinsForAlarm}, '${cleanDest}', '${item.stopCode}', '${cleanStopName}');" style="cursor: pointer; font-size: 1.15rem; padding: 2px 4px; filter: ${hasAlarm ? 'none' : 'grayscale(70%) opacity(0.65)'};" title="${hasAlarm ? 'Ξυπνητήρι ενεργό' : 'Ορισμός ξυπνητηριού'}">
+                ⏰
+              </span>
+              <!-- Remove emoji -->
+              <span onclick="event.stopPropagation(); window.PinnedTrips.removePin('${item.id}')" style="cursor: pointer; font-size: 1.05rem; padding: 2px 4px; color: #ef4444;" title="Αφαίρεση καρφίτσας">
+                🗑️
+              </span>
             </div>
           </div>
         </div>
