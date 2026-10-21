@@ -251,7 +251,7 @@ class FavoritesManager {
           ${this.favLines.map(l => {
             const safeDescr = (l.descr || '').replace(/'/g, "\\'");
             return `
-              <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.6rem; padding: 0.85rem 1rem; margin-bottom: 0; cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); border-left: 3.5px solid #10b981;" onclick="window.App.openLineTimetableBothDirections('${l.code}', '${l.id}', '${safeDescr}')">
+              <div class="m3-card" style="display: flex; flex-direction: column; gap: 0.6rem; padding: 0.85rem 1rem; margin-bottom: 0; cursor: pointer; background: var(--md-sys-color-surface-container); border: 1px solid var(--md-sys-color-outline-variant); " onclick="window.App.openLineTimetableBothDirections('${l.code}', '${l.id}', '${safeDescr}')">
                 <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.65rem;">
                   <div style="display: flex; align-items: center; gap: 0.65rem; min-width: 0; flex: 1;">
                     <span class="ticker-line-badge" style="font-size: 0.95rem; min-width: 48px; flex-shrink: 0;">

@@ -214,7 +214,7 @@ body.is-android-app .m3-top-app-bar {
 #selected-stop-banner {
   background: #ffffff !important;
   border: 1px solid var(--cloud-border-glass) !important;
-  border-left: 4.5px solid #38bdf8 !important;
+  
   border-radius: 18px !important;
   box-shadow: 0 4px 18px -2px rgba(148, 163, 184, 0.16) !important;
 }

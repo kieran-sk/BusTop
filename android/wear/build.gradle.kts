@@ -8,7 +8,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.oasa.athensbus.wear"
+        applicationId = "com.oasa.athensbus"
         minSdk = 28
         targetSdk = 34
         versionCode = 5

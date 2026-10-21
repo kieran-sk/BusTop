@@ -470,8 +470,6 @@ data class PinnedItem(
 )
 
 enum class ScreenState {
-    FEED,
-    FAVORITES,
     PINNED,
     ARRIVALS
 }
@@ -507,7 +505,7 @@ fun WearBusTopApp(
     var stops by remember { mutableStateOf<List<WearStopItem>>(emptyList()) }
     var pinnedList by remember { mutableStateOf<List<PinnedItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
-    var currentScreen by remember { mutableStateOf(ScreenState.FEED) }
+    var currentScreen by remember { mutableStateOf(ScreenState.PINNED) }
     var selectedStop by remember { mutableStateOf<WearStopItem?>(null) }
     val scope = rememberCoroutineScope()
 
@@ -543,21 +541,9 @@ fun WearBusTopApp(
         }
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) {
-        scope.launch { loadAll() }
-    }
-
-    // Initial load: Request location permissions if needed and load stops
     LaunchedEffect(Unit) {
-        permissionLauncher.launch(
-            arrayOf(
-                Manifest.permission.ACCESS_FINE_LOCATION,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            )
-        )
-        loadAll()
+        pinnedList = onLoadPins()
+        isLoading = false
     }
 
     // Auto-refresh arrivals every 30s
@@ -582,18 +568,15 @@ fun WearBusTopApp(
         }
     }
 
-    when (currentScreen) {
-
+        when (currentScreen) {
         ScreenState.PINNED -> {
             PinnedListScreen(
                 pinnedList = pinnedList,
-                onBack = { currentScreen = ScreenState.FEED },
                 onRefresh = {
                     pinnedList = onLoadPins()
                 },
                 onStopTap = { pin ->
-                    // Find or construct stop item and open its arrivals
-                    val matching = stops.find { it.code == pin.stopCode } ?: WearStopItem(
+                    val matching = WearStopItem(
                         code = pin.stopCode,
                         name = pin.stopName
                     )
@@ -614,7 +597,7 @@ fun WearBusTopApp(
                     pinnedList = pinnedList,
                     onBack = {
                         selectedStop = null
-                        currentScreen = ScreenState.FEED
+                        currentScreen = ScreenState.PINNED
                     },
                     onRefresh = {
                         scope.launch {
@@ -628,40 +611,10 @@ fun WearBusTopApp(
                     onToggleFavorite = { handleToggleFavorite(selectedStop!!) }
                 )
             } else {
-                currentScreen = ScreenState.FEED
+                currentScreen = ScreenState.PINNED
             }
         }
-        ScreenState.FAVORITES -> {
-            FavoritesListScreen(
-                stops = stops.filter { it.isFavorite },
-                arrivalsMap = arrivalsMap,
-                pinnedList = pinnedList,
-                onBack = { currentScreen = ScreenState.FEED },
-                onStopTap = { stop ->
-                    selectedStop = stop
-                    currentScreen = ScreenState.ARRIVALS
-                },
-                onToggleFavorite = { stop -> handleToggleFavorite(stop) }
-            )
-        }
-        ScreenState.FEED -> {
-            NearbyStopsListScreen(
-                stops = stops,
-                arrivalsMap = arrivalsMap,
-                pinnedList = pinnedList,
-                isLoading = isLoading,
-                onStopTap = { stop ->
-                    selectedStop = stop
-                    currentScreen = ScreenState.ARRIVALS
-                },
-                onOpenFavorites = { currentScreen = ScreenState.FAVORITES },
-                onOpenPins = { currentScreen = ScreenState.PINNED },
-                onToggleFavorite = { stop -> handleToggleFavorite(stop) },
-                onRefresh = { scope.launch { loadAll() } }
-            )
-        }
     }
-}
 
 // ─── Nearby Stops Feed (Immediate default screen with Crown Scrolling) ───────
 
@@ -1432,7 +1385,6 @@ fun EmptyScreen(onRefresh: () -> Unit) {
 @Composable
 fun PinnedListScreen(
     pinnedList: List<PinnedItem>,
-    onBack: () -> Unit,
     onRefresh: () -> Unit,
     onStopTap: (PinnedItem) -> Unit
 ) {
@@ -1486,36 +1438,25 @@ fun PinnedListScreen(
         ) {
             // Header Bar
             item {
-                Row(
+                Column(
                     modifier = Modifier
                         .fillMaxWidth(0.92f)
                         .padding(bottom = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "📌",
-                            fontSize = 11.sp,
-                            modifier = Modifier.padding(end = 4.dp)
-                        )
-                        Text(
-                            text = "Καρφίτσες (${pinnedList.size})",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = PhoneAmberText
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(PhoneCardBg)
-                            .clickable { onBack() }
-                            .padding(4.dp)
-                    ) {
-                        Text(text = "✕", fontSize = 10.sp, color = PhoneTextMuted, fontWeight = FontWeight.Bold)
-                    }
+                    Text(
+                        text = "📌 Ενεργές Καρφίτσες",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = PhonePrimaryBlue,
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = if (pinnedList.isEmpty()) "Σύνδεση με το κινητό" else "${pinnedList.size} διαδρομές σε εξέλιξη",
+                        fontSize = 9.sp,
+                        color = PhoneTextMuted,
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
 
@@ -1530,18 +1471,19 @@ fun PinnedListScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "Δεν υπάρχουν καρφίτσες",
+                            text = "Καμία ενεργή καρφίτσα",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = PhoneTextPrimary,
                             textAlign = TextAlign.Center
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Καρφιτσώστε μια άφιξη από το κινητό ή το ρολόι",
+                            text = "Καρφιτσώστε μια άφιξη στο κινητό ή κοινοποιήστε μια στάση για να εμφανιστεί εδώ.",
                             fontSize = 9.sp,
                             color = PhoneTextMuted,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
+                            lineHeight = 12.sp
                         )
                     }
                 }
@@ -1602,12 +1544,11 @@ fun PinnedListScreen(
                 }
             }
 
-            // Bottom Back Button
             item {
                 Spacer(modifier = Modifier.height(6.dp))
                 CompactChip(
-                    onClick = onBack,
-                    label = { Text("⬅ Πίσω", fontSize = 11.sp, color = PhoneTextPrimary, fontWeight = FontWeight.Bold) },
+                    onClick = onRefresh,
+                    label = { Text("Ανανέωση 🔄", fontSize = 10.sp, color = PhoneTextPrimary, fontWeight = FontWeight.Bold) },
                     colors = ChipDefaults.chipColors(backgroundColor = PhoneCardBg),
                     modifier = Modifier.padding(bottom = 16.dp)
                 )

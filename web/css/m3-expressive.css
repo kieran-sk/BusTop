@@ -1060,7 +1060,7 @@ body.is-android-app .m3-nav-bar {
 
 /* Favourite stop banner — Clean Material 3 style */
 #selected-stop-banner.is-favourite {
-  border-left: 4px solid #eab308 !important;
+  
   background: #ffffff !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
 }
@@ -1069,7 +1069,7 @@ body.is-android-app .m3-nav-bar {
 .m3-card.is-favourite,
 .m3-card.is-favourite-stop {
   border: 1px solid var(--md-sys-color-outline-variant) !important;
-  border-left: 4px solid #eab308 !important;
+  
   background: #ffffff !important;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
 }
