@@ -53,6 +53,12 @@ class WearCompanionListenerService : WearableListenerService() {
 
             PATH_SHARE_ARRIVALS -> {
                 Log.d(TAG, "Shared arrivals received: $data")
+                try {
+                    val prefs = getSharedPreferences("BusTopWatch", Context.MODE_PRIVATE)
+                    prefs.edit().putString("last_projected_stop", data).apply()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error caching projected stop", e)
+                }
                 MainActivity.instance?.onArrivalsReceived(data)
                     ?: run {
                         val launchIntent = Intent(this, MainActivity::class.java).apply {

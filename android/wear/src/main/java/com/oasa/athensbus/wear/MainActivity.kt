@@ -1,23 +1,13 @@
 package com.oasa.athensbus.wear
 
-import android.Manifest
-import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
-import android.location.Location
-import android.location.LocationManager
-import android.net.Uri
 import android.os.Bundle
 import android.view.HapticFeedbackConstants
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.*
@@ -37,7 +27,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import androidx.wear.compose.foundation.lazy.AutoCenteringParams
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumnDefaults
@@ -97,8 +86,16 @@ class MainActivity : ComponentActivity() {
                 val stopCode = obj.optString("stopCode", obj.optString("code", ""))
                 val lineId = obj.optString("lineId", obj.optString("line", "BUS"))
                 val stopName = obj.optString("stopName", "Στάση $stopCode")
+                val destination = obj.optString("destination", "")
+                val mins = if (obj.has("minutes")) obj.optInt("minutes", 0) else obj.optInt("btime2", 0)
                 if (stopCode.isNotEmpty() && lineId.isNotEmpty()) {
-                    list.add(PinnedItem(stopCode = stopCode, stopName = stopName, lineId = lineId))
+                    list.add(PinnedItem(
+                        stopCode = stopCode,
+                        stopName = stopName,
+                        lineId = lineId,
+                        destination = destination,
+                        minutes = mins
+                    ))
                 }
             }
             runOnUiThread {
@@ -140,7 +137,6 @@ class MainActivity : ComponentActivity() {
         } catch (_: Exception) {}
     }
 
-
     private val httpClient = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(8, TimeUnit.SECONDS)
@@ -155,119 +151,14 @@ class MainActivity : ComponentActivity() {
         handleCompanionIntent(intent)
         setContent {
             WearBusTopApp(
-                onFetchNearbyStops = { fetchNearbyStopsList() },
                 onFetchArrivals = { code -> queryStopArrivals(code) },
-                onTogglePin = { stop, lineId, mins -> togglePin(stop, lineId, mins) },
                 onLoadPins = { loadPinnedItems() },
-                onToggleFavorite = { stop -> toggleFavorite(stop) }
+                onLoadLastProjected = { loadCachedProjectedStop() }
             )
         }
     }
 
-    @SuppressLint("MissingPermission")
-    private fun getLastKnownLocation(): Pair<Double, Double> {
-        val hasFine = ContextCompat.checkSelfPermission(
-            this, Manifest.permission.ACCESS_FINE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-        val hasCoarse = ContextCompat.checkSelfPermission(
-            this, Manifest.permission.ACCESS_COARSE_LOCATION
-        ) == PackageManager.PERMISSION_GRANTED
-        if (hasFine || hasCoarse) {
-            val locManager = getSystemService(Context.LOCATION_SERVICE) as? LocationManager
-            if (locManager != null) {
-                // Priority to modern fused provider on Wear OS / Android 14
-                val providers = listOf(
-                    "fused",
-                    LocationManager.FUSED_PROVIDER,
-                    LocationManager.GPS_PROVIDER,
-                    LocationManager.NETWORK_PROVIDER,
-                    LocationManager.PASSIVE_PROVIDER
-                )
-                for (p in providers) {
-                    try {
-                        val loc: Location? = locManager.getLastKnownLocation(p)
-                        if (loc != null && loc.latitude != 0.0 && loc.longitude != 0.0) {
-                            return Pair(loc.latitude, loc.longitude)
-                        }
-                    } catch (_: Exception) {}
-                }
-                // Try all available providers on device
-                for (p in locManager.getProviders(true)) {
-                    try {
-                        val loc: Location? = locManager.getLastKnownLocation(p)
-                        if (loc != null && loc.latitude != 0.0 && loc.longitude != 0.0) {
-                            return Pair(loc.latitude, loc.longitude)
-                        }
-                    } catch (_: Exception) {}
-                }
-            }
-        }
-        return Pair(37.9845, 23.7335)
-    }
-
-    private fun loadStoredFavorites(): List<WearStopItem> {
-        val favs = mutableListOf<WearStopItem>()
-        val prefsList = listOf(
-            getSharedPreferences("OASA_PERSISTENT_DATA", Context.MODE_PRIVATE),
-            getSharedPreferences("BusTopWatch", Context.MODE_PRIVATE)
-        )
-        for (p in prefsList) {
-            val raw = p.getString("OASA_FAV_STOPS", null) ?: p.getString("fav_stops", null)
-            if (!raw.isNullOrBlank() && raw != "[]" && raw != "null") {
-                try {
-                    val arr = JSONArray(raw)
-                    for (i in 0 until arr.length()) {
-                        val obj = arr.getJSONObject(i)
-                        val code = obj.optString("code", obj.optString("StopCode", ""))
-                        val name = obj.optString("name", obj.optString("stopName", obj.optString("StopDescr", "Στάση $code")))
-                        val street = obj.optString("street", obj.optString("StopStreet", ""))
-                        val lat = if (obj.has("lat") && !obj.isNull("lat")) obj.optDouble("lat", 0.0) else if (obj.has("StopLat")) obj.optDouble("StopLat", 0.0) else 0.0
-                        val lng = if (obj.has("lng") && !obj.isNull("lng")) obj.optDouble("lng", 0.0) else if (obj.has("StopLng")) obj.optDouble("StopLng", 0.0) else 0.0
-                        if (code.isNotEmpty() && favs.none { it.code == code }) {
-                            favs.add(WearStopItem(code = code, name = name, street = street, lat = lat, lng = lng, isFavorite = true))
-                        }
-                    }
-                } catch (_: Exception) {}
-            }
-        }
-        return favs
-    }
-
-    private fun toggleFavorite(stop: WearStopItem): Boolean {
-        val currentFavs = loadStoredFavorites().toMutableList()
-        val exists = currentFavs.any { it.code == stop.code }
-
-        if (exists) {
-            currentFavs.removeAll { it.code == stop.code }
-        } else {
-            currentFavs.add(stop.copy(isFavorite = true))
-        }
-
-        val jsonArr = JSONArray()
-        currentFavs.forEach { fav ->
-            val obj = JSONObject()
-            obj.put("code", fav.code)
-            obj.put("name", fav.name)
-            obj.put("street", fav.street)
-            obj.put("lat", fav.lat)
-            obj.put("lng", fav.lng)
-            jsonArr.put(obj)
-        }
-
-        listOf(
-            getSharedPreferences("OASA_PERSISTENT_DATA", Context.MODE_PRIVATE),
-            getSharedPreferences("BusTopWatch", Context.MODE_PRIVATE)
-        ).forEach { prefs ->
-            prefs.edit()
-                .putString("OASA_FAV_STOPS", jsonArr.toString())
-                .putString("fav_stops", jsonArr.toString())
-                .apply()
-        }
-
-        return !exists
-    }
-
-    private fun loadPinnedItems(): List<PinnedItem> {
+    fun loadPinnedItems(): List<PinnedItem> {
         val list = mutableListOf<PinnedItem>()
         val prefsList = listOf(
             getSharedPreferences("OASA_PERSISTENT_DATA", Context.MODE_PRIVATE),
@@ -283,104 +174,55 @@ class MainActivity : ComponentActivity() {
                         val stopCode = obj.optString("stopCode", obj.optString("code", ""))
                         val lineId = obj.optString("lineId", obj.optString("line", "BUS"))
                         val stopName = obj.optString("stopName", "Στάση $stopCode")
+                        val destination = obj.optString("destination", "")
+                        val mins = if (obj.has("minutes")) obj.optInt("minutes", 0) else obj.optInt("btime2", 0)
                         if (stopCode.isNotEmpty() && lineId.isNotEmpty() && list.none { it.stopCode == stopCode && it.lineId == lineId }) {
-                            list.add(PinnedItem(stopCode = stopCode, stopName = stopName, lineId = lineId))
+                            list.add(PinnedItem(
+                                stopCode = stopCode,
+                                stopName = stopName,
+                                lineId = lineId,
+                                destination = destination,
+                                minutes = mins
+                            ))
                         }
                     }
+                    if (list.isNotEmpty()) break
                 } catch (_: Exception) {}
             }
         }
         return list
     }
 
-    private fun togglePin(stop: WearStopItem, lineId: String, currentMinutes: Int): Boolean {
-        val currentPins = loadPinnedItems().toMutableList()
-        val exists = currentPins.any { it.stopCode == stop.code && it.lineId.equals(lineId, ignoreCase = true) }
-        val prefs = getSharedPreferences("BusTopWatch", Context.MODE_PRIVATE)
-
-        if (exists) {
-            currentPins.removeAll { it.stopCode == stop.code && it.lineId.equals(lineId, ignoreCase = true) }
-        } else {
-            currentPins.add(PinnedItem(stopCode = stop.code, stopName = stop.name, lineId = lineId))
-        }
-
-        val jsonArr = JSONArray()
-        currentPins.forEach { pin ->
-            val obj = JSONObject()
-            obj.put("stopCode", pin.stopCode)
-            obj.put("stopName", pin.stopName)
-            obj.put("lineId", pin.lineId)
-            jsonArr.put(obj)
-        }
-        prefs.edit().putString("pinned_trips", jsonArr.toString()).apply()
-
-        // Sync with primary preferences if available
+    fun loadCachedProjectedStop(): Pair<WearStopItem, List<ArrivalItem>>? {
         try {
-            getSharedPreferences("OASA_PERSISTENT_DATA", Context.MODE_PRIVATE)
-                .edit()
-                .putString("OASA_PINNED_ARRIVALS", jsonArr.toString())
-                .apply()
-        } catch (_: Exception) {}
+            val prefs = getSharedPreferences("BusTopWatch", Context.MODE_PRIVATE)
+            val raw = prefs.getString("last_projected_stop", null) ?: return null
+            val obj = JSONObject(raw)
+            val stopCode = obj.optString("stopCode", "")
+            if (stopCode.isEmpty()) return null
+            val stopName = obj.optString("stopName", "Στάση $stopCode")
+            val stopStreet = obj.optString("stopStreet", "")
+            val stopLat = obj.optDouble("stopLat", 0.0)
+            val stopLng = obj.optDouble("stopLng", 0.0)
 
-        return !exists
-    }
-
-    private suspend fun fetchNearbyStopsList(): List<WearStopItem> = withContext(Dispatchers.IO) {
-        val (lat, lng) = getLastKnownLocation()
-        val list = mutableListOf<WearStopItem>()
-        val favs = loadStoredFavorites()
-
-        // Calculate distance for favourites
-        favs.forEach { fav ->
-            var dist = 0
-            if (fav.lat != 0.0 && fav.lng != 0.0) {
-                val results = FloatArray(1)
-                Location.distanceBetween(lat, lng, fav.lat, fav.lng, results)
-                dist = results[0].toInt()
-            }
-            list.add(fav.copy(distanceMeters = dist))
-        }
-
-        try {
-            val url = "https://telematics.oasa.gr/api/?act=getClosestStops&p1=$lat&p2=$lng"
-            val req = Request.Builder()
-                .url(url)
-                .header("User-Agent", "Mozilla/5.0 (Linux; Android Wear OS; BusTop)")
-                .build()
-            val resp = httpClient.newCall(req).execute()
-            val body = resp.body?.string() ?: ""
-            if (body.isNotEmpty() && body != "null") {
-                val arr = JSONArray(body)
-                for (i in 0 until minOf(arr.length(), 25)) {
-                    val obj = arr.getJSONObject(i)
-                    val sCode = obj.optString("StopCode")
-                    val sName = obj.optString("StopDescr", "Στάση $sCode")
-                    val sStreet = obj.optString("StopStreet", "")
-                    val sLat = obj.optDouble("StopLat", 0.0)
-                    val sLng = obj.optDouble("StopLng", 0.0)
-                    var dist = 0
-                    if (sLat != 0.0 && sLng != 0.0) {
-                        val results = FloatArray(1)
-                        Location.distanceBetween(lat, lng, sLat, sLng, results)
-                        dist = results[0].toInt()
-                    }
-                    if (sCode.isNotEmpty() && list.none { it.code == sCode }) {
-                        list.add(WearStopItem(code = sCode, name = sName, street = sStreet, lat = sLat, lng = sLng, distanceMeters = dist))
-                    }
+            val arrivalsList = mutableListOf<ArrivalItem>()
+            val arrJson = obj.optJSONArray("arrivals")
+            if (arrJson != null) {
+                for (i in 0 until arrJson.length()) {
+                    val aObj = arrJson.getJSONObject(i)
+                    val line = aObj.optString("line_id", aObj.optString("line", "BUS"))
+                    val mins = if (aObj.has("btime2")) aObj.optInt("btime2", 0) else aObj.optInt("minutes", 0)
+                    val dest = aObj.optString("destination", aObj.optString("route_descr", ""))
+                    arrivalsList.add(ArrivalItem(line = line, minutes = mins, destination = dest))
                 }
             }
-        } catch (_: Exception) {}
-
-        if (list.isEmpty()) {
-            list.add(WearStopItem("10175", "Πλ. Κάνιγγος", "Κάνιγγος", 37.9856, 23.7314, 85))
-            list.add(WearStopItem("60010", "Ναυαρίνου", "Ναυαρίνου", 37.9840, 23.7345, 160))
-            list.add(WearStopItem("10022", "Πλ. Συντάγματος", "Όθωνος", 37.9754, 23.7350, 280))
-            list.add(WearStopItem("10034", "Ακαδημία", "Πανεπιστημίου", 37.9801, 23.7330, 320))
-            list.add(WearStopItem("10018", "Ομόνοια", "Πλ. Ομονοίας", 37.9841, 23.7280, 410))
+            return Pair(
+                WearStopItem(code = stopCode, name = stopName, street = stopStreet, lat = stopLat, lng = stopLng),
+                arrivalsList
+            )
+        } catch (_: Exception) {
+            return null
         }
-
-        // Sort: Favorites first, then nearest
-        list.sortedWith(compareByDescending<WearStopItem> { it.isFavorite }.thenBy { it.distanceMeters })
     }
 
     suspend fun queryStopArrivals(stopCode: String): List<ArrivalItem> = withContext(Dispatchers.IO) {
@@ -404,7 +246,6 @@ class MainActivity : ComponentActivity() {
                     val lineId = routeCodeCache[routeCode] ?: routeCode.ifEmpty { "BUS" }
                     val descr = routeDescrCache[routeCode] ?: ""
                     
-                    // Extract clean destination direction
                     val dest = if (descr.contains(" - ")) {
                         val parts = descr.split(" - ")
                         parts.lastOrNull()?.trim() ?: descr
@@ -466,18 +307,21 @@ data class ArrivalItem(
 data class PinnedItem(
     val stopCode: String,
     val stopName: String,
-    val lineId: String
+    val lineId: String,
+    val destination: String = "",
+    val minutes: Int = 0
 )
 
-enum class ScreenState {
+enum class WatchTab {
     PINNED,
-    ARRIVALS
+    PROJECTED
 }
 
-// ─── Clean Expressive Theme Palette (Matching Phone App Exactly) ──────────────
+// ─── Wear OS Dark OLED Aesthetic Theme Palette ──────────────────────────────
 
-private val PhoneSurfaceBg      = Color(0xFF000000) // Pure OLED Black to blend into watch bezel
-private val PhoneCardBg         = Color(0xFF181E29) // Deep Slate / Navy Solid Card
+private val WearSurfaceBg       = Color(0xFF000000) // Pure OLED Black to blend into watch bezel seamlessly
+private val WearCardBg          = Color(0xFF161C26) // Deep Navy/Slate surface card
+private val WearCardBorder      = Color(0xFF263345) // Subtle edge highlight
 private val PhonePrimaryBlue    = Color(0xFF38BDF8) // Crisp Electric Blue for AMOLED
 private val PhonePrimaryPill    = Color(0xFF1E3A8A) // Dark Indigo Pill Container
 private val PhonePrimaryText    = Color(0xFF93C5FD) // Crisp light blue badge text
@@ -495,295 +339,167 @@ private val PhoneAmberText      = Color(0xFFFDE68A) // High contrast amber text
 
 @Composable
 fun WearBusTopApp(
-    onFetchNearbyStops: suspend () -> List<WearStopItem>,
     onFetchArrivals: suspend (String) -> List<ArrivalItem>,
-    onTogglePin: (WearStopItem, String, Int) -> Boolean,
     onLoadPins: () -> List<PinnedItem>,
-    onToggleFavorite: (WearStopItem) -> Boolean
+    onLoadLastProjected: () -> Pair<WearStopItem, List<ArrivalItem>>?
 ) {
-    val arrivalsMap = remember { mutableStateMapOf<String, List<ArrivalItem>>() }
-    var stops by remember { mutableStateOf<List<WearStopItem>>(emptyList()) }
+    var activeTab by remember { mutableStateOf(WatchTab.PINNED) }
     var pinnedList by remember { mutableStateOf<List<PinnedItem>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var currentScreen by remember { mutableStateOf(ScreenState.PINNED) }
-    var selectedStop by remember { mutableStateOf<WearStopItem?>(null) }
+    var projectedStop by remember { mutableStateOf<WearStopItem?>(null) }
+    var projectedArrivals by remember { mutableStateOf<List<ArrivalItem>>(emptyList()) }
     val scope = rememberCoroutineScope()
 
-    // Register tandem companion hooks
+    // Register tandem companion hooks from phone
     LaunchedEffect(Unit) {
+        pinnedList = onLoadPins()
+        val cachedProjected = onLoadLastProjected()
+        if (cachedProjected != null) {
+            projectedStop = cachedProjected.first
+            projectedArrivals = cachedProjected.second
+        }
+
         val act = MainActivity.instance
         if (act != null) {
             act.companionPinsListener = { newPins, shouldNavigate ->
                 pinnedList = newPins
                 if (shouldNavigate) {
-                    currentScreen = ScreenState.PINNED
+                    activeTab = WatchTab.PINNED
                 }
             }
             act.companionArrivalsListener = { sharedStop, sharedArrivals ->
-                selectedStop = sharedStop
-                arrivalsMap[sharedStop.code] = sharedArrivals
-                currentScreen = ScreenState.ARRIVALS
+                projectedStop = sharedStop
+                projectedArrivals = sharedArrivals
+                activeTab = WatchTab.PROJECTED
             }
         }
     }
 
-
-    suspend fun loadAll() {
-        isLoading = true
-        pinnedList = onLoadPins()
-        val fetched = onFetchNearbyStops()
-        stops = fetched
-        isLoading = false
-        fetched.forEach { stop ->
-            scope.launch {
-                arrivalsMap[stop.code] = onFetchArrivals(stop.code)
-            }
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        pinnedList = onLoadPins()
-        isLoading = false
-    }
-
-    // Auto-refresh arrivals every 30s
-    LaunchedEffect(Unit) {
+    // Live auto-refresh every 25 seconds for the projected stop
+    LaunchedEffect(projectedStop?.code) {
+        val sCode = projectedStop?.code ?: return@LaunchedEffect
         while (true) {
-            delay(30_000)
-            stops.forEach { stop ->
-                scope.launch {
-                    arrivalsMap[stop.code] = onFetchArrivals(stop.code)
-                }
+            delay(25_000)
+            val fresh = onFetchArrivals(sCode)
+            if (fresh.isNotEmpty()) {
+                projectedArrivals = fresh
             }
         }
     }
 
-    fun handleToggleFavorite(stop: WearStopItem) {
-        val newState = onToggleFavorite(stop)
-        stops = stops.map {
-            if (it.code == stop.code) it.copy(isFavorite = newState) else it
-        }.sortedWith(compareByDescending<WearStopItem> { it.isFavorite }.thenBy { it.distanceMeters })
-        if (selectedStop?.code == stop.code) {
-            selectedStop = selectedStop?.copy(isFavorite = newState)
-        }
-    }
-
-        when (currentScreen) {
-        ScreenState.PINNED -> {
-            PinnedListScreen(
-                pinnedList = pinnedList,
-                onRefresh = {
-                    pinnedList = onLoadPins()
-                },
-                onStopTap = { pin ->
-                    val matching = WearStopItem(
-                        code = pin.stopCode,
-                        name = pin.stopName
-                    )
-                    selectedStop = matching
-                    currentScreen = ScreenState.ARRIVALS
-                    scope.launch {
-                        arrivalsMap[pin.stopCode] = onFetchArrivals(pin.stopCode)
-                    }
-                }
+    Scaffold(
+        timeText = {
+            TimeText(
+                modifier = Modifier.fillMaxWidth(),
+                timeTextStyle = TimeTextDefaults.timeTextStyle(fontSize = 10.sp, color = PhoneTextMuted)
             )
         }
-
-        ScreenState.ARRIVALS -> {
-            if (selectedStop != null) {
-                ArrivalsScreen(
-                    stop = selectedStop!!,
-                    arrivals = arrivalsMap[selectedStop!!.code],
+    ) {
+        when (activeTab) {
+            WatchTab.PINNED -> {
+                PinnedTabScreen(
                     pinnedList = pinnedList,
-                    onBack = {
-                        selectedStop = null
-                        currentScreen = ScreenState.PINNED
-                    },
+                    activeTab = activeTab,
+                    onSelectTab = { activeTab = it },
                     onRefresh = {
-                        scope.launch {
-                            arrivalsMap[selectedStop!!.code] = onFetchArrivals(selectedStop!!.code)
-                        }
-                    },
-                    onTogglePin = { line, mins ->
-                        onTogglePin(selectedStop!!, line, mins)
                         pinnedList = onLoadPins()
-                    },
-                    onToggleFavorite = { handleToggleFavorite(selectedStop!!) }
+                    }
                 )
-            } else {
-                currentScreen = ScreenState.PINNED
+            }
+            WatchTab.PROJECTED -> {
+                ProjectedTabScreen(
+                    stop = projectedStop,
+                    arrivals = projectedArrivals,
+                    activeTab = activeTab,
+                    onSelectTab = { activeTab = it },
+                    onRefresh = {
+                        val sCode = projectedStop?.code
+                        if (sCode != null) {
+                            scope.launch {
+                                val fresh = onFetchArrivals(sCode)
+                                if (fresh.isNotEmpty()) {
+                                    projectedArrivals = fresh
+                                }
+                            }
+                        }
+                    }
+                )
             }
         }
     }
 }
 
-// ─── Nearby Stops Feed (Immediate default screen with Crown Scrolling) ───────
+// ─── Top Tabs Selector Pill ───────────────────────────────────────────────────
 
 @Composable
-fun NearbyStopsListScreen(
-    stops: List<WearStopItem>,
-    arrivalsMap: Map<String, List<ArrivalItem>>,
+fun TabSelectorHeader(
+    activeTab: WatchTab,
+    onSelectTab: (WatchTab) -> Unit,
+    pinnedCount: Int,
+    hasProjected: Boolean
+) {
+    val view = LocalView.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth(0.92f)
+            .padding(bottom = 8.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Tab 1: Pinned
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(topStart = 10.dp, bottomStart = 10.dp))
+                .background(if (activeTab == WatchTab.PINNED) PhonePrimaryBlue else WearCardBg)
+                .clickable {
+                    view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                    onSelectTab(WatchTab.PINNED)
+                }
+                .padding(vertical = 5.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "📌 Pins ($pinnedCount)",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (activeTab == WatchTab.PINNED) Color.Black else PhoneTextMuted
+            )
+        }
+
+        Spacer(modifier = Modifier.width(2.dp))
+
+        // Tab 2: Projected Live Stop
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .clip(RoundedCornerShape(topEnd = 10.dp, bottomEnd = 10.dp))
+                .background(if (activeTab == WatchTab.PROJECTED) PhonePrimaryBlue else WearCardBg)
+                .clickable {
+                    view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+                    onSelectTab(WatchTab.PROJECTED)
+                }
+                .padding(vertical = 5.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = if (hasProjected) "📡 Στάση 🔴" else "📡 Στάση",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (activeTab == WatchTab.PROJECTED) Color.Black else PhoneTextMuted
+            )
+        }
+    }
+}
+
+// ─── TAB 1: Pinned Arrivals (Line, Stop, Direction, Remaining Time) ───────────
+
+@Composable
+fun PinnedTabScreen(
     pinnedList: List<PinnedItem>,
-    isLoading: Boolean,
-    onStopTap: (WearStopItem) -> Unit,
-    onOpenFavorites: () -> Unit,
-    onOpenPins: () -> Unit,
-    onToggleFavorite: (WearStopItem) -> Unit,
+    activeTab: WatchTab,
+    onSelectTab: (WatchTab) -> Unit,
     onRefresh: () -> Unit
 ) {
-    if (isLoading) { LoadingScreen(); return }
-    if (stops.isEmpty()) { EmptyScreen(onRefresh); return }
-
-    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
-    val focusRequester = remember { FocusRequester() }
-    val coroutineScope = rememberCoroutineScope()
-    val view = LocalView.current
-    var rotaryAccumulator by remember { mutableFloatStateOf(0f) }
-    val tickThreshold = 18f
-
-    val favCount = remember(stops) { stops.count { it.isFavorite } }
-
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
-
-    Scaffold(
-        timeText = {
-            TimeText(
-                modifier = Modifier.fillMaxWidth(),
-                timeTextStyle = TimeTextDefaults.timeTextStyle(fontSize = 10.sp, color = PhoneTextMuted)
-            )
-        },
-        positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
-    ) {
-        ScalingLazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(PhoneSurfaceBg)
-                .onRotaryScrollEvent {
-                    rotaryAccumulator += it.verticalScrollPixels
-                    if (abs(rotaryAccumulator) >= tickThreshold) {
-                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                        rotaryAccumulator = 0f
-                    }
-                    coroutineScope.launch {
-                        listState.scrollBy(it.verticalScrollPixels)
-                    }
-                    true
-                }
-                .focusRequester(focusRequester)
-                .focusable(),
-            state = listState,
-            autoCentering = AutoCenteringParams(itemIndex = 0),
-            contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 28.dp, bottom = 28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            scalingParams = ScalingLazyColumnDefaults.scalingParams(
-                edgeScale = 0.88f,
-                edgeAlpha = 0.65f,
-                minTransitionArea = 0.2f,
-                maxTransitionArea = 0.6f
-            )
-        ) {
-            // Header Bar
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth(0.94f)
-                        .padding(bottom = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "📍",
-                            fontSize = 11.sp,
-                            modifier = Modifier.padding(end = 4.dp)
-                        )
-                        Text(
-                            text = "Στάσεις",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = PhonePrimaryBlue
-                        )
-                    }
-
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        // Favorites menu button
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(if (favCount > 0) PhoneAmberContainer else PhoneCardBg)
-                                .clickable { onOpenFavorites() }
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(
-                                text = "⭐ $favCount",
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (favCount > 0) PhoneAmberText else PhoneTextMuted
-                            )
-                        }
-
-                        if (pinnedList.isNotEmpty()) {
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(PhoneAmberContainer)
-                                    .clickable { onOpenPins() }
-                                    .padding(horizontal = 5.dp, vertical = 2.dp)
-                            ) {
-                                Text(
-                                    text = "📌 ${pinnedList.size}",
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = PhoneAmberText
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Cards Feed
-            items(stops) { stop ->
-                CleanStopCard(
-                    stop = stop,
-                    arrivals = arrivalsMap[stop.code],
-                    isPinned = pinnedList.any { it.stopCode == stop.code },
-                    onClick = { onStopTap(stop) },
-                    onLongClick = {
-                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                        onToggleFavorite(stop)
-                    }
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-            }
-
-            // Refresh chip at the bottom
-            item {
-                Spacer(modifier = Modifier.height(4.dp))
-                CompactChip(
-                    onClick = onRefresh,
-                    label = { Text("Ανανέωση 🔄", fontSize = 11.sp, color = PhoneTextPrimary, fontWeight = FontWeight.Bold) },
-                    colors = ChipDefaults.chipColors(backgroundColor = PhoneCardBg),
-                    modifier = Modifier.padding(bottom = 20.dp)
-                )
-            }
-        }
-    }
-}
-
-// ─── Dedicated Favorites Screen ──────────────────────────────────────────────
-
-@Composable
-fun FavoritesListScreen(
-    stops: List<WearStopItem>,
-    arrivalsMap: Map<String, List<ArrivalItem>>,
-    pinnedList: List<PinnedItem>,
-    onBack: () -> Unit,
-    onStopTap: (WearStopItem) -> Unit,
-    onToggleFavorite: (WearStopItem) -> Unit
-) {
     val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
     val focusRequester = remember { FocusRequester() }
     val coroutineScope = rememberCoroutineScope()
@@ -795,713 +511,289 @@ fun FavoritesListScreen(
         focusRequester.requestFocus()
     }
 
-    Scaffold(
-        timeText = {
-            TimeText(
-                modifier = Modifier.fillMaxWidth(),
-                timeTextStyle = TimeTextDefaults.timeTextStyle(fontSize = 10.sp, color = PhoneTextMuted)
-            )
-        },
-        positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
-    ) {
-        ScalingLazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(PhoneSurfaceBg)
-                .onRotaryScrollEvent {
-                    rotaryAccumulator += it.verticalScrollPixels
-                    if (abs(rotaryAccumulator) >= tickThreshold) {
-                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                        rotaryAccumulator = 0f
-                    }
-                    coroutineScope.launch {
-                        listState.scrollBy(it.verticalScrollPixels)
-                    }
-                    true
-                }
-                .focusRequester(focusRequester)
-                .focusable(),
-            state = listState,
-            autoCentering = AutoCenteringParams(itemIndex = 0),
-            contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 28.dp, bottom = 28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Header
-            item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth(0.94f)
-                        .padding(bottom = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(text = "⭐", fontSize = 11.sp, modifier = Modifier.padding(end = 4.dp))
-                        Text(
-                            text = "Αγαπημένα",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = PhoneAmberText
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .size(26.dp)
-                            .clip(CircleShape)
-                            .background(PhoneCardBg)
-                            .clickable { onBack() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(text = "←", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = PhoneTextPrimary)
-                    }
-                }
-            }
-
-            if (stops.isEmpty()) {
-                item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth(0.88f)
-                            .padding(vertical = 20.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "Δεν έχετε αγαπημένες στάσεις",
-                            fontSize = 11.sp,
-                            color = PhoneTextMuted,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Κρατήστε πατημένη οποιαδήποτε στάση για να την προσθέσετε",
-                            fontSize = 9.sp,
-                            color = PhonePrimaryBlue,
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-            } else {
-                items(stops) { stop ->
-                    CleanStopCard(
-                        stop = stop,
-                        arrivals = arrivalsMap[stop.code],
-                        isPinned = pinnedList.any { it.stopCode == stop.code },
-                        onClick = { onStopTap(stop) },
-                        onLongClick = {
-                            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-                            onToggleFavorite(stop)
-                        }
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                }
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-                CompactChip(
-                    onClick = onBack,
-                    label = { Text("Πίσω στις στάσεις", fontSize = 11.sp, color = PhoneTextPrimary, fontWeight = FontWeight.Bold) },
-                    colors = ChipDefaults.chipColors(backgroundColor = PhoneCardBg),
-                    modifier = Modifier.padding(bottom = 20.dp)
-                )
-            }
-        }
-    }
-}
-
-// ─── Clean Phone-Style Stop Card (Solid White, high-contrast, blue badge) ────
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-fun CleanStopCard(
-    stop: WearStopItem,
-    arrivals: List<ArrivalItem>?,
-    isPinned: Boolean,
-    onClick: () -> Unit,
-    onLongClick: (() -> Unit)? = null
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth(0.94f)
-            .clip(RoundedCornerShape(14.dp))
-            .background(PhoneCardBg)
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick
-            )
-            .padding(horizontal = 10.dp, vertical = 9.dp)
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            // Stop title row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    modifier = Modifier.weight(1f),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (stop.isFavorite) {
-                        Text(text = "⭐ ", fontSize = 10.sp)
-                    } else if (isPinned) {
-                        Text(text = "📌 ", fontSize = 10.sp)
-                    }
-                    Text(
-                        text = stop.name,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = PhoneTextPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                if (stop.distanceMeters > 0) {
-                    Text(
-                        text = "${stop.distanceMeters}μ",
-                        fontSize = 9.sp,
-                        color = PhoneTextMuted,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(start = 4.dp)
-                    )
-                }
-            }
-
-            // Direction / Street subtitle if available
-            if (stop.street.isNotBlank()) {
-                Text(
-                    text = "→ ${stop.street}",
-                    fontSize = 9.sp,
-                    color = PhonePrimaryBlue,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 1.dp, bottom = 4.dp)
-                )
-            } else {
-                Spacer(modifier = Modifier.height(4.dp))
-            }
-
-            // Arrivals preview rows
-            when {
-                arrivals == null -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(28.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            indicatorColor = PhonePrimaryBlue,
-                            strokeWidth = 2.dp
-                        )
-                    }
-                }
-                arrivals.isEmpty() -> {
-                    Text(
-                        text = "Χωρίς άμεσα δρομολόγια",
-                        fontSize = 10.sp,
-                        color = PhoneTextMuted,
-                        textAlign = TextAlign.Start
-                    )
-                }
-                else -> {
-                    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        arrivals.take(2).forEach { arr ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(PhoneSurfaceBg)
-                                    .padding(horizontal = 6.dp, vertical = 2.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // Route badge + Destination
-                                Row(
-                                    modifier = Modifier.weight(1f, fill = false),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(4.dp))
-                                            .background(PhonePrimaryPill)
-                                            .padding(horizontal = 5.dp, vertical = 1.dp)
-                                    ) {
-                                        Text(
-                                            text = arr.line,
-                                            fontSize = 10.sp,
-                                            fontWeight = FontWeight.ExtraBold,
-                                            color = PhonePrimaryText
-                                        )
-                                    }
-
-                                    if (arr.destination.isNotBlank()) {
-                                        Text(
-                                            text = " ${arr.destination}",
-                                            fontSize = 9.sp,
-                                            color = PhoneTextMuted,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.padding(start = 3.dp)
-                                        )
-                                    }
-                                }
-
-                                // Minutes remaining
-                                Text(
-                                    text = if (arr.minutes == 0) "Τώρα" else "${arr.minutes}'",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = if (arr.minutes <= 3) PhoneLiveGreen else PhonePrimaryBlue,
-                                    modifier = Modifier.padding(start = 6.dp)
-                                )
-                            }
-                        }
-
-                        if (arrivals.size > 2) {
-                            Text(
-                                text = "+${arrivals.size - 2} ακόμη →",
-                                fontSize = 9.sp,
-                                color = PhoneTextMuted,
-                                textAlign = TextAlign.End,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ─── Stop Detail / Arrivals Screen with Crown Scroll & Pinning ────────────────
-
-@Composable
-fun ArrivalsScreen(
-    stop: WearStopItem,
-    arrivals: List<ArrivalItem>?,
-    pinnedList: List<PinnedItem>,
-    onBack: () -> Unit,
-    onRefresh: () -> Unit,
-    onTogglePin: (String, Int) -> Unit,
-    onToggleFavorite: () -> Unit
-) {
-    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
-    val focusRequester = remember { FocusRequester() }
-    val coroutineScope = rememberCoroutineScope()
-    val view = LocalView.current
-    var rotaryAccumulator by remember { mutableFloatStateOf(0f) }
-    val tickThreshold = 18f
-
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
-
-    Scaffold(
-        timeText = {
-            TimeText(
-                modifier = Modifier.fillMaxWidth(),
-                timeTextStyle = TimeTextDefaults.timeTextStyle(fontSize = 10.sp, color = PhoneTextMuted)
-            )
-        },
-        positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
-    ) {
-        ScalingLazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(PhoneSurfaceBg)
-                .onRotaryScrollEvent {
-                    rotaryAccumulator += it.verticalScrollPixels
-                    if (abs(rotaryAccumulator) >= tickThreshold) {
-                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                        rotaryAccumulator = 0f
-                    }
-                    coroutineScope.launch {
-                        listState.scrollBy(it.verticalScrollPixels)
-                    }
-                    true
-                }
-                .focusRequester(focusRequester)
-                .focusable(),
-            state = listState,
-            autoCentering = AutoCenteringParams(itemIndex = 0),
-            contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 28.dp, bottom = 28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            // Header Bar: Stop Name & Favorite Star
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth(0.94f)
-                        .padding(bottom = 6.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = stop.name,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = PhoneTextPrimary,
-                            textAlign = TextAlign.Center,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-
-                        Box(
-                            modifier = Modifier
-                                .padding(start = 6.dp)
-                                .size(26.dp)
-                                .clip(CircleShape)
-                                .background(if (stop.isFavorite) PhoneAmberContainer else PhoneCardBg)
-                                .clickable {
-                                    view.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
-                                    onToggleFavorite()
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(text = if (stop.isFavorite) "⭐" else "☆", fontSize = 13.sp)
-                        }
-                    }
-
-                    if (stop.street.isNotBlank()) {
-                        Text(
-                            text = "→ ${stop.street} • ${stop.code}",
-                            fontSize = 10.sp,
-                            color = PhonePrimaryBlue,
-                            fontWeight = FontWeight.Bold
-                        )
-                    } else {
-                        Text(
-                            text = "Αφίξεις • ${stop.code}",
-                            fontSize = 10.sp,
-                            color = PhonePrimaryBlue,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-
-            when {
-                arrivals == null -> {
-                    item {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(70.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(22.dp),
-                                indicatorColor = PhonePrimaryBlue,
-                                strokeWidth = 2.5.dp
-                            )
-                        }
-                    }
-                }
-                arrivals.isEmpty() -> {
-                    item {
-                        Text(
-                            text = "Δεν υπάρχουν\nπρογραμματισμένες αφίξεις",
-                            fontSize = 11.sp,
-                            color = PhoneTextMuted,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(16.dp),
-                            lineHeight = 16.sp
-                        )
-                    }
-                }
-                else -> {
-                    items(arrivals) { arr ->
-                        val isThisPinned = pinnedList.any { it.stopCode == stop.code && it.lineId.equals(arr.line, ignoreCase = true) }
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth(0.94f)
-                                .padding(vertical = 2.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(PhoneCardBg)
-                                .padding(horizontal = 8.dp, vertical = 6.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Left: Badge + Line + Destination
-                            Row(
-                                modifier = Modifier.weight(1f, fill = false),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(PhonePrimaryPill)
-                                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = arr.line,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = PhonePrimaryText
-                                    )
-                                }
-
-                                if (arr.destination.isNotBlank()) {
-                                    Text(
-                                        text = " ${arr.destination}",
-                                        fontSize = 10.sp,
-                                        color = PhoneTextMuted,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.padding(start = 4.dp)
-                                    )
-                                }
-                            }
-
-                            // Right: Time + Pin Button
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = if (arr.minutes == 0) "Τώρα" else "${arr.minutes}'",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Black,
-                                    color = if (arr.minutes <= 3) PhoneLiveGreen else PhonePrimaryBlue,
-                                    modifier = Modifier.padding(end = 6.dp)
-                                )
-
-                                // Pin toggle button
-                                Box(
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .clip(CircleShape)
-                                        .background(if (isThisPinned) PhoneAmberContainer else PhoneSurfaceBg)
-                                        .clickable { onTogglePin(arr.line, arr.minutes) },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "📌",
-                                        fontSize = 10.sp
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Quick Actions: Back & Refresh (Navigation button removed per user request)
-            item {
-                Spacer(modifier = Modifier.height(10.dp))
-                Row(
-                    modifier = Modifier.padding(bottom = 20.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Minimal Circular Back Button (Same as Phone App)
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(PhoneCardBg)
-                            .clickable { onBack() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "←",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = PhoneTextPrimary
-                        )
-                    }
-
-                    // Refresh button
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(PhoneCardBg)
-                            .clickable { onRefresh() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "🔄",
-                            fontSize = 14.sp
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-// ─── Loading / Empty screens ──────────────────────────────────────────────────
-
-@Composable
-fun LoadingScreen() {
-    Box(
+    ScalingLazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .background(PhoneSurfaceBg),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            CircularProgressIndicator(modifier = Modifier.size(28.dp), indicatorColor = PhonePrimaryBlue)
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(text = "Φόρτωση στάσεων…", fontSize = 11.sp, color = PhoneTextMuted, fontWeight = FontWeight.SemiBold)
-        }
-    }
-}
-
-@Composable
-fun EmptyScreen(onRefresh: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(PhoneSurfaceBg),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = "Δεν βρέθηκαν κοντινές στάσεις",
-                fontSize = 11.sp,
-                color = PhoneTextMuted,
-                textAlign = TextAlign.Center
-            )
-            Spacer(modifier = Modifier.height(10.dp))
-            CompactChip(
-                onClick = onRefresh,
-                label = { Text("Ανανέωση 🔄", fontSize = 11.sp, color = PhoneTextPrimary, fontWeight = FontWeight.Bold) },
-                colors = ChipDefaults.chipColors(backgroundColor = PhoneCardBg)
-            )
-        }
-    }
-}
-
-
-// ─── Dedicated Pinned Pins Screen (Hevy Tandem Companion View) ───────────────
-
-@Composable
-fun PinnedListScreen(
-    pinnedList: List<PinnedItem>,
-    onRefresh: () -> Unit,
-    onStopTap: (PinnedItem) -> Unit
-) {
-    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
-    val focusRequester = remember { FocusRequester() }
-    val coroutineScope = rememberCoroutineScope()
-    val view = LocalView.current
-    var rotaryAccumulator by remember { mutableFloatStateOf(0f) }
-    val tickThreshold = 18f
-
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-    }
-
-    Scaffold(
-        timeText = {
-            TimeText(
-                modifier = Modifier.fillMaxWidth(),
-                timeTextStyle = TimeTextDefaults.timeTextStyle(fontSize = 10.sp, color = PhoneTextMuted)
-            )
-        },
-        positionIndicator = { PositionIndicator(scalingLazyListState = listState) }
-    ) {
-        ScalingLazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(PhoneSurfaceBg)
-                .onRotaryScrollEvent {
-                    rotaryAccumulator += it.verticalScrollPixels
-                    if (abs(rotaryAccumulator) >= tickThreshold) {
-                        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
-                        rotaryAccumulator = 0f
-                    }
-                    coroutineScope.launch {
-                        listState.scrollBy(it.verticalScrollPixels)
-                    }
-                    true
+            .background(WearSurfaceBg)
+            .onRotaryScrollEvent {
+                rotaryAccumulator += it.verticalScrollPixels
+                if (abs(rotaryAccumulator) >= tickThreshold) {
+                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                    rotaryAccumulator = 0f
                 }
-                .focusRequester(focusRequester)
-                .focusable(),
-            state = listState,
-            autoCentering = AutoCenteringParams(itemIndex = 0),
-            contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 28.dp, bottom = 28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            scalingParams = ScalingLazyColumnDefaults.scalingParams(
-                edgeScale = 0.88f,
-                edgeAlpha = 0.65f,
-                minTransitionArea = 0.2f,
-                maxTransitionArea = 0.6f
+                coroutineScope.launch {
+                    listState.scrollBy(it.verticalScrollPixels)
+                }
+                true
+            }
+            .focusRequester(focusRequester)
+            .focusable(),
+        state = listState,
+        autoCentering = AutoCenteringParams(itemIndex = 0),
+        contentPadding = PaddingValues(start = 6.dp, end = 6.dp, top = 26.dp, bottom = 26.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        scalingParams = ScalingLazyColumnDefaults.scalingParams(
+            edgeScale = 0.88f,
+            edgeAlpha = 0.65f,
+            minTransitionArea = 0.2f,
+            maxTransitionArea = 0.6f
+        )
+    ) {
+        // Two-tab selector
+        item {
+            TabSelectorHeader(
+                activeTab = activeTab,
+                onSelectTab = onSelectTab,
+                pinnedCount = pinnedList.size,
+                hasProjected = false
             )
-        ) {
-            // Header Bar
+        }
+
+        if (pinnedList.isEmpty()) {
             item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth(0.92f)
-                        .padding(bottom = 8.dp),
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(WearCardBg)
+                        .padding(14.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "📌 Ενεργές Καρφίτσες",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = PhonePrimaryBlue,
+                        text = "Καμία ενεργή καρφίτσα",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PhoneTextPrimary,
                         textAlign = TextAlign.Center
                     )
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = if (pinnedList.isEmpty()) "Σύνδεση με το κινητό" else "${pinnedList.size} διαδρομές σε εξέλιξη",
+                        text = "Καρφιτσώστε μια άφιξη στο κινητό για να εμφανιστεί εδώ ζωντανά.",
                         fontSize = 9.sp,
                         color = PhoneTextMuted,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 12.sp
+                    )
+                }
+            }
+        } else {
+            items(pinnedList) { pin ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth(0.94f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(WearCardBg)
+                        .padding(horizontal = 8.dp, vertical = 7.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Left info: Line Pill + Stop + Direction
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(PhonePrimaryPill)
+                                .padding(horizontal = 6.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = pin.lineId,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = PhonePrimaryText
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(6.dp))
+
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = pin.stopName,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = PhoneTextPrimary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            if (pin.destination.isNotBlank()) {
+                                Text(
+                                    text = "→ ${pin.destination}",
+                                    fontSize = 8.5.sp,
+                                    color = PhoneTextMuted,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+
+                    // Right info: Remaining time
+                    Text(
+                        text = if (pin.minutes <= 0) "Τώρα" else "${pin.minutes}'",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Black,
+                        color = if (pin.minutes <= 3) PhoneLiveGreen else PhonePrimaryBlue,
+                        modifier = Modifier.padding(start = 6.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(4.dp))
+            CompactChip(
+                onClick = onRefresh,
+                label = { Text("Ανανέωση 🔄", fontSize = 10.sp, color = PhoneTextPrimary, fontWeight = FontWeight.Bold) },
+                colors = ChipDefaults.chipColors(backgroundColor = WearCardBg),
+                modifier = Modifier.padding(bottom = 14.dp)
+            )
+        }
+    }
+}
+
+// ─── TAB 2: Beamed Stop Arrivals (Live snapshot of stop from phone) ───────────
+
+@Composable
+fun ProjectedTabScreen(
+    stop: WearStopItem?,
+    arrivals: List<ArrivalItem>,
+    activeTab: WatchTab,
+    onSelectTab: (WatchTab) -> Unit,
+    onRefresh: () -> Unit
+) {
+    val listState = rememberScalingLazyListState(initialCenterItemIndex = 0)
+    val focusRequester = remember { FocusRequester() }
+    val coroutineScope = rememberCoroutineScope()
+    val view = LocalView.current
+    var rotaryAccumulator by remember { mutableFloatStateOf(0f) }
+    val tickThreshold = 18f
+
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
+    ScalingLazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(WearSurfaceBg)
+            .onRotaryScrollEvent {
+                rotaryAccumulator += it.verticalScrollPixels
+                if (abs(rotaryAccumulator) >= tickThreshold) {
+                    view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+                    rotaryAccumulator = 0f
+                }
+                coroutineScope.launch {
+                    listState.scrollBy(it.verticalScrollPixels)
+                }
+                true
+            }
+            .focusRequester(focusRequester)
+            .focusable(),
+        state = listState,
+        autoCentering = AutoCenteringParams(itemIndex = 0),
+        contentPadding = PaddingValues(start = 6.dp, end = 6.dp, top = 26.dp, bottom = 26.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        scalingParams = ScalingLazyColumnDefaults.scalingParams(
+            edgeScale = 0.88f,
+            edgeAlpha = 0.65f,
+            minTransitionArea = 0.2f,
+            maxTransitionArea = 0.6f
+        )
+    ) {
+        // Two-tab selector
+        item {
+            TabSelectorHeader(
+                activeTab = activeTab,
+                onSelectTab = onSelectTab,
+                pinnedCount = 0,
+                hasProjected = stop != null
+            )
+        }
+
+        if (stop == null) {
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth(0.92f)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(WearCardBg)
+                        .padding(14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Καμία μεταδοθείσα στάση",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PhoneTextPrimary,
                         textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Πατήστε το κουμπί ⌚ στις Αφίξεις του κινητού για να μεταδώσετε ζωντανά τη στάση εδώ.",
+                        fontSize = 9.sp,
+                        color = PhoneTextMuted,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 12.sp
+                    )
+                }
+            }
+        } else {
+            // Stop header info
+            item {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth(0.94f)
+                        .padding(bottom = 6.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = stop.name,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = PhoneTextPrimary,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = if (stop.street.isNotBlank()) "→ ${stop.street} • ${stop.code}" else "Αφίξεις • #${stop.code}",
+                        fontSize = 9.5.sp,
+                        color = PhonePrimaryBlue,
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
 
-            if (pinnedList.isEmpty()) {
+            if (arrivals.isEmpty()) {
                 item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth(0.92f)
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(PhoneCardBg)
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = "Καμία ενεργή καρφίτσα",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = PhoneTextPrimary,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "Καρφιτσώστε μια άφιξη στο κινητό ή κοινοποιήστε μια στάση για να εμφανιστεί εδώ.",
-                            fontSize = 9.sp,
-                            color = PhoneTextMuted,
-                            textAlign = TextAlign.Center,
-                            lineHeight = 12.sp
-                        )
-                    }
+                    Text(
+                        text = "Δεν υπάρχουν
+προγραμματισμένες αφίξεις",
+                        fontSize = 11.sp,
+                        color = PhoneTextMuted,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(14.dp),
+                        lineHeight = 15.sp
+                    )
                 }
             } else {
-                items(pinnedList) { pin ->
+                items(arrivals) { arr ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth(0.94f)
+                            .padding(vertical = 2.dp)
                             .clip(RoundedCornerShape(12.dp))
-                            .background(PhoneCardBg)
-                            .clickable { onStopTap(pin) }
-                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                            .background(WearCardBg)
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // Badge + Destination
                         Row(
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier.weight(1f, fill = false),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Box(
@@ -1511,47 +803,44 @@ fun PinnedListScreen(
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
                                 Text(
-                                    text = pin.lineId,
+                                    text = arr.line,
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.ExtraBold,
                                     color = PhonePrimaryText
                                 )
                             }
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Column {
+
+                            if (arr.destination.isNotBlank()) {
                                 Text(
-                                    text = pin.stopName,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = PhoneTextPrimary,
+                                    text = " ${arr.destination}",
+                                    fontSize = 9.5.sp,
+                                    color = PhoneTextMuted,
                                     maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = "#${pin.stopCode}",
-                                    fontSize = 9.sp,
-                                    color = PhoneTextMuted
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(start = 4.dp)
                                 )
                             }
                         }
+
+                        // Minutes
                         Text(
-                            text = "➜",
+                            text = if (arr.minutes == 0) "Τώρα" else "${arr.minutes}'",
                             fontSize = 12.sp,
-                            color = PhonePrimaryBlue,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Black,
+                            color = if (arr.minutes <= 3) PhoneLiveGreen else PhonePrimaryBlue,
+                            modifier = Modifier.padding(start = 6.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.height(5.dp))
                 }
             }
 
             item {
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 CompactChip(
                     onClick = onRefresh,
                     label = { Text("Ανανέωση 🔄", fontSize = 10.sp, color = PhoneTextPrimary, fontWeight = FontWeight.Bold) },
-                    colors = ChipDefaults.chipColors(backgroundColor = PhoneCardBg),
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    colors = ChipDefaults.chipColors(backgroundColor = WearCardBg),
+                    modifier = Modifier.padding(bottom = 14.dp)
                 )
             }
         }

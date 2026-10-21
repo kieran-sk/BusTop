@@ -38,13 +38,21 @@ class PinnedTripsManager {
   syncPinsToWatch(launchWatch = false) {
     if (window.AndroidBridge) {
       try {
-        const payload = JSON.stringify(this.pinnedItems.map(p => ({
-          stopCode: p.stopCode,
-          stopName: p.stopName,
-          lineId: p.lineId,
-          destination: p.destination || p.lineDescr || '',
-          minutes: p.initialMinutes || 0
-        })));
+        const now = Date.now();
+        const payload = JSON.stringify(this.pinnedItems.map(p => {
+          const arrs = this.liveArrivals.get(p.stopCode) || [];
+          const match = this.findBestArrivalMatch(p, arrs);
+          let remMins = (match && typeof match.btime2 === 'number') 
+            ? match.btime2 
+            : (p.targetArrivalTimestamp ? Math.max(0, Math.round((p.targetArrivalTimestamp - now) / 60000)) : (p.initialMinutes || 0));
+          return {
+            stopCode: p.stopCode,
+            stopName: p.stopName,
+            lineId: p.lineId,
+            destination: p.destination || p.lineDescr || (match ? match.destination : ''),
+            minutes: remMins
+          };
+        }));
         if (launchWatch && typeof window.AndroidBridge.launchPinsOnWatch === 'function') {
           window.AndroidBridge.launchPinsOnWatch(payload);
         } else if (typeof window.AndroidBridge.syncPinsWithWatch === 'function') {
