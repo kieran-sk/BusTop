@@ -738,10 +738,11 @@ class PinnedTripsManager {
     return remMins > 0 ? `${hours}ʰ ${remMins}'` : `${hours}ʰ`;
   }
 
-  renderSplitFlapDigits(key, text) {
+  renderSplitFlapDigits(key, text, urgencyClass = '') {
     const chars = String(text).split('');
-    const prevChars = (this.previousDigitsMap.get(key) || '').split('');
-    if (this.previousDigitsMap.size > 100) {
+    const prev = this.previousDigitsMap.get(key) || '';
+    const prevChars = prev.split('');
+    if (this.previousDigitsMap.size > 200) {
       const oldestKey = this.previousDigitsMap.keys().next().value;
       if (oldestKey) this.previousDigitsMap.delete(oldestKey);
     }
@@ -755,12 +756,12 @@ class PinnedTripsManager {
       } else if (/[a-zA-Z\u0370-\u03ff]/.test(ch)) {
         return `<span class="flap-unit">${ch}</span>`;
       } else {
-        const changed = prevChars.length > 0 && prevChars[idx] !== ch;
+        const changed = prev.length > 0 && prevChars[idx] !== ch;
         return `<span class="flap-digit-box ${changed ? 'flap-flip' : ''}" data-digit="${ch}">${ch}</span>`;
       }
     }).join('');
 
-    return `<div class="split-flap-board">${html}</div>`;
+    return `<div class="split-flap-board ${urgencyClass}">${html}</div>`;
   }
 
   renderUI() {
@@ -862,10 +863,35 @@ class PinnedTripsManager {
                 </div>
               </div>
             </div>
-            <div style="text-align: right; flex-shrink: 0;">
-              <span class="m3-badge" style="background: ${isLive ? 'var(--md-sys-color-primary-container, #e0f2fe)' : '#f1f5f9'}; color: ${isLive ? 'var(--md-sys-color-primary, #005ac1)' : '#475569'}; font-size: 0.72rem; font-weight: 800; padding: 2px 7px;">
-                ${isDeparted ? '🏁 Αναχώρησε' : (isLive ? `⚡ ~${formattedTime}` : (displayMinutes !== null ? `🕒 ~${formattedTime}` : (item.departureTime ? `🕒 ${item.departureTime}` : '⏳ Αναμονή')))}
-              </span>
+            <div style="text-align: right; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; justify-content: center;">
+              ${(() => {
+                const fieldKey = `pin_${item.stopCode}_${item.lineId}_${idx}`;
+                let urgencyClass = 'urgency-normal';
+                let flapText = '--';
+                if (isDeparted) {
+                  return `<span class="m3-badge" style="background: #f1f5f9; color: #64748b; font-size: 0.72rem; font-weight: 800; padding: 2px 7px;">🏁 Αναχώρησε</span>`;
+                }
+                if (displayMinutes !== null) {
+                  if (displayMinutes <= 3) urgencyClass = 'urgency-now';
+                  else if (displayMinutes <= 10) urgencyClass = 'urgency-soon';
+                  else urgencyClass = 'urgency-normal';
+
+                  if (displayMinutes >= 60) {
+                    flapText = this.formatMinutesHuman(displayMinutes);
+                  } else {
+                    flapText = String(displayMinutes).padStart(2, '0');
+                  }
+                } else if (matchingArr && matchingArr.estimated_arrival_time) {
+                  urgencyClass = 'urgency-scheduled';
+                  flapText = matchingArr.estimated_arrival_time;
+                } else if (item.departureTime || item.estimatedArrivalTime) {
+                  urgencyClass = 'urgency-scheduled';
+                  flapText = item.departureTime || item.estimatedArrivalTime;
+                } else {
+                  flapText = '--:--';
+                }
+                return this.renderSplitFlapDigits(fieldKey, flapText, urgencyClass);
+              })()}
             </div>
           </div>
           <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px dashed var(--md-sys-color-outline-variant); padding-top: 0.45rem; font-size: 0.8rem; color: var(--md-sys-color-outline);">
