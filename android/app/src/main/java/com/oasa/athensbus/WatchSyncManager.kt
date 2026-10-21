@@ -2,11 +2,11 @@ package com.oasa.athensbus
 
 import android.content.Context
 import android.util.Log
+import com.google.android.gms.tasks.Tasks
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
 object WatchSyncManager {
     private const val TAG = "WatchSyncManager"
@@ -44,7 +44,7 @@ object WatchSyncManager {
             try {
                 val nodeClient = Wearable.getNodeClient(context)
                 val messageClient = Wearable.getMessageClient(context)
-                val nodes = nodeClient.connectedNodes.await()
+                val nodes = Tasks.await(nodeClient.connectedNodes)
 
                 if (nodes.isEmpty()) {
                     Log.w(TAG, "No Wear OS nodes connected.")
@@ -57,7 +57,7 @@ object WatchSyncManager {
 
                 for (node in nodes) {
                     try {
-                        messageClient.sendMessage(node.id, path, dataBytes).await()
+                        Tasks.await(messageClient.sendMessage(node.id, path, dataBytes))
                         Log.d(TAG, "Successfully sent message $path to watch node: ${node.displayName} (${node.id})")
                         successCount++
                     } catch (e: Exception) {
