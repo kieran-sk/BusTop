@@ -142,7 +142,9 @@ object NotificationHelper {
         destination: String = "",
         walkMinutes: Int = 0,
         stopCode: String = "",
-        initialMinutes: Int = 10
+        initialMinutes: Int = 10,
+        isLive: Boolean = true,
+        clockTime: String = ""
     ) {
         createLiveNotificationChannel(context)
 
@@ -170,10 +172,23 @@ object NotificationHelper {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val timeFormatted = if (minutesAway <= 0) "🏁 Αναχώρησε" else formatMinutesHuman(minutesAway)
-        val shortText = if (minutesAway <= 0) "🏁" else "${minutesAway}'"
+        val isScheduledOnly = !isLive && clockTime.isNotBlank()
+        val timeFormatted = when {
+            minutesAway <= 0 -> "🏁 Αναχώρησε"
+            isScheduledOnly -> "🕒 $clockTime"
+            else -> formatMinutesHuman(minutesAway)
+        }
+        val shortText = when {
+            minutesAway <= 0 -> "🏁"
+            isScheduledOnly -> "🕒 $clockTime"
+            else -> "${minutesAway}'"
+        }
         val cleanDest = cleanDestination(destination)
-        val title = if (minutesAway <= 0) "$lineId 🏁 Αναχώρησε" else "$lineId σε $timeFormatted"
+        val title = when {
+            minutesAway <= 0 -> "$lineId 🏁 Αναχώρησε"
+            isScheduledOnly -> "$lineId • $clockTime (Προγραμματισμένο)"
+            else -> "$lineId σε $timeFormatted"
+        }
         val content = if (cleanDest.isNotBlank()) "προς $cleanDest • $stopName" else stopName
         val bigText = if (cleanDest.isNotBlank()) "προς $cleanDest\n$stopName" else stopName
 

@@ -597,7 +597,9 @@ class MainActivity : FragmentActivity() {
             destination: String = "",
             walkMinutes: Double = 0.0,
             stopCode: String = "",
-            initialMinutes: Double = 10.0
+            initialMinutes: Double = 10.0,
+            isLive: Boolean = true,
+            clockTime: String = ""
         ) {
             try {
                 NotificationHelper.updateLiveArrivalNotification(
@@ -608,7 +610,9 @@ class MainActivity : FragmentActivity() {
                     destination,
                     walkMinutes.toInt(),
                     stopCode,
-                    initialMinutes.toInt()
+                    initialMinutes.toInt(),
+                    isLive,
+                    clockTime
                 )
             } catch (e: Exception) {
                 e.printStackTrace()

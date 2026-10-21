@@ -42,6 +42,7 @@ class LiveTrackingService : Service() {
     private var vehCode: String = ""
     private var departureTime: String = ""
     private var estimatedArrivalTime: String = ""
+    private var isLiveTracked: Boolean = true
     private var startedAtMs: Long = 0L
     private var ringUntilDismissed: Boolean = false
     private var isAlarmTriggered = false
@@ -371,6 +372,7 @@ class LiveTrackingService : Service() {
                     }
 
                     if (matched != null) {
+                        isLiveTracked = matched.isLive
                         if (matched.cVeh.isNotBlank()) {
                             vehCode = matched.cVeh
                         }
@@ -429,10 +431,24 @@ class LiveTrackingService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val timeFormatted = if (mins <= 0) "🏁 Αναχώρησε" else NotificationHelper.formatMinutesHuman(mins)
-        val shortText = if (mins <= 0) "🏁" else "${mins}'"
+        val clockTime = if (estimatedArrivalTime.isNotBlank()) estimatedArrivalTime else departureTime
+        val isScheduledOnly = !isLiveTracked && clockTime.isNotBlank()
+        val timeFormatted = when {
+            mins <= 0 -> "🏁 Αναχώρησε"
+            isScheduledOnly -> "🕒 $clockTime"
+            else -> NotificationHelper.formatMinutesHuman(mins)
+        }
+        val shortText = when {
+            mins <= 0 -> "🏁"
+            isScheduledOnly -> "🕒 $clockTime"
+            else -> "${mins}'"
+        }
         val cleanDest = NotificationHelper.cleanDestination(destination)
-        val title = if (mins <= 0) "$lineId 🏁 Αναχώρησε" else "$lineId σε $timeFormatted"
+        val title = when {
+            mins <= 0 -> "$lineId 🏁 Αναχώρησε"
+            isScheduledOnly -> "$lineId • $clockTime (Προγραμματισμένο)"
+            else -> "$lineId σε $timeFormatted"
+        }
         val content = if (cleanDest.isNotBlank()) "προς $cleanDest • $stopName" else stopName
         val bigText = if (cleanDest.isNotBlank()) "προς $cleanDest\n$stopName" else stopName
 

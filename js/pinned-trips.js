@@ -667,6 +667,8 @@ class PinnedTripsManager {
         try {
           const dest = this.getCleanDestination(item);
           const initMins = typeof item.initialMinutes === 'number' ? item.initialMinutes : (typeof mins === 'number' ? mins : 10);
+          const isLiveArrival = match ? match.is_live : item.isLive;
+          const clockStr = (match && match.estimated_arrival_time) || item.estimatedArrivalTime || (match && match.departure_time) || item.departureTime || '';
           if (typeof window.AndroidBridge.updateLiveArrivalNotification === 'function') {
             window.AndroidBridge.updateLiveArrivalNotification(
               item.lineId,
@@ -675,7 +677,9 @@ class PinnedTripsManager {
               dest,
               item.walkMinutes || 0,
               item.stopCode,
-              initMins
+              initMins,
+              !!isLiveArrival,
+              clockStr
             );
           }
           if (typeof window.AndroidBridge.startLiveTracking === 'function') {
@@ -871,6 +875,10 @@ class PinnedTripsManager {
                 if (isDeparted) {
                   return `<span class="m3-badge" style="background: #f1f5f9; color: #64748b; font-size: 0.72rem; font-weight: 800; padding: 2px 7px;">🏁 Αναχώρησε</span>`;
                 }
+                const clockTime = (matchingArr && matchingArr.estimated_arrival_time) || item.estimatedArrivalTime || (matchingArr && matchingArr.departure_time) || item.departureTime || '';
+                if (!isLive && clockTime) {
+                  return `<span class="m3-badge" style="background: var(--md-sys-color-surface-container-high, #f1f5f9); color: var(--md-sys-color-on-surface, #0f172a); border: 1px solid var(--md-sys-color-outline-variant, #cbd5e1); font-size: 0.88rem; font-weight: 800; padding: 4px 10px; border-radius: 8px; letter-spacing: 0.5px;">🕒 ${clockTime}</span>`;
+                }
                 if (displayMinutes !== null) {
                   if (displayMinutes <= 3) urgencyClass = 'urgency-now';
                   else if (displayMinutes <= 10) urgencyClass = 'urgency-soon';
@@ -881,12 +889,8 @@ class PinnedTripsManager {
                   } else {
                     flapText = String(displayMinutes).padStart(2, '0');
                   }
-                } else if (matchingArr && matchingArr.estimated_arrival_time) {
-                  urgencyClass = 'urgency-scheduled';
-                  flapText = matchingArr.estimated_arrival_time;
-                } else if (item.departureTime || item.estimatedArrivalTime) {
-                  urgencyClass = 'urgency-scheduled';
-                  flapText = item.departureTime || item.estimatedArrivalTime;
+                } else if (clockTime) {
+                  return `<span class="m3-badge" style="background: var(--md-sys-color-surface-container-high, #f1f5f9); color: var(--md-sys-color-on-surface, #0f172a); border: 1px solid var(--md-sys-color-outline-variant, #cbd5e1); font-size: 0.88rem; font-weight: 800; padding: 4px 10px; border-radius: 8px; letter-spacing: 0.5px;">🕒 ${clockTime}</span>`;
                 } else {
                   flapText = '--:--';
                 }
