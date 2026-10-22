@@ -490,7 +490,10 @@ fun WearBusTopApp(
 fun WearSplitFlapTile(
     char: Char,
     isUrgent: Boolean,
-    isSoon: Boolean
+    isSoon: Boolean,
+    tileWidth: androidx.compose.ui.unit.Dp = 13.dp,
+    tileHeight: androidx.compose.ui.unit.Dp = 20.dp,
+    fontSize: androidx.compose.ui.unit.TextUnit = 12.sp
 ) {
     val tileBg = when {
         isUrgent -> Color(0xFF450A0A) // Deep wine red
@@ -510,17 +513,17 @@ fun WearSplitFlapTile(
 
     Box(
         modifier = Modifier
-            .width(13.dp)
-            .height(20.dp)
-            .clip(RoundedCornerShape(3.dp))
+            .width(tileWidth)
+            .height(tileHeight)
+            .clip(RoundedCornerShape(4.dp))
             .background(tileBg)
-            .border(0.75.dp, tileBorder, RoundedCornerShape(3.dp)),
+            .border(0.85.dp, tileBorder, RoundedCornerShape(4.dp)),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = char.toString(),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.ExtraBold,
+            fontSize = fontSize,
+            fontWeight = FontWeight.Black,
             color = textColor,
             textAlign = TextAlign.Center
         )
@@ -538,7 +541,10 @@ fun WearSplitFlapTile(
 @Composable
 fun WearSplitFlapDisplay(
     minutes: Int,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    tileWidth: androidx.compose.ui.unit.Dp = 13.dp,
+    tileHeight: androidx.compose.ui.unit.Dp = 20.dp,
+    fontSize: androidx.compose.ui.unit.TextUnit = 12.sp
 ) {
     val isUrgent = minutes in 1..3
     val isSoon = minutes in 4..10
@@ -554,16 +560,23 @@ fun WearSplitFlapDisplay(
 
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(1.5.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         text.forEach { ch ->
-            WearSplitFlapTile(char = ch, isUrgent = isUrgent, isSoon = isSoon)
+            WearSplitFlapTile(
+                char = ch,
+                isUrgent = isUrgent,
+                isSoon = isSoon,
+                tileWidth = tileWidth,
+                tileHeight = tileHeight,
+                fontSize = fontSize
+            )
         }
         if (minutes > 0) {
             Text(
                 text = "'",
-                fontSize = 12.sp,
+                fontSize = fontSize,
                 fontWeight = FontWeight.Black,
                 color = when {
                     isUrgent -> Color(0xFFEF4444)
@@ -576,7 +589,7 @@ fun WearSplitFlapDisplay(
     }
 }
 
-// ─── TAB 1: Pinned Arrivals (Line, Stop, Direction, Remaining Time) ───────────
+// ─── TAB 1: Pinned Arrivals (Expanded edge-to-edge layout filling screen) ─────
 
 @Composable
 fun PinnedTabScreen(
@@ -613,64 +626,65 @@ fun PinnedTabScreen(
             .focusable(),
         state = listState,
         autoCentering = AutoCenteringParams(itemIndex = 0),
-        contentPadding = PaddingValues(start = 2.dp, end = 2.dp, top = 8.dp, bottom = 20.dp),
+        contentPadding = PaddingValues(start = 1.dp, end = 1.dp, top = 2.dp, bottom = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         scalingParams = ScalingLazyColumnDefaults.scalingParams(
-            edgeScale = 0.94f,
-            edgeAlpha = 0.75f,
-            minTransitionArea = 0.15f,
-            maxTransitionArea = 0.65f
+            edgeScale = 0.96f,
+            edgeAlpha = 0.85f,
+            minTransitionArea = 0.1f,
+            maxTransitionArea = 0.5f
         )
     ) {
-        // Minimal subtle title
-        item {
-            Text(
-                text = "📌 Καρφίτσες",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.ExtraBold,
-                color = PhonePrimaryBlue,
-                modifier = Modifier.padding(bottom = 2.dp)
-            )
-        }
-
         if (pinnedList.isEmpty()) {
             item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth(0.96f)
-                        .clip(RoundedCornerShape(14.dp))
+                        .clip(RoundedCornerShape(16.dp))
                         .background(WearCardBg)
-                        .padding(14.dp),
+                        .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
+                        text = "📌 Καρφίτσες",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = PhonePrimaryBlue
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
                         text = "Καμία ενεργή καρφίτσα",
-                        fontSize = 11.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = PhoneTextPrimary,
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Καρφιτσώστε μια άφιξη στο κινητό για να εμφανιστεί εδώ ζωντανά.",
-                        fontSize = 9.sp,
+                        text = "Καρφιτσώστε μια άφιξη στο κινητό για να εμφανιστεί εδώ.",
+                        fontSize = 10.sp,
                         color = PhoneTextMuted,
                         textAlign = TextAlign.Center,
-                        lineHeight = 12.sp
+                        lineHeight = 13.sp
                     )
                 }
             }
         } else {
             items(pinnedList) { pin ->
-                // Full-width edge-to-edge card maximizing visibility on round watch screens
+                val isSinglePin = pinnedList.size == 1
+                
+                // Prominent full-width hero card taking advantage of screen height
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth(0.98f)
-                        .clip(RoundedCornerShape(14.dp))
+                        .fillMaxWidth(0.99f)
+                        .clip(RoundedCornerShape(16.dp))
                         .background(WearCardBg)
-                        .padding(horizontal = 9.dp, vertical = 7.dp)
+                        .padding(
+                            horizontal = 12.dp,
+                            vertical = if (isSinglePin) 14.dp else 10.dp
+                        )
                 ) {
-                    // Top row: Line Badge + Split-Flap Arrival Time Display
+                    // Top row: Big Line Badge + Large Split-Flap Arrival Counter
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -678,54 +692,65 @@ fun PinnedTabScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
+                                .clip(RoundedCornerShape(8.dp))
                                 .background(PhonePrimaryPill)
-                                .padding(horizontal = 7.dp, vertical = 2.5.dp)
+                                .padding(
+                                    horizontal = if (isSinglePin) 10.dp else 8.dp,
+                                    vertical = if (isSinglePin) 5.dp else 3.5.dp
+                                )
                         ) {
                             Text(
                                 text = pin.lineId,
-                                fontSize = 12.sp,
+                                fontSize = if (isSinglePin) 17.sp else 14.sp,
                                 fontWeight = FontWeight.Black,
                                 color = PhonePrimaryText
                             )
                         }
 
-                        // Split-Flap Arrival Display
-                        WearSplitFlapDisplay(minutes = pin.minutes)
+                        // Prominent High-Visibility Split-Flap Timer
+                        WearSplitFlapDisplay(
+                            minutes = pin.minutes,
+                            tileWidth = if (isSinglePin) 18.dp else 14.dp,
+                            tileHeight = if (isSinglePin) 27.dp else 22.dp,
+                            fontSize = if (isSinglePin) 17.sp else 13.sp
+                        )
                     }
 
-                    Spacer(modifier = Modifier.height(3.dp))
+                    Spacer(modifier = Modifier.height(if (isSinglePin) 8.dp else 5.dp))
 
-                    // Bottom info: Stop Name & Direction filling full horizontal width
+                    // Stop Name
                     Text(
                         text = pin.stopName,
-                        fontSize = 10.5.sp,
-                        fontWeight = FontWeight.Bold,
+                        fontSize = if (isSinglePin) 14.sp else 12.sp,
+                        fontWeight = FontWeight.Black,
                         color = PhoneTextPrimary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+
+                    // Destination with arrow
                     if (pin.destination.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = "→ ${pin.destination}",
-                            fontSize = 9.sp,
+                            fontSize = if (isSinglePin) 12.sp else 10.5.sp,
+                            fontWeight = FontWeight.Medium,
                             color = PhoneTextMuted,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(6.dp))
             }
         }
 
         item {
-            Spacer(modifier = Modifier.height(4.dp))
             CompactChip(
                 onClick = onRefresh,
-                label = { Text("Ανανέωση 🔄", fontSize = 10.sp, color = PhoneTextPrimary, fontWeight = FontWeight.Bold) },
+                label = { Text("Ανανέωση 🔄", fontSize = 10.5.sp, color = PhoneTextPrimary, fontWeight = FontWeight.Bold) },
                 colors = ChipDefaults.chipColors(backgroundColor = WearCardBg),
-                modifier = Modifier.padding(bottom = 12.dp)
+                modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
             )
         }
     }
@@ -769,28 +794,28 @@ fun ProjectedTabScreen(
             .focusable(),
         state = listState,
         autoCentering = AutoCenteringParams(itemIndex = 0),
-        contentPadding = PaddingValues(start = 6.dp, end = 6.dp, top = 14.dp, bottom = 22.dp),
+        contentPadding = PaddingValues(start = 2.dp, end = 2.dp, top = 2.dp, bottom = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         scalingParams = ScalingLazyColumnDefaults.scalingParams(
-            edgeScale = 0.88f,
-            edgeAlpha = 0.65f,
-            minTransitionArea = 0.2f,
-            maxTransitionArea = 0.6f
+            edgeScale = 0.94f,
+            edgeAlpha = 0.85f,
+            minTransitionArea = 0.12f,
+            maxTransitionArea = 0.5f
         )
     ) {
         if (stop == null) {
             item {
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth(0.92f)
-                        .clip(RoundedCornerShape(14.dp))
+                        .fillMaxWidth(0.96f)
+                        .clip(RoundedCornerShape(16.dp))
                         .background(WearCardBg)
-                        .padding(14.dp),
+                        .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
                         text = "📡 Καμία στάση",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = PhoneTextPrimary,
                         textAlign = TextAlign.Center
@@ -798,10 +823,10 @@ fun ProjectedTabScreen(
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Πατήστε το κουμπί ⌚ στις Αφίξεις του κινητού για να μεταδώσετε ζωντανά τη στάση εδώ.",
-                        fontSize = 9.sp,
+                        fontSize = 10.sp,
                         color = PhoneTextMuted,
                         textAlign = TextAlign.Center,
-                        lineHeight = 12.sp
+                        lineHeight = 13.sp
                     )
                 }
             }
@@ -810,14 +835,14 @@ fun ProjectedTabScreen(
             item {
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth(0.94f)
+                        .fillMaxWidth(0.96f)
                         .padding(bottom = 6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
                         text = stop.name,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.ExtraBold,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Black,
                         color = PhoneTextPrimary,
                         textAlign = TextAlign.Center,
                         maxLines = 2,
@@ -825,7 +850,7 @@ fun ProjectedTabScreen(
                     )
                     Text(
                         text = if (stop.street.isNotBlank()) "→ ${stop.street} • #${stop.code}" else "Αφίξεις • #${stop.code}",
-                        fontSize = 9.5.sp,
+                        fontSize = 10.5.sp,
                         color = PhonePrimaryBlue,
                         fontWeight = FontWeight.Bold
                     )
@@ -836,7 +861,7 @@ fun ProjectedTabScreen(
                 item {
                     Text(
                         text = "Δεν υπάρχουν προγραμματισμένες αφίξεις",
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         color = PhoneTextMuted,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(14.dp),
@@ -847,11 +872,11 @@ fun ProjectedTabScreen(
                 items(arrivals) { arr ->
                     Row(
                         modifier = Modifier
-                            .fillMaxWidth(0.98f)
+                            .fillMaxWidth(0.99f)
                             .padding(vertical = 2.dp)
                             .clip(RoundedCornerShape(12.dp))
                             .background(WearCardBg)
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                            .padding(horizontal = 9.dp, vertical = 7.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -864,12 +889,12 @@ fun ProjectedTabScreen(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(6.dp))
                                     .background(PhonePrimaryPill)
-                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    .padding(horizontal = 7.dp, vertical = 2.5.dp)
                             ) {
                                 Text(
                                     text = arr.line,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Black,
                                     color = PhonePrimaryText
                                 )
                             }
@@ -877,17 +902,22 @@ fun ProjectedTabScreen(
                             if (arr.destination.isNotBlank()) {
                                 Text(
                                     text = " ${arr.destination}",
-                                    fontSize = 9.5.sp,
+                                    fontSize = 10.5.sp,
                                     color = PhoneTextMuted,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.padding(start = 4.dp)
+                                    modifier = Modifier.padding(start = 5.dp)
                                 )
                             }
                         }
 
                         // Split-Flap Arrival Display
-                        WearSplitFlapDisplay(minutes = arr.minutes)
+                        WearSplitFlapDisplay(
+                            minutes = arr.minutes,
+                            tileWidth = 14.dp,
+                            tileHeight = 22.dp,
+                            fontSize = 13.sp
+                        )
                     }
                 }
             }
@@ -896,9 +926,9 @@ fun ProjectedTabScreen(
                 Spacer(modifier = Modifier.height(4.dp))
                 CompactChip(
                     onClick = onRefresh,
-                    label = { Text("Ανανέωση 🔄", fontSize = 10.sp, color = PhoneTextPrimary, fontWeight = FontWeight.Bold) },
+                    label = { Text("Ανανέωση 🔄", fontSize = 10.5.sp, color = PhoneTextPrimary, fontWeight = FontWeight.Bold) },
                     colors = ChipDefaults.chipColors(backgroundColor = WearCardBg),
-                    modifier = Modifier.padding(bottom = 12.dp)
+                    modifier = Modifier.padding(bottom = 8.dp)
                 )
             }
         }
