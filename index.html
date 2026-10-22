@@ -66,6 +66,27 @@
       document.documentElement.classList.add('is-android-app');
     }
   </script>
+<script>
+(function() {
+  var failsafe = setTimeout(function() {
+    var splash = document.getElementById('app-splash-screen');
+    if (splash && !splash.classList.contains('splash-hidden')) {
+      console.warn('[Failsafe] Forcing splash screen dismiss after timeout');
+      splash.classList.add('splash-hidden');
+      setTimeout(function() { if (splash && splash.parentNode) splash.remove(); }, 600);
+    }
+  }, 2500);
+  window.addEventListener('load', function() {
+    setTimeout(function() {
+      var splash = document.getElementById('app-splash-screen');
+      if (splash && !splash.classList.contains('splash-hidden')) {
+        splash.classList.add('splash-hidden');
+        setTimeout(function() { if (splash && splash.parentNode) splash.remove(); }, 600);
+      }
+    }, 1800);
+  });
+})();
+</script>
 </head>
 <body>
 

@@ -108,14 +108,28 @@
     }
   });
 
-  document.addEventListener('DOMContentLoaded', () => {
-    replaceEmojisInNode(document.body);
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-      characterData: true
+  function startObserving() {
+    if (!document.body) return;
+    try {
+      replaceEmojisInNode(document.body);
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true
+      });
+    } catch (e) {
+      console.warn('Noto 3D observer init failed:', e);
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      // Defer slightly so main app init completes and splash screen fades cleanly
+      setTimeout(startObserving, 500);
     });
-  });
+  } else {
+    setTimeout(startObserving, 500);
+  }
 
   // Expose global helper if components want to format strings directly
   window.Noto3DEmoji = {

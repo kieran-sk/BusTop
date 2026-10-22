@@ -357,7 +357,7 @@ class AlarmManager {
         };
         const stopInfo = {
           StopCode: stopCodeStr,
-          StopDescr: alarm.stopName || Στάση #
+          StopDescr: alarm.stopName || `Στάση #${stopCodeStr}`
         };
         window.PinnedTrips.pinArrival(syntheticArrival, stopInfo);
       } catch (e) {
