@@ -904,6 +904,16 @@ class AppController {
       if (window.Alarms) window.Alarms.renderUI();
     }
 
+    // Settings tab selected
+    if (tabId === 'settings') {
+      this.syncBatterySaverUI();
+      this.updateOfflineCacheCount();
+      const chipCard = document.getElementById('android-live-chip-card');
+      if (chipCard && window.AndroidBridge) {
+        chipCard.style.display = 'block';
+      }
+    }
+
     this.updateBackButtonsVisibility();
 
     // Scroll to top

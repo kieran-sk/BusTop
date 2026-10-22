@@ -38,13 +38,25 @@ class PinnedTripsManager {
   syncPinsToWatch(launchWatch = false) {
     if (window.AndroidBridge) {
       try {
-        const payload = JSON.stringify(this.pinnedItems.map(p => ({
-          stopCode: p.stopCode,
-          stopName: p.stopName,
-          lineId: p.lineId,
-          destination: p.destination || p.lineDescr || '',
-          minutes: p.initialMinutes || 0
-        })));
+        const now = Date.now();
+        const payload = JSON.stringify(this.pinnedItems.map(p => {
+          const arrs = this.liveArrivals.get(p.stopCode) || [];
+          const match = this.findBestArrivalMatch(p, arrs);
+          let remMins = (match && typeof match.btime2 === 'number') 
+            ? match.btime2 
+            : (p.targetArrivalTimestamp ? Math.max(0, Math.round((p.targetArrivalTimestamp - now) / 60000)) : (p.initialMinutes || 0));
+          const isLiveArrival = match ? match.is_live : (p.isLive !== false);
+          const clockStr = (match && match.estimated_arrival_time) || p.estimatedArrivalTime || (match && match.departure_time) || p.departureTime || '';
+          return {
+            stopCode: p.stopCode,
+            stopName: p.stopName,
+            lineId: p.lineId,
+            destination: p.destination || p.lineDescr || (match ? match.destination : ''),
+            minutes: remMins,
+            isLive: !!isLiveArrival,
+            clockTime: clockStr
+          };
+        }));
         if (launchWatch && typeof window.AndroidBridge.launchPinsOnWatch === 'function') {
           window.AndroidBridge.launchPinsOnWatch(payload);
         } else if (typeof window.AndroidBridge.syncPinsWithWatch === 'function') {
@@ -292,7 +304,7 @@ class PinnedTripsManager {
         vehCode: arrival.veh_code || null,
         departureTime: arrival.departure_time || null,
         estimatedArrivalTime: arrival.estimated_arrival_time || null,
-        isLive: !!arrival.is_live,
+        isLive: (typeof arrival.is_live === 'boolean' ? arrival.is_live : (!arrival.departure_time && !!arrival.veh_code)),
         initialMinutes: Math.max(0, busMins),
         targetArrivalTimestamp,
         arrivalKey,
@@ -314,10 +326,7 @@ class PinnedTripsManager {
       const threshold = 0;
       const ringUntilDismissed = false;
 
-      // Disarm and remove any active or pending alarm for this line & stop so pinning is 100% passive
-      if (window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
-        window.Alarms.removeAlarmByStopAndLine(stopCode, lineId);
-      }
+      // Do not remove alarms when pinning (alarms and pins sync seamlessly)
 
       // Update notifications only if there are other pins with notificationEnabled: true
       this.updateLiveAndroidNotification();
@@ -538,6 +547,7 @@ class PinnedTripsManager {
 
     this.renderUI();
     this.updateLiveAndroidNotification();
+    this.syncPinsToWatch(false);
   }
 
   checkExpiredPins() {
@@ -659,6 +669,8 @@ class PinnedTripsManager {
         try {
           const dest = this.getCleanDestination(item);
           const initMins = typeof item.initialMinutes === 'number' ? item.initialMinutes : (typeof mins === 'number' ? mins : 10);
+          const isLiveArrival = match ? match.is_live : item.isLive;
+          const clockStr = (match && match.estimated_arrival_time) || item.estimatedArrivalTime || (match && match.departure_time) || item.departureTime || '';
           if (typeof window.AndroidBridge.updateLiveArrivalNotification === 'function') {
             window.AndroidBridge.updateLiveArrivalNotification(
               item.lineId,
@@ -667,7 +679,9 @@ class PinnedTripsManager {
               dest,
               item.walkMinutes || 0,
               item.stopCode,
-              initMins
+              initMins,
+              !!isLiveArrival,
+              clockStr
             );
           }
           if (typeof window.AndroidBridge.startLiveTracking === 'function') {
@@ -683,7 +697,8 @@ class PinnedTripsManager {
               initMins,
               item.vehCode || '',
               item.departureTime || '',
-              item.estimatedArrivalTime || ''
+              item.estimatedArrivalTime || '',
+              !!isLiveArrival
             );
           }
         } catch (e) {}
@@ -730,10 +745,11 @@ class PinnedTripsManager {
     return remMins > 0 ? `${hours}ʰ ${remMins}'` : `${hours}ʰ`;
   }
 
-  renderSplitFlapDigits(key, text) {
+  renderSplitFlapDigits(key, text, urgencyClass = '') {
     const chars = String(text).split('');
-    const prevChars = (this.previousDigitsMap.get(key) || '').split('');
-    if (this.previousDigitsMap.size > 100) {
+    const prev = this.previousDigitsMap.get(key) || '';
+    const prevChars = prev.split('');
+    if (this.previousDigitsMap.size > 200) {
       const oldestKey = this.previousDigitsMap.keys().next().value;
       if (oldestKey) this.previousDigitsMap.delete(oldestKey);
     }
@@ -747,12 +763,12 @@ class PinnedTripsManager {
       } else if (/[a-zA-Z\u0370-\u03ff]/.test(ch)) {
         return `<span class="flap-unit">${ch}</span>`;
       } else {
-        const changed = prevChars.length > 0 && prevChars[idx] !== ch;
+        const changed = prev.length > 0 && prevChars[idx] !== ch;
         return `<span class="flap-digit-box ${changed ? 'flap-flip' : ''}" data-digit="${ch}">${ch}</span>`;
       }
     }).join('');
 
-    return `<div class="split-flap-board">${html}</div>`;
+    return `<div class="split-flap-board ${urgencyClass}">${html}</div>`;
   }
 
   renderUI() {
@@ -847,40 +863,61 @@ class PinnedTripsManager {
               <div style="min-width: 0; flex: 1;">
                 <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                   <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: normal; overflow-wrap: normal; hyphens: none;">${item.stopName}</div>
-                  ${isActiveTracked ? `<span class="m3-badge" style="background: var(--md-sys-color-primary-container, #e0f2fe); color: var(--md-sys-color-on-primary-container, #005ac1); font-size: 0.68rem; font-weight: 800; padding: 1px 6px; border: 1px solid rgba(0, 90, 193, 0.2);">📍 Ενεργό</span>` : ''}
+                  
                 </div>
                 <div style="font-size: 0.76rem; color: var(--md-sys-color-outline); margin-top: 2px;">
                   ${item.direction ? `<strong style="color: var(--md-sys-color-primary); margin-right: 4px;">${item.direction}</strong> • ` : ''}${item.departureTime ? `<strong style="color: #475569; margin-right: 4px;">🕒 Αναχώρηση: ${item.departureTime}</strong> • ` : ''}Στάση #${item.stopCode} • <span style="color: var(--md-sys-color-primary); text-decoration: underline;">Προβολή στάσης ➜</span>
                 </div>
               </div>
             </div>
-            <div style="text-align: right; flex-shrink: 0;">
-              <span class="m3-badge" style="background: ${isLive ? 'var(--md-sys-color-primary-container, #e0f2fe)' : '#f1f5f9'}; color: ${isLive ? 'var(--md-sys-color-primary, #005ac1)' : '#475569'}; font-size: 0.72rem; font-weight: 800; padding: 2px 7px;">
-                ${isDeparted ? '🏁 Αναχώρησε' : (isLive ? `⚡ ~${formattedTime}` : (displayMinutes !== null ? `🕒 ~${formattedTime}` : (item.departureTime ? `🕒 ${item.departureTime}` : '⏳ Αναμονή')))}
-              </span>
+            <div style="text-align: right; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; justify-content: center;">
+              ${(() => {
+                const fieldKey = `pin_${item.stopCode}_${item.lineId}_${idx}`;
+                let urgencyClass = 'urgency-normal';
+                let flapText = '--';
+                if (isDeparted) {
+                  return `<span class="m3-badge" style="background: #f1f5f9; color: #64748b; font-size: 0.72rem; font-weight: 800; padding: 2px 7px;">🏁 Αναχώρησε</span>`;
+                }
+                const clockTime = (matchingArr && matchingArr.estimated_arrival_time) || item.estimatedArrivalTime || (matchingArr && matchingArr.departure_time) || item.departureTime || '';
+                if (!isLive && clockTime) {
+                  return `<span class="m3-badge" style="background: var(--md-sys-color-surface-container-high, #f1f5f9); color: var(--md-sys-color-on-surface, #0f172a); border: 1px solid var(--md-sys-color-outline-variant, #cbd5e1); font-size: 0.88rem; font-weight: 800; padding: 4px 10px; border-radius: 8px; letter-spacing: 0.5px;">🕒 ${clockTime}</span>`;
+                }
+                if (displayMinutes !== null) {
+                  if (displayMinutes <= 3) urgencyClass = 'urgency-now';
+                  else if (displayMinutes <= 10) urgencyClass = 'urgency-soon';
+                  else urgencyClass = 'urgency-normal';
+
+                  if (displayMinutes >= 60) {
+                    flapText = this.formatMinutesHuman(displayMinutes);
+                  } else {
+                    flapText = String(displayMinutes).padStart(2, '0');
+                  }
+                } else if (clockTime) {
+                  return `<span class="m3-badge" style="background: var(--md-sys-color-surface-container-high, #f1f5f9); color: var(--md-sys-color-on-surface, #0f172a); border: 1px solid var(--md-sys-color-outline-variant, #cbd5e1); font-size: 0.88rem; font-weight: 800; padding: 4px 10px; border-radius: 8px; letter-spacing: 0.5px;">🕒 ${clockTime}</span>`;
+                } else {
+                  flapText = '--:--';
+                }
+                return this.renderSplitFlapDigits(fieldKey, flapText, urgencyClass);
+              })()}
             </div>
           </div>
-          <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px dashed var(--md-sys-color-outline-variant); padding-top: 0.5rem; font-size: 0.8rem; color: var(--md-sys-color-outline); flex-wrap: wrap; gap: 0.4rem;">
-            <div>
-              🚶 <strong style="color: var(--md-sys-color-on-surface);">${walkMins}'</strong> (${walkDistanceM}μ. περπάτημα)
+          <div style="display: flex; align-items: center; justify-content: space-between; border-top: 1px dashed var(--md-sys-color-outline-variant); padding-top: 0.45rem; font-size: 0.8rem; color: var(--md-sys-color-outline);">
+            <div style="display: flex; align-items: center; gap: 0.35rem;">
+              <span>🚶 <strong style="color: var(--md-sys-color-on-surface);">${walkMins}'</strong> (${walkDistanceM}μ.)</span>
             </div>
-            <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
-              <!-- Notification toggle button -->
-              <button class="m3-btn ${isNotifOn ? 'm3-btn-primary' : 'm3-btn-tonal'}" onclick="event.stopPropagation(); window.PinnedTrips.toggleNotification('${item.id}')" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; border-radius: 9999px; gap: 4px; display: inline-flex; align-items: center;" title="Ενεργοποίηση/Απενεργοποίηση συνεχούς ειδοποίησης για αυτή την άφιξη">
-                ${isNotifOn ? '🔔 Ειδοποίηση ON' : '🔕 Ειδοποίηση OFF'}
-              </button>
-              <!-- Alarm time selection dialog button -->
-              <button class="m3-btn ${hasAlarm ? 'm3-btn-primary' : 'm3-btn-tonal'}" onclick="event.stopPropagation(); window.App.openAlarmDialog('${item.lineId}', '${item.routeCode || ''}', ${targetMinsForAlarm}, '${cleanDest}', '${item.stopCode}', '${cleanStopName}');" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; border-radius: 9999px; gap: 4px; display: inline-flex; align-items: center;" title="Ορισμός ξυπνητηριού / ειδοποίησης αντίστροφης μέτρησης">
-                ⏰ ${hasAlarm ? 'Ξυπνητήρι ON' : 'Ξυπνητήρι'}
-              </button>
-              ${!isActiveTracked ? `
-                <button class="m3-btn m3-btn-outlined" onclick="event.stopPropagation(); window.PinnedTrips.setActivePin('${item.id}')" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; border-radius: 9999px; border-color: var(--md-sys-color-primary); color: var(--md-sys-color-primary);" title="Ορισμός ως κύρια γραμμή για την ειδοποίηση Android">
-                  📍 Εστίαση
-                </button>
-              ` : ''}
-              <button class="m3-btn m3-btn-tonal" onclick="event.stopPropagation(); window.PinnedTrips.removePin('${item.id}')" style="padding: 0.25rem 0.65rem; font-size: 0.74rem; border-radius: 9999px; color: #64748b;">
-                ✕ Αφαίρεση
-              </button>
+            <div style="display: flex; gap: 0.5rem; align-items: center;">
+              <!-- Notification toggle emoji -->
+              <span onclick="event.stopPropagation(); window.PinnedTrips.toggleNotification('${item.id}')" style="cursor: pointer; font-size: 1.15rem; padding: 2px 4px; filter: ${isNotifOn ? 'none' : 'grayscale(100%) opacity(0.5)'};" title="${isNotifOn ? 'Ειδοποίηση ενεργή (πατήστε για απενεργοποίηση)' : 'Ειδοποίηση ανενεργή (πατήστε για ενεργοποίηση)'}">
+                ${isNotifOn ? '🔔' : '🔕'}
+              </span>
+              <!-- Alarm emoji dialog -->
+              <span onclick="event.stopPropagation(); window.App.openAlarmDialog('${item.lineId}', '${item.routeCode || ''}', ${targetMinsForAlarm}, '${cleanDest}', '${item.stopCode}', '${cleanStopName}');" style="cursor: pointer; font-size: 1.15rem; padding: 2px 4px; filter: ${hasAlarm ? 'none' : 'grayscale(70%) opacity(0.65)'};" title="${hasAlarm ? 'Ξυπνητήρι ενεργό' : 'Ορισμός ξυπνητηριού'}">
+                ⏰
+              </span>
+              <!-- Remove emoji (X) -->
+              <span onclick="event.stopPropagation(); window.PinnedTrips.removePin('${item.id}')" style="cursor: pointer; font-size: 1.15rem; font-weight: 800; padding: 2px 5px; color: #ef4444; line-height: 1;" title="Αφαίρεση καρφίτσας">
+                ✕
+              </span>
             </div>
           </div>
         </div>

@@ -581,6 +581,26 @@ class MainActivity : FragmentActivity() {
         }
 
         @JavascriptInterface
+        fun triggerNativeAlarm(
+            lineId: String,
+            stopName: String,
+            minutesAway: Double,
+            ringUntilDismissed: Boolean = true,
+            stopCode: String = ""
+        ) {
+            try {
+                val mins = minutesAway.toInt()
+                if (ringUntilDismissed) {
+                    AlarmRingingService.start(context, lineId, stopName, mins, stopCode)
+                } else {
+                    NotificationHelper.showBusAlarmNotification(context, lineId, stopName, mins, stopCode)
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        @JavascriptInterface
         fun dismissAlarm() {
             try {
                 AlarmRingingService.dismiss(context)

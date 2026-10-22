@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.HapticFeedbackConstants
+import android.view.WindowManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -93,12 +95,16 @@ class MainActivity : ComponentActivity() {
                 val destination = obj.optString("destination", "")
                 val mins = if (obj.has("minutes")) obj.optInt("minutes", 0) else obj.optInt("btime2", 0)
                 if (stopCode.isNotEmpty() && lineId.isNotEmpty()) {
+                    val isLive = obj.optBoolean("isLive", obj.optBoolean("is_live", true))
+                    val clockTime = obj.optString("clockTime", obj.optString("departureTime", obj.optString("departure_time", "")))
                     list.add(PinnedItem(
                         stopCode = stopCode,
                         stopName = stopName,
                         lineId = lineId,
                         destination = destination,
-                        minutes = mins
+                        minutes = mins,
+                        isLive = isLive,
+                        clockTime = clockTime
                     ))
                 }
             }
@@ -125,7 +131,9 @@ class MainActivity : ComponentActivity() {
                     val line = aObj.optString("line_id", aObj.optString("line", "BUS"))
                     val mins = if (aObj.has("btime2")) aObj.optInt("btime2", 0) else aObj.optInt("minutes", 0)
                     val dest = aObj.optString("destination", aObj.optString("route_descr", ""))
-                    arrivalsList.add(ArrivalItem(line = line, minutes = mins, destination = dest))
+                    val isLive = aObj.optBoolean("isLive", aObj.optBoolean("is_live", true))
+                    val clockTime = aObj.optString("clockTime", aObj.optString("departure_time", aObj.optString("estimated_arrival_time", "")))
+                    arrivalsList.add(ArrivalItem(line = line, minutes = mins, destination = dest, isLive = isLive, clockTime = clockTime))
                 }
             }
             val stopItem = WearStopItem(
@@ -181,12 +189,16 @@ class MainActivity : ComponentActivity() {
                         val destination = obj.optString("destination", "")
                         val mins = if (obj.has("minutes")) obj.optInt("minutes", 0) else obj.optInt("btime2", 0)
                         if (stopCode.isNotEmpty() && lineId.isNotEmpty() && list.none { it.stopCode == stopCode && it.lineId == lineId }) {
+                            val isLive = obj.optBoolean("isLive", obj.optBoolean("is_live", true))
+                            val clockTime = obj.optString("clockTime", obj.optString("departureTime", obj.optString("departure_time", "")))
                             list.add(PinnedItem(
                                 stopCode = stopCode,
                                 stopName = stopName,
                                 lineId = lineId,
                                 destination = destination,
-                                minutes = mins
+                                minutes = mins,
+                                isLive = isLive,
+                                clockTime = clockTime
                             ))
                         }
                     }
@@ -217,7 +229,9 @@ class MainActivity : ComponentActivity() {
                     val line = aObj.optString("line_id", aObj.optString("line", "BUS"))
                     val mins = if (aObj.has("btime2")) aObj.optInt("btime2", 0) else aObj.optInt("minutes", 0)
                     val dest = aObj.optString("destination", aObj.optString("route_descr", ""))
-                    arrivalsList.add(ArrivalItem(line = line, minutes = mins, destination = dest))
+                    val isLive = aObj.optBoolean("isLive", aObj.optBoolean("is_live", true))
+                    val clockTime = aObj.optString("clockTime", aObj.optString("departure_time", aObj.optString("estimated_arrival_time", "")))
+                    arrivalsList.add(ArrivalItem(line = line, minutes = mins, destination = dest, isLive = isLive, clockTime = clockTime))
                 }
             }
             return Pair(
@@ -254,8 +268,10 @@ class MainActivity : ComponentActivity() {
                         val parts = descr.split(" - ")
                         parts.lastOrNull()?.trim() ?: descr
                     } else descr
+                    val isLive = item.optBoolean("is_live", item.has("veh_code") && item.optString("veh_code").isNotBlank())
+                    val clockTime = item.optString("estimated_arrival_time", item.optString("departure_time", ""))
 
-                    list.add(ArrivalItem(line = lineId, minutes = mins, destination = dest))
+                    list.add(ArrivalItem(line = lineId, minutes = mins, destination = dest, isLive = isLive, clockTime = clockTime))
                 }
             }
         } catch (_: Exception) {}
@@ -305,7 +321,9 @@ data class WearStopItem(
 data class ArrivalItem(
     val line: String,
     val minutes: Int,
-    val destination: String = ""
+    val destination: String = "",
+    val isLive: Boolean = true,
+    val clockTime: String = ""
 )
 
 data class PinnedItem(
@@ -313,7 +331,9 @@ data class PinnedItem(
     val stopName: String,
     val lineId: String,
     val destination: String = "",
-    val minutes: Int = 0
+    val minutes: Int = 0,
+    val isLive: Boolean = true,
+    val clockTime: String = ""
 )
 
 // ─── Wear OS Dark OLED Aesthetic Theme Palette ──────────────────────────────
@@ -338,6 +358,19 @@ fun WearBusTopApp(
 ) {
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 2 })
     var pinnedList by remember { mutableStateOf<List<PinnedItem>>(emptyList()) }
+    val activity = LocalContext.current as? ComponentActivity
+
+    // Keep screen awake continuously while pinned arrivals are active
+    DisposableEffect(pinnedList.isNotEmpty()) {
+        if (pinnedList.isNotEmpty()) {
+            activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        onDispose {
+            activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+    }
     var projectedStop by remember { mutableStateOf<WearStopItem?>(null) }
     var projectedArrivals by remember { mutableStateOf<List<ArrivalItem>>(emptyList()) }
     val scope = rememberCoroutineScope()
@@ -386,8 +419,8 @@ fun WearBusTopApp(
                         val pin = updated[i]
                         if (pin.stopCode == s) {
                             val match = arrivals.firstOrNull { it.line.equals(pin.lineId, ignoreCase = true) }
-                            if (match != null && match.minutes != pin.minutes) {
-                                updated[i] = pin.copy(minutes = match.minutes)
+                            if (match != null && (match.minutes != pin.minutes || match.isLive != pin.isLive || match.clockTime != pin.clockTime)) {
+                                updated[i] = pin.copy(minutes = match.minutes, isLive = match.isLive, clockTime = match.clockTime)
                                 anyChanged = true
                             }
                         }
@@ -542,13 +575,17 @@ fun WearSplitFlapTile(
 fun WearSplitFlapDisplay(
     minutes: Int,
     modifier: Modifier = Modifier,
+    isLive: Boolean = true,
+    clockTime: String = "",
     tileWidth: androidx.compose.ui.unit.Dp = 13.dp,
     tileHeight: androidx.compose.ui.unit.Dp = 20.dp,
     fontSize: androidx.compose.ui.unit.TextUnit = 12.sp
 ) {
-    val isUrgent = minutes in 1..3
-    val isSoon = minutes in 4..10
+    val isScheduled = !isLive && clockTime.isNotBlank()
+    val isUrgent = isLive && minutes in 1..3
+    val isSoon = isLive && minutes in 4..10
     val text = when {
+        isScheduled -> clockTime
         minutes <= 0 -> "🏁"
         minutes >= 60 -> {
             val h = minutes / 60
@@ -568,12 +605,12 @@ fun WearSplitFlapDisplay(
                 char = ch,
                 isUrgent = isUrgent,
                 isSoon = isSoon,
-                tileWidth = tileWidth,
+                tileWidth = if (ch == ':') (tileWidth * 0.5f) else tileWidth,
                 tileHeight = tileHeight,
                 fontSize = fontSize
             )
         }
-        if (minutes > 0) {
+        if (!isScheduled && minutes > 0) {
             Text(
                 text = "'",
                 fontSize = fontSize,
@@ -707,12 +744,14 @@ fun PinnedTabScreen(
                             )
                         }
 
-                        // Prominent High-Visibility Split-Flap Timer
+                        // Prominent High-Visibility Split-Flap Timer (Shows expected clock time for non-live arrivals)
                         WearSplitFlapDisplay(
                             minutes = pin.minutes,
-                            tileWidth = if (isSinglePin) 18.dp else 14.dp,
+                            isLive = pin.isLive,
+                            clockTime = pin.clockTime,
+                            tileWidth = if (isSinglePin) (if (!pin.isLive && pin.clockTime.isNotBlank()) 14.dp else 18.dp) else 14.dp,
                             tileHeight = if (isSinglePin) 27.dp else 22.dp,
-                            fontSize = if (isSinglePin) 17.sp else 13.sp
+                            fontSize = if (isSinglePin) (if (!pin.isLive && pin.clockTime.isNotBlank()) 14.sp else 17.sp) else 13.sp
                         )
                     }
 
@@ -914,9 +953,11 @@ fun ProjectedTabScreen(
                         // Split-Flap Arrival Display
                         WearSplitFlapDisplay(
                             minutes = arr.minutes,
-                            tileWidth = 14.dp,
+                            isLive = arr.isLive,
+                            clockTime = arr.clockTime,
+                            tileWidth = if (!arr.isLive && arr.clockTime.isNotBlank()) 11.dp else 14.dp,
                             tileHeight = 22.dp,
-                            fontSize = 13.sp
+                            fontSize = if (!arr.isLive && arr.clockTime.isNotBlank()) 11.sp else 13.sp
                         )
                     }
                 }

@@ -45,12 +45,16 @@ class PinnedTripsManager {
           let remMins = (match && typeof match.btime2 === 'number') 
             ? match.btime2 
             : (p.targetArrivalTimestamp ? Math.max(0, Math.round((p.targetArrivalTimestamp - now) / 60000)) : (p.initialMinutes || 0));
+          const isLiveArrival = match ? match.is_live : (p.isLive !== false);
+          const clockStr = (match && match.estimated_arrival_time) || p.estimatedArrivalTime || (match && match.departure_time) || p.departureTime || '';
           return {
             stopCode: p.stopCode,
             stopName: p.stopName,
             lineId: p.lineId,
             destination: p.destination || p.lineDescr || (match ? match.destination : ''),
-            minutes: remMins
+            minutes: remMins,
+            isLive: !!isLiveArrival,
+            clockTime: clockStr
           };
         }));
         if (launchWatch && typeof window.AndroidBridge.launchPinsOnWatch === 'function') {
@@ -322,10 +326,7 @@ class PinnedTripsManager {
       const threshold = 0;
       const ringUntilDismissed = false;
 
-      // Disarm and remove any active or pending alarm for this line & stop so pinning is 100% passive
-      if (window.Alarms && typeof window.Alarms.removeAlarmByStopAndLine === 'function') {
-        window.Alarms.removeAlarmByStopAndLine(stopCode, lineId);
-      }
+      // Do not remove alarms when pinning (alarms and pins sync seamlessly)
 
       // Update notifications only if there are other pins with notificationEnabled: true
       this.updateLiveAndroidNotification();

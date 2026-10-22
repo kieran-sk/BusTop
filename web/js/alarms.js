@@ -337,6 +337,34 @@ class AlarmManager {
       window.App.triggerHaptic('success');
     }
 
+    // 4. Pin arrival and promote status chip
+    if (window.PinnedTrips) {
+      try {
+        let matchingArrival = null;
+        if (window.App && Array.isArray(window.App.currentStopArrivals)) {
+          matchingArrival = window.App.currentStopArrivals.find(a =>
+            String(a.line_id || a.LineID || '').trim().toUpperCase() === lineIdStr.toUpperCase()
+          );
+        }
+        const syntheticArrival = matchingArrival || {
+          line_id: lineIdStr,
+          LineID: lineIdStr,
+          route_code: alarm.routeCode || '',
+          route_descr: alarm.destination || '',
+          destination: alarm.destination || '',
+          btime2: Number(initialMins),
+          is_live: true
+        };
+        const stopInfo = {
+          StopCode: stopCodeStr,
+          StopDescr: alarm.stopName || Στάση #
+        };
+        window.PinnedTrips.pinArrival(syntheticArrival, stopInfo);
+      } catch (e) {
+        console.warn('Could not auto-pin arrival for alarm:', e);
+      }
+    }
+
     // Re-render departures if ticker is visible
     if (window.App && window.App.ticker) {
       window.App.ticker.render();
@@ -605,7 +633,23 @@ class AlarmManager {
     alarm.triggeredAt = Date.now();
     this.save();
 
-    // 1. Start loud audible ringing siren & vibration loop
+    if (window.AndroidBridge) {
+      // In Native Android App: Trigger native alarm & notifications, do NOT pop web dialog over UI
+      try {
+        if (typeof window.AndroidBridge.triggerNativeAlarm === 'function') {
+          window.AndroidBridge.triggerNativeAlarm(
+            String(alarm.lineId),
+            String(alarm.stopName),
+            Number(currentMinutes),
+            Boolean(alarm.ringUntilDismissed !== false),
+            String(alarm.stopCode)
+          );
+        }
+      } catch (e) {}
+      return;
+    }
+
+    // 1. Start loud audible ringing siren & vibration loop (Web/PWA only)
     this.startAlarmRinging();
 
     // 2. Regular High-Priority Push Notification via Service Worker
