@@ -91,7 +91,7 @@ object NotificationHelper {
         notificationManager.notify(notifId, notification)
     }
 
-    const val LIVE_CHANNEL_ID = "oasa_bus_live_channel_v9"
+    const val LIVE_CHANNEL_ID = "oasa_bus_live_channel_v10"
     const val LIVE_CHANNEL_NAME = "Live Bus Tracking"
     const val LIVE_NOTIF_ID = 2001
 
@@ -117,6 +117,7 @@ object NotificationHelper {
                 notificationManager.deleteNotificationChannel("oasa_bus_live_channel_v6")
                 notificationManager.deleteNotificationChannel("oasa_bus_live_channel_v7")
                 notificationManager.deleteNotificationChannel("oasa_bus_live_channel_v8")
+                notificationManager.deleteNotificationChannel("oasa_bus_live_channel_v9")
             } catch (e: Exception) {}
 
             val channel = NotificationChannel(LIVE_CHANNEL_ID, LIVE_CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH).apply {
@@ -283,6 +284,7 @@ object NotificationHelper {
             notification.extras.putString("android.template", "android.app.Notification\$BigTextStyle")
         } catch (e: Throwable) {}
 
+        notification.flags = notification.flags or Notification.FLAG_ONGOING_EVENT
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(LIVE_NOTIF_ID, notification)
     }
