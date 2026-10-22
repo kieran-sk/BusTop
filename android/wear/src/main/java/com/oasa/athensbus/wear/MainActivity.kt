@@ -371,6 +371,35 @@ fun WearBusTopApp(
         }
     }
 
+    // Live auto-refresh every 20 seconds for pinned arrivals (fetching live API per stop directly on watch)
+    LaunchedEffect(pinnedList.map { it.stopCode }.distinct()) {
+        val stops = pinnedList.map { it.stopCode }.filter { it.isNotBlank() }.distinct()
+        if (stops.isEmpty()) return@LaunchedEffect
+        while (true) {
+            delay(20_000)
+            val updated = pinnedList.toMutableList()
+            var anyChanged = false
+            for (s in stops) {
+                val arrivals = onFetchArrivals(s)
+                if (arrivals.isNotEmpty()) {
+                    for (i in updated.indices) {
+                        val pin = updated[i]
+                        if (pin.stopCode == s) {
+                            val match = arrivals.firstOrNull { it.line.equals(pin.lineId, ignoreCase = true) }
+                            if (match != null && match.minutes != pin.minutes) {
+                                updated[i] = pin.copy(minutes = match.minutes)
+                                anyChanged = true
+                            }
+                        }
+                    }
+                }
+            }
+            if (anyChanged) {
+                pinnedList = updated
+            }
+        }
+    }
+
     // Live auto-refresh every 25 seconds for the projected stop
     LaunchedEffect(projectedStop?.code) {
         val sCode = projectedStop?.code ?: return@LaunchedEffect

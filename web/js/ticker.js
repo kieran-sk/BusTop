@@ -495,25 +495,27 @@ class AirportTicker {
 
     return `
       <div class="ticker-row" onclick="if(window.App && window.App.triggerHaptic) window.App.triggerHaptic('tick'); window.App.openLineTimetableBothDirections('${arr.line_code}', '${arr.line_id}', '${safeDescr}')" title="Κλικ για προβολή πλήρους δρομολογίου και στάσεων">
-        <!-- Top Section: Arrival Counter (Top Left), Line Badge, Destination & Direction -->
-        <div class="ticker-row-top" style="align-items: center; gap: 0.65rem;">
-          <!-- Arrival Counter (Top Left) -->
-          <div class="ticker-cell-due" style="display: inline-flex; flex-direction: row; align-items: center; gap: 4px; flex-shrink: 0;" title="Εκτιμώμενος χρόνος άφιξης στη στάση">
-            ${dueDisplay}
-          </div>
-
-          <div class="ticker-cell-line">
-            <span class="ticker-line-badge">
-              ${arr.line_id}
-            </span>
-          </div>
-
-          <div class="ticker-dest-info" style="flex: 1; min-width: 0;">
-            <!-- Destination & Direction in a single clean line -->
-            <div class="ticker-dest-title-row" style="display: flex; align-items: center; gap: 6px; flex-wrap: nowrap;">
-              <span class="ticker-dest-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 800; font-size: 0.95rem;">${arr.destination || lineDescr}</span>
-              <span style="font-size: 0.95rem; line-height: 1; flex-shrink: 0;">${directionText}</span>
+        <!-- Top Section: Line Badge, Destination & Direction on Left, Arrival Counter on Top Right -->
+        <div class="ticker-row-top" style="align-items: center; justify-content: space-between; gap: 0.65rem;">
+          <div style="display: flex; align-items: center; gap: 0.65rem; flex: 1; min-width: 0;">
+            <div class="ticker-cell-line">
+              <span class="ticker-line-badge">
+                ${arr.line_id}
+              </span>
             </div>
+
+            <div class="ticker-dest-info" style="flex: 1; min-width: 0;">
+              <!-- Destination & Direction in a single clean line -->
+              <div class="ticker-dest-title-row" style="display: flex; align-items: center; gap: 6px; flex-wrap: nowrap;">
+                <span class="ticker-dest-name" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 800; font-size: 0.95rem;">${arr.destination || lineDescr}</span>
+                <span style="font-size: 0.95rem; line-height: 1; flex-shrink: 0;">${directionText}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Arrival Counter (Top Right) -->
+          <div class="ticker-cell-due" style="display: inline-flex; flex-direction: row; align-items: center; gap: 4px; flex-shrink: 0; margin-left: auto;" title="Εκτιμώμενος χρόνος άφιξης στη στάση">
+            ${dueDisplay}
           </div>
         </div>
 

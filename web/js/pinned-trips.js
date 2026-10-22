@@ -546,6 +546,7 @@ class PinnedTripsManager {
 
     this.renderUI();
     this.updateLiveAndroidNotification();
+    this.syncPinsToWatch(false);
   }
 
   checkExpiredPins() {
