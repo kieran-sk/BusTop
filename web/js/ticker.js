@@ -621,12 +621,12 @@ class AirportTicker {
 
       // Header with view switcher (Στάσεις vs Γραμμές)
       const tabSwitcherHtml = `
-        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; padding: 0.25rem 0.1rem;">
-          <div style="display: inline-flex; background: var(--md-sys-color-surface-container-high); padding: 4px; border-radius: 9999px; border: 1px solid var(--md-sys-color-outline-variant);">
-            <button class="m3-btn ${this.activeView === 'stops' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="font-size: 0.82rem; padding: 0.35rem 1rem; border-radius: 9999px; border: none; font-weight: 800; cursor: pointer;" onclick="window.App.ticker.setActiveView('stops')">
+        <div style="display: flex; justify-content: center; width: 100%; margin-bottom: 0.75rem; padding: 0 0.1rem;">
+          <div style="display: inline-flex; width: 100%; max-width: 480px; background: var(--md-sys-color-surface-container-high); padding: 4px; border-radius: 9999px; border: 1px solid var(--md-sys-color-outline-variant);">
+            <button class="m3-btn ${this.activeView === 'stops' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="flex: 1; font-size: 0.82rem; padding: 0.4rem 0.6rem; border-radius: 9999px; border: none; font-weight: 800; cursor: pointer; justify-content: center;" onclick="window.App.ticker.setActiveView('stops')">
               🚏 Στάσεις ${totalStopsCount > 0 ? `(${totalStopsCount})` : (this.isLoadingAllStops ? '(φόρτωση...)' : '')}
             </button>
-            <button class="m3-btn ${this.activeView === 'lines' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="font-size: 0.82rem; padding: 0.35rem 1rem; border-radius: 9999px; border: none; font-weight: 800; cursor: pointer;" onclick="window.App.ticker.setActiveView('lines')">
+            <button class="m3-btn ${this.activeView === 'lines' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="flex: 1; font-size: 0.82rem; padding: 0.4rem 0.6rem; border-radius: 9999px; border: none; font-weight: 800; cursor: pointer; justify-content: center;" onclick="window.App.ticker.setActiveView('lines')">
               🚌 Γραμμές ${lines.length > 0 ? `(${lines.length})` : ''}
             </button>
           </div>
@@ -750,24 +750,23 @@ class AirportTicker {
       const paginatedStops = sortedStops.slice(0, visibleLimit);
 
       const stopsTabSwitcherHtml = `
-        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; padding: 0.25rem 0.1rem;">
-          <div style="display: inline-flex; background: var(--md-sys-color-surface-container-high); padding: 4px; border-radius: 9999px; border: 1px solid var(--md-sys-color-outline-variant);">
-            <button class="m3-btn ${this.activeView === 'stops' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="font-size: 0.82rem; padding: 0.35rem 1rem; border-radius: 9999px; border: none; font-weight: 800; cursor: pointer;" onclick="window.App.ticker.setActiveView('stops')">
+        <div style="display: flex; justify-content: center; width: 100%; margin-bottom: 0.75rem; padding: 0 0.1rem;">
+          <div style="display: inline-flex; width: 100%; max-width: 480px; background: var(--md-sys-color-surface-container-high); padding: 4px; border-radius: 9999px; border: 1px solid var(--md-sys-color-outline-variant);">
+            <button class="m3-btn ${this.activeView === 'stops' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="flex: 1; font-size: 0.82rem; padding: 0.4rem 0.6rem; border-radius: 9999px; border: none; font-weight: 800; cursor: pointer; justify-content: center;" onclick="window.App.ticker.setActiveView('stops')">
               🚏 Στάσεις ${sortedStops.length > 0 ? `(${sortedStops.length})` : (this.isLoadingAllStops ? '(φόρτωση...)' : '')}
             </button>
-            <button class="m3-btn ${this.activeView === 'lines' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="font-size: 0.82rem; padding: 0.35rem 1rem; border-radius: 9999px; border: none; font-weight: 800; cursor: pointer;" onclick="window.App.ticker.setActiveView('lines')">
+            <button class="m3-btn ${this.activeView === 'lines' ? 'm3-btn-primary' : 'm3-btn-tonal'}" style="flex: 1; font-size: 0.82rem; padding: 0.4rem 0.6rem; border-radius: 9999px; border: none; font-weight: 800; cursor: pointer; justify-content: center;" onclick="window.App.ticker.setActiveView('lines')">
               🚌 Γραμμές ${lines.length > 0 ? `(${lines.length})` : ''}
             </button>
           </div>
+        </div>
 
-          <div style="display: flex; align-items: center; gap: 0.4rem;">
-            <label for="stops-sort-select" style="font-size: 0.75rem; color: #64748b; font-weight: 700;">Ταξινόμηση:</label>
-            <select id="stops-sort-select" onchange="window.App.ticker.setStopsSortBy(this.value)" style="padding: 0.25rem 0.6rem; font-size: 0.78rem; font-weight: 700; border-radius: 9999px; border: 1px solid var(--md-sys-color-outline-variant); background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface); outline: none; cursor: pointer;">
-              <option value="distance" ${sortBy === 'distance' ? 'selected' : ''}>Απόσταση</option>
-              <option value="alpha" ${sortBy === 'alpha' ? 'selected' : ''}>Αλφαβητικά</option>
-              <option value="numeric" ${sortBy === 'numeric' ? 'selected' : ''}>Κωδικός</option>
-            </select>
-          </div>
+        <div style="display: flex; justify-content: flex-start; align-items: center; margin-bottom: 0.75rem; padding: 0 0.1rem;">
+          <select id="stops-sort-select" aria-label="Ταξινόμηση στάσεων" onchange="window.App.ticker.setStopsSortBy(this.value)" style="padding: 0.3rem 0.75rem; font-size: 0.78rem; font-weight: 700; border-radius: 9999px; border: 1px solid var(--md-sys-color-outline-variant); background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface); outline: none; cursor: pointer;">
+            <option value="distance" ${sortBy === 'distance' ? 'selected' : ''}>Απόσταση</option>
+            <option value="alpha" ${sortBy === 'alpha' ? 'selected' : ''}>Αλφαβητικά</option>
+            <option value="numeric" ${sortBy === 'numeric' ? 'selected' : ''}>Κωδικός</option>
+          </select>
         </div>
       `;
 
@@ -775,9 +774,8 @@ class AirportTicker {
       if (paginatedStops.length > 0) {
         stopsContent = `
           ${stopsTabSwitcherHtml}
-          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: #64748b; margin-bottom: 0.5rem; padding: 0 0.2rem;">
-            <span>${this.stopsFilterQuery ? `Αποτελέσματα: ${sortedStops.length}` : `Σύνολο: ${sortedStops.length} στάσεις`}</span>
-            <span>Εμφάνιση ${paginatedStops.length} από ${sortedStops.length}</span>
+          <div style="display: flex; justify-content: flex-end; align-items: center; font-size: 0.75rem; color: #64748b; margin-bottom: 0.5rem; padding: 0 0.2rem;">
+            <span>${paginatedStops.length} από ${sortedStops.length}</span>
           </div>
           <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem;">
             ${paginatedStops.map(s => {
@@ -835,8 +833,11 @@ class AirportTicker {
                   ` : ''}
 
                   <div style="display: flex; justify-content: flex-end; padding-top: 2px;">
-                    <button class="m3-btn m3-btn-primary" style="font-size: 0.78rem; padding: 0.3rem 0.8rem; border-radius: 9999px; width: 100%; justify-content: center;" onclick="event.stopPropagation(); window.App.selectStop('${sCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})">
-                      Προβολή Αφίξεων ➜
+                    <button class="m3-icon-btn m3-btn-primary" title="Προβολή Αφίξεων" aria-label="Προβολή Αφίξεων" style="width: 38px; height: 38px; min-width: 38px; min-height: 38px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--md-sys-color-primary); color: #ffffff; border: none; box-shadow: 0 2px 6px rgba(0, 90, 193, 0.35); cursor: pointer;" onclick="event.stopPropagation(); window.App.selectStop('${sCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                      </svg>
                     </button>
                   </div>
                 </div>

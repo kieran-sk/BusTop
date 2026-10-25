@@ -218,9 +218,7 @@ class FavoritesManager {
             return `
               <div class="m3-card stop-interactive-card is-favourite-stop" data-stop-code="${s.code}" data-stop-title="${safeName}" data-stop-lat="${s.lat || ''}" data-stop-lng="${s.lng || ''}" style="display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.85rem 1rem; margin-bottom: 0; cursor: pointer; background: #fffdf5;" onclick="window.App.selectStop('${s.code}', '${safeName}', '${s.lat || ''}', '${s.lng || ''}')">
                 <div style="display: flex; align-items: center; gap: 0.75rem; min-width: 0; flex: 1;">
-                  <div class="m3-icon-btn" style="width: 36px; height: 36px; background: #eff6ff; color: var(--md-sys-color-primary); border: 1.5px solid #bfdbfe; flex-shrink: 0;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"></path><circle cx="12" cy="9" r="2.5"></circle></svg>
-                  </div>
+                  
                   <div style="min-width: 0; flex: 1;">
                     <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); line-height: 1.3; word-break: normal; overflow-wrap: normal; hyphens: none;">${s.name}</div>
                     <div style="font-size: 0.75rem; color: var(--md-sys-color-outline); margin-top: 2px;">#${s.code}</div>

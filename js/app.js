@@ -6,7 +6,7 @@
 
 class AppController {
   constructor() {
-    this.activeTab = 'search'; // Default to 'search' (Stops Near Me & Explorer)
+    try { this.activeTab = localStorage.getItem('OASA_ACTIVE_TAB') || 'search'; } catch (e) { this.activeTab = 'search'; }
     this.currentStop = null;
     this.currentLine = null;
     this.currentRoute = null;
@@ -403,6 +403,30 @@ class AppController {
     if (linkCloud) linkCloud.disabled = true;
   }
 
+  
+  initTopClockVisibility() {
+    try {
+      const hideClock = localStorage.getItem('OASA_HIDE_TOP_CLOCK') === 'true';
+      const clockCenter = document.querySelector('.m3-top-app-bar-center');
+      if (clockCenter) {
+        clockCenter.style.display = hideClock ? 'none' : 'flex';
+      }
+      const toggle = document.getElementById('hide-top-clock-toggle');
+      if (toggle) toggle.checked = hideClock;
+    } catch (e) {}
+  }
+
+  toggleTopClock(hide) {
+    try {
+      localStorage.setItem('OASA_HIDE_TOP_CLOCK', hide ? 'true' : 'false');
+      const clockCenter = document.querySelector('.m3-top-app-bar-center');
+      if (clockCenter) {
+        clockCenter.style.display = hide ? 'none' : 'flex';
+      }
+      this.triggerHaptic('light');
+    } catch (e) {}
+  }
+
   async init() {
     console.log('[Athens OASA Bus Suite] Initializing Material 3 Expressive & Leaflet Map in Greek...');
     if (window.AndroidBridge) {
@@ -439,8 +463,10 @@ class AppController {
       window.Search.findNearbyStops(true);
     }
 
-    // Switch to search/nearby tab as default landing view
-    this.switchTab('search');
+    // Restore saved active tab on refresh or fallback to search
+    let savedTab = 'search';
+    try { savedTab = localStorage.getItem('OASA_ACTIVE_TAB') || 'search'; } catch (e) {}
+    this.switchTab(savedTab, false);
 
     // Setup global window resize
     window.addEventListener('resize', () => {
@@ -545,6 +571,7 @@ class AppController {
 
     // Setup scroll shrinking for home map & dynamic stop highlight
     this.setupHomepageScrollEffects();
+    this.initTopClockVisibility();
 
     // Hide launch splash screen with smooth fade after initial UI stabilizes
     setTimeout(() => {
@@ -817,6 +844,7 @@ class AppController {
     }
 
     this.activeTab = tabId;
+    try { localStorage.setItem('OASA_ACTIVE_TAB', tabId); } catch (e) {}
     this.triggerHaptic('selection');
 
     // Update bottom nav bar active state

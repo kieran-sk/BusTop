@@ -371,66 +371,92 @@ body.is-android-app .m3-nav-bar {
 
 .m3-nav-pill {
   width: 48px;
-  height: 34px;
+  height: 38px;
   border-radius: var(--md-sys-shape-corner-full);
   display: flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  border: 1px solid #cbd5e1;
-  background-color: #f8fafc;
+  border: none;
+  background-color: transparent;
   color: #64748b;
-  will-change: transform, box-shadow;
-  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
-              background-color 0.2s ease,
-              border-color 0.2s ease,
-              color 0.2s ease,
-              box-shadow 0.2s ease;
+  will-change: transform, color;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+              color 0.2s ease;
   position: relative;
 }
 
 .m3-nav-icon {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
   user-select: none;
 }
 
 .m3-nav-icon svg {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   display: block;
   stroke: currentColor;
-  transition: stroke 0.15s ease, stroke-width 0.15s ease;
+  fill: none;
+  transition: stroke 0.2s ease, fill 0.2s ease, transform 0.2s ease;
 }
 
 .m3-nav-item:hover .m3-nav-pill {
-  border-color: #94a3b8;
+  border-color: transparent;
   color: #334155;
-  transform: translateY(-2px) scale(1.04);
+  transform: translateY(-1px);
 }
 
 .m3-nav-item:active .m3-nav-pill {
-  transform: scale(0.88);
+  transform: scale(0.9);
   transition-duration: 0.08s;
 }
 
+/* Active tab: Clean icon fill instead of entire button highlighting */
 .m3-nav-item.active .m3-nav-pill {
-  background-color: var(--md-sys-color-secondary-container, #d7e3f7);
-  border-color: var(--md-sys-color-primary, #005ac1);
-  color: var(--md-sys-color-primary, #005ac1);
-  box-shadow: 0 3px 8px rgba(0, 90, 193, 0.22);
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: var(--md-sys-color-primary, #005ac1) !important;
 }
 
 .m3-nav-item.active .m3-nav-icon {
-  transform: scale(1.18);
+  transform: scale(1.12);
 }
 
 .m3-nav-item.active .m3-nav-icon svg {
-  stroke-width: 2.3;
+  stroke: var(--md-sys-color-primary, #005ac1) !important;
+  fill: var(--md-sys-color-primary, #005ac1) !important;
+}
+
+/* Specific icon adjustments when filled */
+.m3-nav-item[data-tab="search"].active .m3-nav-icon svg circle {
+  fill: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+.m3-nav-item[data-tab="ticker"].active .m3-nav-icon svg line {
+  stroke: #ffffff !important;
+  stroke-width: 2.2 !important;
+}
+
+.m3-nav-item[data-tab="ticker"].active .m3-nav-icon svg circle {
+  fill: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+.m3-nav-item[data-tab="ticker"].active .m3-nav-icon svg path {
+  stroke: var(--md-sys-color-primary, #005ac1) !important;
+  stroke-width: 2.5 !important;
+}
+
+.m3-nav-item[data-tab="settings"].active .m3-nav-icon svg circle {
+  fill: #ffffff !important;
+  stroke: #ffffff !important;
 }
 
 .m3-nav-item:active .m3-nav-pill {
