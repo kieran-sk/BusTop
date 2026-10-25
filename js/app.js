@@ -348,7 +348,7 @@ class AppController {
     const badge = document.getElementById('battery-saver-badge');
     const slider = document.getElementById('battery-saver-slider');
     if (toggle) toggle.checked = enabled;
-    if (badge) badge.style.display = enabled ? 'inline-block' : 'none';
+    if (badge) badge.style.display = 'none';
     if (slider) {
       slider.style.backgroundColor = enabled ? '#10b981' : '#cbd5e1';
     }
@@ -406,22 +406,48 @@ class AppController {
   
   initTopClockVisibility() {
     try {
-      const hideClock = localStorage.getItem('OASA_HIDE_TOP_CLOCK') === 'true';
-      const clockCenter = document.querySelector('.m3-top-app-bar-center');
-      if (clockCenter) {
-        clockCenter.style.display = hideClock ? 'none' : 'flex';
-      }
+      const hideTopBar = localStorage.getItem('OASA_HIDE_TOP_CLOCK') === 'true';
+      const header = document.querySelector('.m3-top-app-bar');
+      const searchContainer = document.querySelector('.m3-search-container');
+      const slider = document.getElementById('hide-top-clock-slider');
       const toggle = document.getElementById('hide-top-clock-toggle');
-      if (toggle) toggle.checked = hideClock;
+
+      if (header) {
+        header.style.display = hideTopBar ? 'none' : 'flex';
+      }
+      if (searchContainer) {
+        if (hideTopBar) {
+          searchContainer.classList.add('topbar-hidden-search');
+        } else {
+          searchContainer.classList.remove('topbar-hidden-search');
+        }
+      }
+      if (toggle) toggle.checked = hideTopBar;
+      if (slider) {
+        slider.style.backgroundColor = hideTopBar ? '#10b981' : '#cbd5e1';
+      }
     } catch (e) {}
   }
 
   toggleTopClock(hide) {
     try {
       localStorage.setItem('OASA_HIDE_TOP_CLOCK', hide ? 'true' : 'false');
-      const clockCenter = document.querySelector('.m3-top-app-bar-center');
-      if (clockCenter) {
-        clockCenter.style.display = hide ? 'none' : 'flex';
+      const header = document.querySelector('.m3-top-app-bar');
+      const searchContainer = document.querySelector('.m3-search-container');
+      const slider = document.getElementById('hide-top-clock-slider');
+
+      if (header) {
+        header.style.display = hide ? 'none' : 'flex';
+      }
+      if (searchContainer) {
+        if (hide) {
+          searchContainer.classList.add('topbar-hidden-search');
+        } else {
+          searchContainer.classList.remove('topbar-hidden-search');
+        }
+      }
+      if (slider) {
+        slider.style.backgroundColor = hide ? '#10b981' : '#cbd5e1';
       }
       this.triggerHaptic('light');
     } catch (e) {}

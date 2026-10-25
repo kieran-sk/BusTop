@@ -118,12 +118,8 @@
     <div class="m3-top-app-bar-center" style="display: flex; justify-content: center; align-items: center; flex-shrink: 0;">
       <div class="ticker-clock" id="ticker-live-clock" title="Τρέχουσα ώρα Αθήνας">--:--:--</div>
     </div>
-    <!-- Right slot: live telemetry dot only (settings & alerts removed) -->
-    <div style="flex: 1 0 0; display: flex; align-items: center; justify-content: flex-end; gap: 0.4rem; min-width: 0; padding-right: 0.5rem;">
-      <span title="Τηλεματική Ενεργή" style="display:inline-flex;align-items:center;">
-        <span class="m3-pulse-dot" style="width:10px;height:10px;background:#059669;"></span>
-      </span>
-    </div>
+    <!-- Right slot: empty spacer (green dot removed) -->
+    <div style="flex: 1 0 0; display: flex; align-items: center; justify-content: flex-end; min-width: 0;"></div>
   </header>
 
   <!-- Offline / Connection Status Banner -->
@@ -315,10 +311,10 @@
         <div class="m3-card" style="display: flex; justify-content: space-between; align-items: center; padding: 0.85rem 1rem;">
           <div>
             <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface);">
-              <span>🕒 Απόκρυψη Ρολογιού Κορυφής</span>
+              <span>🕒 Απόκρυψη Επάνω Γραμμής (Top Bar)</span>
             </div>
             <div style="font-size: 0.75rem; color: var(--md-sys-color-outline); margin-top: 2px;">
-              Απόκρυψη της ώρας από την επάνω γραμμή εφαρμογής
+              Απόκρυψη ολόκληρης της επάνω μπάρας για μέγιστο χώρο
             </div>
           </div>
           <label style="position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; cursor: pointer;">
@@ -332,7 +328,7 @@
             <div>
               <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); display: flex; align-items: center; gap: 6px;">
                 <span>🔋 Εξοικονόμηση Μπαταρίας</span>
-                <span id="battery-saver-badge" class="m3-badge" style="display: none; background: #fef3c7; color: #b45309; font-size: 0.68rem;">ΕΝΕΡΓΗ</span>
+                
               </div>
               <div style="font-size: 0.75rem; color: var(--md-sys-color-outline); margin-top: 2px;">
                 Αραίωση ανανέωσης GPS όταν η οθόνη είναι σβηστή
@@ -566,7 +562,7 @@
             <div style="padding-right: 0.5rem;">
               <div style="font-weight: 800; font-size: 0.95rem; color: var(--md-sys-color-on-surface); display: flex; align-items: center; gap: 6px;">
                 <span>🔋 Εξοικονόμηση Μπαταρίας</span>
-                <span id="battery-saver-badge" class="m3-badge" style="display: none; background: #fef3c7; color: #b45309; font-size: 0.68rem;">ΕΝΕΡΓΗ</span>
+                
               </div>
               <div style="font-size: 0.75rem; color: var(--md-sys-color-outline); margin-top: 2px;">Αραιώνει την ανανέωση GPS (35λ) και αναστέλλει τις κλήσεις όταν η οθόνη είναι κλειστή</div>
             </div>

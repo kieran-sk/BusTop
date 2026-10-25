@@ -761,12 +761,13 @@ class AirportTicker {
           </div>
         </div>
 
-        <div style="display: flex; justify-content: flex-start; align-items: center; margin-bottom: 0.75rem; padding: 0 0.1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; padding: 0 0.2rem;">
           <select id="stops-sort-select" aria-label="Ταξινόμηση στάσεων" onchange="window.App.ticker.setStopsSortBy(this.value)" style="padding: 0.3rem 0.75rem; font-size: 0.78rem; font-weight: 700; border-radius: 9999px; border: 1px solid var(--md-sys-color-outline-variant); background: var(--md-sys-color-surface-container); color: var(--md-sys-color-on-surface); outline: none; cursor: pointer;">
             <option value="distance" ${sortBy === 'distance' ? 'selected' : ''}>Απόσταση</option>
             <option value="alpha" ${sortBy === 'alpha' ? 'selected' : ''}>Αλφαβητικά</option>
             <option value="numeric" ${sortBy === 'numeric' ? 'selected' : ''}>Κωδικός</option>
           </select>
+          <span style="font-size: 0.75rem; color: #64748b; font-weight: 600;">${paginatedStops.length} από ${sortedStops.length}</span>
         </div>
       `;
 
@@ -774,9 +775,6 @@ class AirportTicker {
       if (paginatedStops.length > 0) {
         stopsContent = `
           ${stopsTabSwitcherHtml}
-          <div style="display: flex; justify-content: flex-end; align-items: center; font-size: 0.75rem; color: #64748b; margin-bottom: 0.5rem; padding: 0 0.2rem;">
-            <span>${paginatedStops.length} από ${sortedStops.length}</span>
-          </div>
           <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.75rem;">
             ${paginatedStops.map(s => {
               const sCode = s.StopCode;
@@ -806,24 +804,34 @@ class AirportTicker {
               return `
                 <div class="m3-card stop-interactive-card ${isFav ? 'is-favourite-stop' : ''}" data-stop-code="${sCode}" data-stop-title="${safeTitle}" data-stop-lat="${s.StopLat}" data-stop-lng="${s.StopLng}" style="padding: 0.9rem; display: flex; flex-direction: column; justify-content: space-between; gap: 0.65rem; cursor: pointer; transition: transform 0.15s ease, box-shadow 0.15s ease; ${isFav ? 'background: #fffdf5;' : 'background: #ffffff;'}" onclick="window.App.selectStop('${sCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})">
                   <div>
-                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem;">
-                      <div style="font-weight: 800; font-size: 0.98rem; color: #0f172a; line-height: 1.25;">
-                        ${sTitle}
+<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 0.5rem;">
+                      <div style="flex: 1; min-width: 0;">
+                        <div style="font-weight: 800; font-size: 0.98rem; color: #0f172a; line-height: 1.25;">
+                          ${sTitle}
+                        </div>
+                        ${sStreet ? `<div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">${sStreet}</div>` : ''}
+                        ${(distText || walkText) ? `
+                          <div style="display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #0284c7; font-weight: 700; margin-top: 4px;">
+                            <span>🚶 ${distText}</span>
+                            ${walkText ? `<span>• ${walkText}</span>` : ''}
+                          </div>
+                        ` : ''}
                       </div>
-                      <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
-                        ${isFav ? '<span class="m3-badge" style="background: #fef08a; color: #854d0e; font-size: 0.72rem; font-weight: 800; padding: 2px 6px;">⭐</span>' : ''}
-                        <span class="m3-badge" style="font-size: 0.7rem; font-weight: 800; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;">
-                          #${sCode}
-                        </span>
+                      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px; flex-shrink: 0;">
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                          ${isFav ? '<span class="m3-badge" style="background: #fef08a; color: #854d0e; font-size: 0.72rem; font-weight: 800; padding: 2px 6px;">⭐</span>' : ''}
+                          <span class="m3-badge" style="font-size: 0.7rem; font-weight: 800; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;">
+                            #${sCode}
+                          </span>
+                        </div>
+                        <button class="m3-icon-btn m3-btn-primary" title="Προβολή Αφίξεων" aria-label="Προβολή Αφίξεων" style="width: 36px; height: 36px; min-width: 36px; min-height: 36px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--md-sys-color-primary); color: #ffffff; border: none; box-shadow: 0 2px 6px rgba(0, 90, 193, 0.35); cursor: pointer;" onclick="event.stopPropagation(); window.App.selectStop('${sCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})">
+                          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                          </svg>
+                        </button>
                       </div>
                     </div>
-                    ${sStreet ? `<div style="font-size: 0.75rem; color: #64748b; margin-top: 2px;">${sStreet}</div>` : ''}
-                    ${(distText || walkText) ? `
-                      <div style="display: flex; align-items: center; gap: 6px; font-size: 0.75rem; color: #0284c7; font-weight: 700; margin-top: 4px;">
-                        <span>🚶 ${distText}</span>
-                        ${walkText ? `<span>• ${walkText}</span>` : ''}
-                      </div>
-                    ` : ''}
                   </div>
 
                   ${linesPills ? `
@@ -831,15 +839,6 @@ class AirportTicker {
                       ${linesPills}
                     </div>
                   ` : ''}
-
-                  <div style="display: flex; justify-content: flex-end; padding-top: 2px;">
-                    <button class="m3-icon-btn m3-btn-primary" title="Προβολή Αφίξεων" aria-label="Προβολή Αφίξεων" style="width: 38px; height: 38px; min-width: 38px; min-height: 38px; border-radius: 50%; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--md-sys-color-primary); color: #ffffff; border: none; box-shadow: 0 2px 6px rgba(0, 90, 193, 0.35); cursor: pointer;" onclick="event.stopPropagation(); window.App.selectStop('${sCode}', '${safeTitle}', ${s.StopLat}, ${s.StopLng})">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                        <polyline points="12 5 19 12 12 19"></polyline>
-                      </svg>
-                    </button>
-                  </div>
                 </div>
               `;
             }).join('')}
