@@ -214,10 +214,14 @@ class LiveTrackingService : Service() {
 
         NotificationHelper.createLiveNotificationChannel(this)
         val initialNotif = buildLiveNotification(initialMinutes)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NotificationHelper.LIVE_NOTIF_ID, initialNotif, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-        } else {
-            startForeground(NotificationHelper.LIVE_NOTIF_ID, initialNotif)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NotificationHelper.LIVE_NOTIF_ID, initialNotif, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            } else {
+                startForeground(NotificationHelper.LIVE_NOTIF_ID, initialNotif)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
 
         startBackgroundPolling()

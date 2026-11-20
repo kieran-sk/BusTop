@@ -18,6 +18,8 @@ class AirportTicker {
     this.showAllStops = false;
     this.modeFilter = 'all'; // 'all', 'live', 'scheduled'
     this.activeView = 'stops'; // 'stops' or 'lines'
+    this.isLoadingArrivals = false;
+    this.arrivalsError = null;
     this.allLines = [];
     this.linesFilterQuery = '';
     this.allStops = [];
@@ -240,6 +242,8 @@ class AirportTicker {
   setStopLoading(stopInfo) {
     this.currentStop = stopInfo;
     this.arrivals = [];
+    this.isLoadingArrivals = true;
+    this.arrivalsError = null;
     const container = document.getElementById(this.containerId);
     if (!container) return;
 
@@ -269,6 +273,14 @@ class AirportTicker {
     }
     this.currentStop = stopInfo;
     this.arrivals = arrivals;
+    this.isLoadingArrivals = false;
+    this.arrivalsError = null;
+    this.render();
+  }
+
+  setStopError(error) {
+    this.isLoadingArrivals = false;
+    this.arrivalsError = error || true;
     this.render();
   }
 
@@ -899,16 +911,46 @@ class AirportTicker {
     }
 
     let rowsHtml = '';
-    if (this.arrivals.length === 0) {
+    if (this.isLoadingArrivals) {
       rowsHtml = `
         <div style="padding: 2.5rem 1.25rem; text-align: center; color: #64748b; font-size: 0.95rem;">
           <div class="m3-pulse-dot" style="width: 12px; height: 12px; margin: 0 auto 0.85rem; background: var(--md-sys-color-primary, #005ac1);"></div>
           <div style="font-weight: 700; color: var(--md-sys-color-on-surface, #0f172a); margin-bottom: 0.35rem; font-size: 1rem;">
-            Η σύνδεση είναι αργή και η φόρτωση βρίσκεται σε εξέλιξη...
+            Ανάκτηση αφίξεων σε πραγματικό χρόνο...
           </div>
           <div style="font-size: 0.82rem; color: #64748b; line-height: 1.4;">
-            Ανάκτηση αφίξεων και δρομολογίων σε πραγματικό χρόνο. Παρακαλώ περιμένετε.
+            Σύνδεση με τηλεματική ΟΑΣΑ. Παρακαλώ περιμένετε.
           </div>
+        </div>
+      `;
+    } else if (this.arrivalsError && this.arrivals.length === 0) {
+      rowsHtml = `
+        <div style="padding: 2.5rem 1.25rem; text-align: center; color: #64748b; font-size: 0.95rem;">
+          <div style="font-size: 2rem; margin-bottom: 0.5rem;">⚠️</div>
+          <div style="font-weight: 700; color: var(--md-sys-color-on-surface, #0f172a); margin-bottom: 0.35rem; font-size: 1rem;">
+            Προσωρινή αδυναμία σύνδεσης
+          </div>
+          <div style="font-size: 0.82rem; color: #64748b; line-height: 1.4; margin-bottom: 1rem;">
+            Δεν κατέστη δυνατή η λήψη αφίξεων αυτή τη στιγμή.
+          </div>
+          <button class="m3-btn m3-btn-primary" style="font-size: 0.85rem; padding: 0.5rem 1.2rem; border-radius: 9999px; cursor: pointer;" onclick="if(window.App){window.App.refreshStopArrivals();}">
+            🔄 Επανάληψη
+          </button>
+        </div>
+      `;
+    } else if (this.arrivals.length === 0) {
+      rowsHtml = `
+        <div style="padding: 2.5rem 1.25rem; text-align: center; color: #64748b; font-size: 0.95rem;">
+          <div style="font-size: 2rem; margin-bottom: 0.5rem;">🚏</div>
+          <div style="font-weight: 700; color: var(--md-sys-color-on-surface, #0f172a); margin-bottom: 0.35rem; font-size: 1rem;">
+            Δεν υπάρχουν προγραμματισμένες αφίξεις
+          </div>
+          <div style="font-size: 0.82rem; color: #64748b; line-height: 1.4; margin-bottom: 1rem;">
+            Δεν εντοπίστηκαν επερχόμενα δρομολόγια για την επιλεγμένη στάση.
+          </div>
+          <button class="m3-btn m3-btn-tonal" style="font-size: 0.85rem; padding: 0.4rem 1rem; border-radius: 9999px; cursor: pointer;" onclick="if(window.App){window.App.refreshStopArrivals();}">
+            🔄 Ανανέωση
+          </button>
         </div>
       `;
     } else if (this.modeFilter === 'live' && visibleArrivals.length === 0) {

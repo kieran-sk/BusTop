@@ -1294,6 +1294,9 @@ class AppController {
         connText.innerText = '⚡ Προσωρινή καθυστέρηση τηλεματικής ΟΑΣΑ: Προβολή προηγούμενων αφίξεων';
         connBanner.style.display = 'flex';
       }
+      if (this.ticker) {
+        this.ticker.setStopError(err);
+      }
     }
   }
 

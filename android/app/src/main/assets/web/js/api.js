@@ -4,7 +4,17 @@
 
 const API = {
   // Can be pointed to any hosted backend URL (e.g. Render, Railway, Localtunnel, etc.)
-  baseUrl: localStorage.getItem('OASA_API_BASE_URL') || window.location.origin,
+  baseUrl: (function() {
+    const custom = localStorage.getItem('OASA_API_BASE_URL');
+    if (custom && custom.trim().length > 0) return custom.trim();
+    if (typeof window !== 'undefined' && window.location && window.location.origin) {
+      const orig = window.location.origin;
+      if (orig.startsWith('http://') || orig.startsWith('https://')) {
+        return orig;
+      }
+    }
+    return 'https://bustop.pages.dev';
+  })(),
 
   // In-memory cache with debounced storage persist for zero main-thread freezing
   _memCache: null,
